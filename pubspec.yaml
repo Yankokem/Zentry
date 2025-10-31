@@ -1,0 +1,44 @@
+name: zentry
+description: A personal productivity app for tasks, journal, and wishlist
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.1
+
+  # UI/UX
+  google_fonts: ^6.1.0
+  flutter_svg: ^2.0.9
+
+  # Utils
+  intl: ^0.18.1
+  uuid: ^4.2.2
+
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
+  # Uncomment if you add custom fonts
+  # fonts:
+  #   - family: YourFont
+  #     fonts:
+  #       - asset: assets/fonts/YourFont-Regular.ttf
+  #       - asset: assets/fonts/YourFont-Bold.ttf
+  #         weight: 700
