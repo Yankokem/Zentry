@@ -17,22 +17,28 @@ class _LaunchScreenState extends State<LaunchScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+      ),
     );
 
     _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.8, curve: Curves.easeOutBack),
+      ),
     );
 
     _controller.forward();
 
-    // Navigate to login after 2 seconds
-    Future.delayed(const Duration(seconds: 2), () {
+    // Navigate to login after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         Navigator.pushReplacementNamed(context, AppRoutes.login);
       }
@@ -63,6 +69,13 @@ class _LaunchScreenState extends State<LaunchScreen> with SingleTickerProviderSt
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
                   child: const Icon(
                     Icons.book_outlined,
@@ -76,6 +89,7 @@ class _LaunchScreenState extends State<LaunchScreen> with SingleTickerProviderSt
                   style: Theme.of(context).textTheme.displayLarge?.copyWith(
                         color: const Color(0xFF1E1E1E),
                         fontWeight: FontWeight.bold,
+                        fontSize: 40,
                       ),
                 ),
                 const SizedBox(height: 8),
@@ -83,6 +97,7 @@ class _LaunchScreenState extends State<LaunchScreen> with SingleTickerProviderSt
                   'Your life, organized',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: const Color(0xFF1E1E1E).withOpacity(0.7),
+                        fontSize: 16,
                       ),
                 ),
               ],
