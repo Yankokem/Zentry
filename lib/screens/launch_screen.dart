@@ -164,7 +164,7 @@ class _LaunchScreenState extends State<LaunchScreen> with SingleTickerProviderSt
           ],
         ),
       ),
-    )
+      )
     );
   }
 }

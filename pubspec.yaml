@@ -13,6 +13,9 @@ dependencies:
   # State Management
   provider: ^6.1.1
 
+  # Local Storage
+  shared_preferences: ^2.2.2
+
   # UI/UX
   google_fonts: ^6.1.0
   flutter_svg: ^2.0.9

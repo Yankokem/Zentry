@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/config/constants.dart';
+import 'package:zentry/widgets/home/add_menu_widget.dart';
 
 class FloatingNavBar extends StatelessWidget {
   final int currentIndex;
@@ -65,65 +66,7 @@ class FloatingNavBar extends StatelessWidget {
   }
 
   void _showAddMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        margin: const EdgeInsets.all(AppConstants.paddingMedium),
-        padding: const EdgeInsets.all(AppConstants.paddingLarge),
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(AppConstants.radiusXL),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _AddMenuItem(
-              icon: Icons.add_task,
-              title: 'New Task',
-              subtitle: 'Add a task to your list',
-              color: Theme.of(context).primaryColor,
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to add task
-              },
-            ),
-            const SizedBox(height: 12),
-            _AddMenuItem(
-              icon: Icons.edit_note,
-              title: 'Write Journal',
-              subtitle: 'Start a new journal entry',
-              color: Theme.of(context).colorScheme.secondary,
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to journal editor
-              },
-            ),
-            const SizedBox(height: 12),
-            _AddMenuItem(
-              icon: Icons.star_rounded,
-              title: 'Add Wish',
-              subtitle: 'Add item to wishlist',
-              color: Colors.orange,
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to add wish
-              },
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
+    AddMenuWidget.show(context);
   }
 }
 
@@ -181,82 +124,8 @@ class _NavItem extends StatelessWidget {
         ),
         child: Icon(
           icon,
-          color: isSelected
-              ? Theme.of(context).primaryColor
-              : Colors.grey[400],
+          color: isSelected ? Theme.of(context).primaryColor : Colors.grey[400],
           size: 26,
-        ),
-      ),
-    );
-  }
-}
-
-class _AddMenuItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _AddMenuItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-      child: Container(
-        padding: const EdgeInsets.all(AppConstants.paddingMedium),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: const Color(0xFF1E1E1E),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.color
-                              ?.withOpacity(0.6),
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
-          ],
         ),
       ),
     );

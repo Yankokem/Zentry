@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/screens/auth/login_screen.dart';
+import 'package:zentry/screens/auth/signup_screen.dart';
 import 'package:zentry/screens/home/home_screen.dart';
 import 'package:zentry/screens/launch_screen.dart';
+import 'package:zentry/screens/profile/profile_screen.dart';
 
 class AppRoutes {
   // Route Names
@@ -38,12 +40,17 @@ class AppRoutes {
 
       case signup:
         return MaterialPageRoute(
-          builder: (_) => const Placeholder(), // Replace with SignupScreen()
+          builder: (_) => const SignupScreen(),
         );
 
       case home:
         return MaterialPageRoute(
           builder: (_) => const HomeScreen(),
+        );
+
+      case profile:
+        return MaterialPageRoute(
+          builder: (_) => const ProfileScreen(),
         );
 
       case tasks:
