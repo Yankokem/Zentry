@@ -134,8 +134,8 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 40),
 
             // Stats Cards
-            Padding(
-              padding: const EdgeInsets.symmetric(
+            const Padding(
+              padding: EdgeInsets.symmetric(
                 horizontal: AppConstants.paddingMedium,
               ),
               child: Row(
@@ -148,7 +148,7 @@ class ProfileScreen extends StatelessWidget {
                       color: Colors.green,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: _ProfileStatCard(
                       icon: Icons.book_rounded,
@@ -157,7 +157,7 @@ class ProfileScreen extends StatelessWidget {
                       color: Colors.purple,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: _ProfileStatCard(
                       icon: Icons.star_rounded,
@@ -203,7 +203,7 @@ class ProfileScreen extends StatelessWidget {
                       onChanged: (value) {
                         themeProvider.toggleTheme();
                       },
-                      activeColor: Theme.of(context).primaryColor,
+                      activeThumbColor: Theme.of(context).primaryColor,
                     ),
                   ),
 

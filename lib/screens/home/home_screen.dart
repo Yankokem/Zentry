@@ -128,8 +128,8 @@ class HomePage extends StatelessWidget {
             const SizedBox(height: 24),
 
             // Task Overview Cards - Fixed sizing
-            Padding(
-              padding: const EdgeInsets.symmetric(
+            const Padding(
+              padding: EdgeInsets.symmetric(
                   horizontal: AppConstants.paddingMedium),
               child: Row(
                 children: [
@@ -141,7 +141,7 @@ class HomePage extends StatelessWidget {
                       color: Colors.green,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: _StatCard(
                       icon: Icons.access_time_rounded,
@@ -150,7 +150,7 @@ class HomePage extends StatelessWidget {
                       color: Colors.orange,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: _StatCard(
                       icon: Icons.trending_up_rounded,
@@ -266,19 +266,19 @@ class HomePage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            _EnhancedTaskCard(
+            const _EnhancedTaskCard(
               title: 'Complete the final documentation',
               time: '10:30 AM',
               priority: 'high',
               isDone: false,
             ),
-            _EnhancedTaskCard(
+            const _EnhancedTaskCard(
               title: 'Buy groceries',
               time: '4:30 PM',
               priority: 'medium',
               isDone: false,
             ),
-            _EnhancedTaskCard(
+            const _EnhancedTaskCard(
               title: 'Call dentist',
               time: 'Tomorrow',
               priority: 'low',
@@ -315,7 +315,7 @@ class HomePage extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.paddingMedium),
-                children: [
+                children: const [
                   _WishCard(
                     title: 'New MacBook Pro',
                     price: '\$2,499',
@@ -359,7 +359,7 @@ class HomePage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            _RecentJournalCard(
+            const _RecentJournalCard(
               date: 'Nov 2, 2025',
               emoji: '😊',
               title: 'A Productive Day',
@@ -499,7 +499,7 @@ class _EnhancedTaskCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.access_time, size: 14, color: Colors.grey),
+                    const Icon(Icons.access_time, size: 14, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       time,
