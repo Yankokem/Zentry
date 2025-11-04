@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "1038744556460",
+    "project_id": "zentry-f40a0",
+    "storage_bucket": "zentry-f40a0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1038744556460:android:e41f568e504739dc4aa009",
+        "android_client_info": {
+          "package_name": "com.example.zentry"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1038744556460-shj37ippgd0ate0nin6hihp8qbonvdee.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtxxyN1gQdOvSs7zPR08tGRYsfOxbHh-E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1038744556460-shj37ippgd0ate0nin6hihp8qbonvdee.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1038744556460-lm9d4l2aqo31ojurpd4nq5hmtef2gh9m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.zentry"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

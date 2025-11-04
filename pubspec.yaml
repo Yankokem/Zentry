@@ -9,6 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  firebase_core: ^2.15.1
+  firebase_auth: ^4.6.5
+  cloud_firestore: ^4.7.3
 
   # State Management
   provider: ^6.1.1
