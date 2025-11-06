@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/config/routes.dart';
 import 'package:zentry/widgets/common/floating_nav_bar.dart';
+import 'package:zentry/screens/home/tasks_screen.dart';
+import 'package:zentry/screens/home/journal_screen.dart'; // ADD THIS IMPORT
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,7 +18,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _pages = [
     const HomePage(),
     const TasksPage(),
-    const JournalPage(),
+    const JournalPage(), // This will now use the one from journal_screen.dart
     const WishlistPage(),
   ];
 
@@ -73,7 +75,7 @@ class HomePage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '9:27',
+                            '',
                             style: Theme.of(context)
                                 .textTheme
                                 .titleLarge
@@ -127,7 +129,7 @@ class HomePage extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // Task Overview Cards - Fixed sizing
+            // Task Overview Cards
             Padding(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppConstants.paddingMedium),
@@ -374,7 +376,7 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// Enhanced Stat Card - Fixed sizing
+// Enhanced Stat Card
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final String count;
@@ -531,7 +533,7 @@ class _EnhancedTaskCard extends StatelessWidget {
   }
 }
 
-// Wish Card - Fixed price visibility
+// Wish Card
 class _WishCard extends StatelessWidget {
   final String title;
   final String price;
@@ -680,39 +682,9 @@ class _RecentJournalCard extends StatelessWidget {
   }
 }
 
-// Placeholder pages
-class TasksPage extends StatelessWidget {
-  const TasksPage({super.key});
+// REMOVE the placeholder JournalPage class - it's now imported from journal_screen.dart
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Tasks')),
-      body: const Center(child: Text('Tasks Screen - Coming Soon')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-
-class JournalPage extends StatelessWidget {
-  const JournalPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Journal')),
-      body: const Center(child: Text('Journal Screen - Coming Soon')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        child: const Icon(Icons.edit),
-      ),
-    );
-  }
-}
-
+// Keep only WishlistPage placeholder
 class WishlistPage extends StatelessWidget {
   const WishlistPage({super.key});
 
