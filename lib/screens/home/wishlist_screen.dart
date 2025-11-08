@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zentry/config/constants.dart';
-import 'package:zentry/services/journal_manager.dart';
+import 'package:zentry/services/wishlist_manager.dart';
 
-class JournalPage extends StatefulWidget {
-  const JournalPage({super.key});
+class WishlistPage extends StatefulWidget {
+  const WishlistPage({super.key});
 
   @override
-  State<JournalPage> createState() => _JournalPageState();
+  State<WishlistPage> createState() => _WishlistPageState();
 }
 
-class _JournalPageState extends State<JournalPage> {
-  bool _isSearching = false;
-  String _searchQuery = '';
-  final TextEditingController _searchController = TextEditingController();
-  final JournalManager _journalManager = JournalManager();
+class _WishlistPageState extends State<WishlistPage> {
+  final WishlistManager _manager = WishlistManager();
+  String _selectedCategory = 'all';
 
   @override
   void initState() {
@@ -27,47 +25,35 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+  List<Map<String, dynamic>> _getFilteredItems() {
+    if (_selectedCategory == 'all') return _manager.items;
+    return _manager.items.where((item) => item['category'] == _selectedCategory).toList();
   }
 
-  List<Map<String, dynamic>> _getFilteredEntries() {
-    if (_searchQuery.isEmpty) return _journalManager.entries;
-    
-    return _journalManager.entries.where((entry) {
-      return entry['title']!.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             entry['content']!.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
-  }
-
-  Color _getMoodColor(String mood) {
-    switch (mood) {
-      case 'happy':
-        return const Color(0xFFFDD835);
-      case 'sad':
+  Color _getCategoryColor(String category) {
+    switch (category) {
+      case 'tech':
         return const Color(0xFF42A5F5);
-      case 'angry':
-        return const Color(0xFFEF5350);
-      case 'excited':
-        return const Color(0xFFAB47BC);
-      case 'calm':
+      case 'travel':
         return const Color(0xFF66BB6A);
+      case 'fashion':
+        return const Color(0xFFAB47BC);
+      case 'home':
+        return const Color(0xFFFFA726);
       default:
-        return Colors.grey;
+        return const Color(0xFF78909C);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final filteredEntries = _getFilteredEntries();
+    final filteredItems = _getFilteredItems();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9ED69),
       body: Column(
         children: [
-          // Header
+          // Header - EXACTLY like journal
           Container(
             width: double.infinity,
             decoration: const BoxDecoration(
@@ -84,134 +70,82 @@ class _JournalPageState extends State<JournalPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const SizedBox.shrink(),
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(_isSearching ? Icons.close : Icons.search),
-                              color: const Color(0xFF1E1E1E),
-                              onPressed: () {
-                                setState(() {
-                                  _isSearching = !_isSearching;
-                                  if (!_isSearching) {
-                                    _searchQuery = '';
-                                    _searchController.clear();
-                                  }
-                                });
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              color: const Color(0xFF1E1E1E),
-                              onPressed: _showAddDialog,
-                            ),
-                          ],
+                        IconButton(
+                          icon: const Icon(Icons.add),
+                          color: const Color(0xFF1E1E1E),
+                          onPressed: _showAddDialog,
                         ),
                       ],
                     ),
-                    if (!_isSearching) ...[
-                      Text(
-                        'My Journal',
-                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF1E1E1E),
-                        ),
+                    Text(
+                      'My Wishlist',
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1E1E1E),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Things I want to get',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: const Color(0xFF1E1E1E).withOpacity(0.7),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E1E1E),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${_manager.items.length} items',
+                            style: const TextStyle(
+                              color: Color(0xFFF9ED69),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
                         children: [
-                          Expanded(
-                            child: Text(
-                              'Your private thoughts',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: const Color(0xFF1E1E1E).withOpacity(0.7),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E1E1E),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '${_journalManager.entries.length} entries',
-                              style: const TextStyle(
-                                color: Color(0xFFF9ED69),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
+                          _buildCategoryChip('all', 'All'),
+                          const SizedBox(width: 8),
+                          _buildCategoryChip('tech', 'Tech'),
+                          const SizedBox(width: 8),
+                          _buildCategoryChip('travel', 'Travel'),
+                          const SizedBox(width: 8),
+                          _buildCategoryChip('fashion', 'Fashion'),
+                          const SizedBox(width: 8),
+                          _buildCategoryChip('home', 'Home'),
                         ],
                       ),
-                    ] else ...[
-                      TextField(
-                        controller: _searchController,
-                        autofocus: true,
-                        style: const TextStyle(
-                          color: Color(0xFF1E1E1E),
-                          fontSize: 20,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search entries...',
-                          hintStyle: TextStyle(
-                            color: const Color(0xFF1E1E1E).withOpacity(0.5),
-                          ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
-                      ),
-                    ],
+                    ),
                   ],
                 ),
               ),
             ),
           ),
 
-          // Entries list
+          // Items list
           Expanded(
             child: Container(
               color: Colors.grey.shade100,
-              child: filteredEntries.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _searchQuery.isNotEmpty ? Icons.search_off : Icons.book_outlined,
-                            size: 80,
-                            color: Colors.grey.withOpacity(0.3),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _searchQuery.isNotEmpty ? 'No entries found' : 'No entries yet',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  color: Colors.grey,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _searchQuery.isNotEmpty 
-                                ? 'Try different keywords'
-                                : 'Tap + to write your first entry',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.grey,
-                                ),
-                          ),
-                        ],
-                      ),
-                    )
+              child: filteredItems.isEmpty
+                  ? _buildEmptyState()
                   : ListView.builder(
                       padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                      itemCount: filteredEntries.length,
+                      itemCount: filteredItems.length,
                       itemBuilder: (context, index) {
-                        return _buildEntryCard(filteredEntries[index]);
+                        return _buildWishCard(filteredItems[index]);
                       },
                     ),
             ),
@@ -221,8 +155,40 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  Widget _buildEntryCard(Map<String, dynamic> entry) {
-    final moodColor = _getMoodColor(entry['mood'] ?? 'calm');
+  Widget _buildCategoryChip(String category, String label) {
+    final isSelected = _selectedCategory == category;
+    final color = _getCategoryColor(category);
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategory = category;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color : color.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : color.withOpacity(0.3),
+            width: 2,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : color.withOpacity(0.8),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWishCard(Map<String, dynamic> item) {
+    final color = _getCategoryColor(item['category']);
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -230,19 +196,19 @@ class _JournalPageState extends State<JournalPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: moodColor.withOpacity(0.3),
+          color: color.withOpacity(0.3),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: moodColor.withOpacity(0.1),
+            color: color.withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: InkWell(
-        onTap: () => _showDetail(entry),
+        onTap: () => _showItemDetails(item),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -255,7 +221,7 @@ class _JournalPageState extends State<JournalPage> {
                     width: 4,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: moodColor,
+                      color: color,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -265,7 +231,7 @@ class _JournalPageState extends State<JournalPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          entry['title']!,
+                          item['title'],
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -276,7 +242,7 @@ class _JournalPageState extends State<JournalPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          entry['date']!,
+                          item['dateAdded'],
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey.shade600,
@@ -288,13 +254,13 @@ class _JournalPageState extends State<JournalPage> {
                   IconButton(
                     icon: const Icon(Icons.more_vert, size: 20),
                     color: Colors.grey.shade600,
-                    onPressed: () => _showOptions(entry),
+                    onPressed: () => _showOptionsMenu(item),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               Text(
-                entry['content']!,
+                item['notes'],
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey.shade700,
@@ -309,27 +275,27 @@ class _JournalPageState extends State<JournalPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: moodColor.withOpacity(0.2),
+                      color: color.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      (entry['mood'] ?? 'calm').toUpperCase(),
+                      '\$${item['price']}',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: moodColor.withOpacity(0.8),
+                        color: color.withOpacity(0.8),
                       ),
                     ),
                   ),
                   const Spacer(),
                   Icon(
-                    Icons.access_time,
+                    Icons.category,
                     size: 14,
                     color: Colors.grey.shade600,
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    entry['time']!,
+                    item['category'].toUpperCase(),
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -344,8 +310,37 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  void _showDetail(Map<String, dynamic> entry) {
-    final moodColor = _getMoodColor(entry['mood'] ?? 'calm');
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.card_giftcard,
+            size: 80,
+            color: Colors.grey.withOpacity(0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No items yet',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.grey,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tap + to add your first wish',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showItemDetails(Map<String, dynamic> item) {
+    final color = _getCategoryColor(item['category']);
     
     showModalBottomSheet(
       context: context,
@@ -362,7 +357,7 @@ class _JournalPageState extends State<JournalPage> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: moodColor.withOpacity(0.2),
+                color: color.withOpacity(0.2),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
@@ -372,7 +367,7 @@ class _JournalPageState extends State<JournalPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          entry['title']!,
+                          item['title'],
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -391,15 +386,15 @@ class _JournalPageState extends State<JournalPage> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: moodColor.withOpacity(0.3),
+                          color: color.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          (entry['mood'] ?? 'calm').toUpperCase(),
+                          item['category'].toUpperCase(),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: moodColor.withOpacity(0.9),
+                            color: color.withOpacity(0.9),
                           ),
                         ),
                       ),
@@ -407,17 +402,17 @@ class _JournalPageState extends State<JournalPage> {
                       Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
-                        entry['date']!,
+                        item['dateAdded'],
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                      Icon(Icons.attach_money, size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
-                        entry['time']!,
+                        '\$${item['price']}',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
@@ -431,13 +426,25 @@ class _JournalPageState extends State<JournalPage> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
-                child: Text(
-                  entry['content']!,
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 1.6,
-                    color: Colors.grey.shade800,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Notes',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      item['notes'],
+                      style: TextStyle(
+                        fontSize: 16,
+                        height: 1.6,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -459,7 +466,7 @@ class _JournalPageState extends State<JournalPage> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        _showEditDialog(entry);
+                        _showEditDialog(item);
                       },
                       icon: const Icon(Icons.edit),
                       label: const Text('Edit'),
@@ -475,7 +482,7 @@ class _JournalPageState extends State<JournalPage> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        _confirmDelete(entry);
+                        _confirmDelete(item);
                       },
                       icon: const Icon(Icons.delete),
                       label: const Text('Delete'),
@@ -495,7 +502,7 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  void _showOptions(Map<String, dynamic> entry) {
+  void _showOptionsMenu(Map<String, dynamic> item) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -522,7 +529,7 @@ class _JournalPageState extends State<JournalPage> {
               title: const Text('Edit'),
               onTap: () {
                 Navigator.pop(context);
-                _showEditDialog(entry);
+                _showEditDialog(item);
               },
             ),
             ListTile(
@@ -530,7 +537,7 @@ class _JournalPageState extends State<JournalPage> {
               title: const Text('Delete'),
               onTap: () {
                 Navigator.pop(context);
-                _confirmDelete(entry);
+                _confirmDelete(item);
               },
             ),
             const SizedBox(height: 20),
@@ -540,11 +547,11 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  void _confirmDelete(Map<String, dynamic> entry) {
+  void _confirmDelete(Map<String, dynamic> item) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Entry'),
+        title: const Text('Delete Item'),
         content: const Text('Are you sure? This cannot be undone.'),
         actions: [
           TextButton(
@@ -554,11 +561,11 @@ class _JournalPageState extends State<JournalPage> {
           ElevatedButton(
             onPressed: () {
               setState(() {
-                _journalManager.removeEntry(entry);
+                _manager.removeItem(item);
               });
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Entry deleted')),
+                const SnackBar(content: Text('Item deleted')),
               );
             },
             style: ElevatedButton.styleFrom(
@@ -574,18 +581,19 @@ class _JournalPageState extends State<JournalPage> {
 
   void _showAddDialog() {
     final titleController = TextEditingController();
-    final contentController = TextEditingController();
-    String selectedMood = 'happy';
+    final priceController = TextEditingController();
+    final notesController = TextEditingController();
+    String selectedCategory = 'tech';
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final moodColor = _getMoodColor(selectedMood);
+          final color = _getCategoryColor(selectedCategory);
           
           return AlertDialog(
             backgroundColor: Colors.white,
-            title: const Text('New Entry'),
+            title: const Text('New Item'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -593,10 +601,10 @@ class _JournalPageState extends State<JournalPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: moodColor.withOpacity(0.1),
+                      color: color.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: moodColor.withOpacity(0.3),
+                        color: color.withOpacity(0.3),
                         width: 1,
                       ),
                     ),
@@ -604,7 +612,7 @@ class _JournalPageState extends State<JournalPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'How are you feeling?',
+                          'Category',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -615,20 +623,17 @@ class _JournalPageState extends State<JournalPage> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _buildMoodChip('happy', 'Happy', selectedMood, (mood) {
-                              setDialogState(() => selectedMood = mood);
+                            _buildCategoryChipDialog('tech', 'Tech', selectedCategory, (category) {
+                              setDialogState(() => selectedCategory = category);
                             }),
-                            _buildMoodChip('sad', 'Sad', selectedMood, (mood) {
-                              setDialogState(() => selectedMood = mood);
+                            _buildCategoryChipDialog('travel', 'Travel', selectedCategory, (category) {
+                              setDialogState(() => selectedCategory = category);
                             }),
-                            _buildMoodChip('angry', 'Angry', selectedMood, (mood) {
-                              setDialogState(() => selectedMood = mood);
+                            _buildCategoryChipDialog('fashion', 'Fashion', selectedCategory, (category) {
+                              setDialogState(() => selectedCategory = category);
                             }),
-                            _buildMoodChip('excited', 'Excited', selectedMood, (mood) {
-                              setDialogState(() => selectedMood = mood);
-                            }),
-                            _buildMoodChip('calm', 'Calm', selectedMood, (mood) {
-                              setDialogState(() => selectedMood = mood);
+                            _buildCategoryChipDialog('home', 'Home', selectedCategory, (category) {
+                              setDialogState(() => selectedCategory = category);
                             }),
                           ],
                         ),
@@ -639,29 +644,38 @@ class _JournalPageState extends State<JournalPage> {
                   TextField(
                     controller: titleController,
                     decoration: InputDecoration(
-                      labelText: 'Title',
+                      labelText: 'Item Name',
                       border: const OutlineInputBorder(),
-                      fillColor: Colors.white,
-                      filled: true,
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: moodColor, width: 2),
+                        borderSide: BorderSide(color: color, width: 2),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
-                    controller: contentController,
+                    controller: priceController,
+                    keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      labelText: 'What\'s on your mind?',
+                      labelText: 'Price',
+                      prefixText: '\$ ',
                       border: const OutlineInputBorder(),
-                      alignLabelWithHint: true,
-                      fillColor: Colors.white,
-                      filled: true,
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: moodColor, width: 2),
+                        borderSide: BorderSide(color: color, width: 2),
                       ),
                     ),
-                    maxLines: 6,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: notesController,
+                    decoration: InputDecoration(
+                      labelText: 'Notes',
+                      border: const OutlineInputBorder(),
+                      alignLabelWithHint: true,
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: color, width: 2),
+                      ),
+                    ),
+                    maxLines: 3,
                   ),
                 ],
               ),
@@ -673,24 +687,24 @@ class _JournalPageState extends State<JournalPage> {
               ),
               ElevatedButton(
                 onPressed: () {
-                  if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
+                  if (titleController.text.isNotEmpty && priceController.text.isNotEmpty) {
                     setState(() {
-                      _journalManager.addEntry({
+                      _manager.addItem({
                         'title': titleController.text,
-                        'content': contentController.text,
-                        'date': _getCurrentDate(),
-                        'time': _getCurrentTime(),
-                        'mood': selectedMood,
+                        'price': priceController.text,
+                        'category': selectedCategory,
+                        'notes': notesController.text.isEmpty ? 'No notes' : notesController.text,
+                        'dateAdded': _getCurrentDate(),
                       });
                     });
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Entry added')),
+                      const SnackBar(content: Text('Item added')),
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: moodColor,
+                  backgroundColor: color,
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('Add'),
@@ -702,26 +716,26 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  Widget _buildMoodChip(String mood, String label, String selectedMood, Function(String) onTap) {
-    final isSelected = selectedMood == mood;
-    final moodColor = _getMoodColor(mood);
+  Widget _buildCategoryChipDialog(String category, String label, String selectedCategory, Function(String) onTap) {
+    final isSelected = selectedCategory == category;
+    final color = _getCategoryColor(category);
     
     return GestureDetector(
-      onTap: () => onTap(mood),
+      onTap: () => onTap(category),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? moodColor : moodColor.withOpacity(0.2),
+          color: isSelected ? color : color.withOpacity(0.2),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? moodColor : moodColor.withOpacity(0.3),
+            color: isSelected ? color : color.withOpacity(0.3),
             width: 2,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : moodColor.withOpacity(0.8),
+            color: isSelected ? Colors.white : color.withOpacity(0.8),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             fontSize: 14,
           ),
@@ -730,20 +744,21 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  void _showEditDialog(Map<String, dynamic> entry) {
-    final titleController = TextEditingController(text: entry['title']);
-    final contentController = TextEditingController(text: entry['content']);
-    String selectedMood = entry['mood'] ?? 'happy';
+  void _showEditDialog(Map<String, dynamic> item) {
+    final titleController = TextEditingController(text: item['title']);
+    final priceController = TextEditingController(text: item['price']);
+    final notesController = TextEditingController(text: item['notes']);
+    String selectedCategory = item['category'];
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final moodColor = _getMoodColor(selectedMood);
+          final color = _getCategoryColor(selectedCategory);
           
           return AlertDialog(
             backgroundColor: Colors.white,
-            title: const Text('Edit Entry'),
+            title: const Text('Edit Item'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -751,10 +766,10 @@ class _JournalPageState extends State<JournalPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: moodColor.withOpacity(0.1),
+                      color: color.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: moodColor.withOpacity(0.3),
+                        color: color.withOpacity(0.3),
                         width: 1,
                       ),
                     ),
@@ -762,7 +777,7 @@ class _JournalPageState extends State<JournalPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'How are you feeling?',
+                          'Category',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -773,20 +788,17 @@ class _JournalPageState extends State<JournalPage> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _buildMoodChip('happy', 'Happy', selectedMood, (mood) {
-                              setDialogState(() => selectedMood = mood);
+                            _buildCategoryChipDialog('tech', 'Tech', selectedCategory, (category) {
+                              setDialogState(() => selectedCategory = category);
                             }),
-                            _buildMoodChip('sad', 'Sad', selectedMood, (mood) {
-                              setDialogState(() => selectedMood = mood);
+                            _buildCategoryChipDialog('travel', 'Travel', selectedCategory, (category) {
+                              setDialogState(() => selectedCategory = category);
                             }),
-                            _buildMoodChip('angry', 'Angry', selectedMood, (mood) {
-                              setDialogState(() => selectedMood = mood);
+                            _buildCategoryChipDialog('fashion', 'Fashion', selectedCategory, (category) {
+                              setDialogState(() => selectedCategory = category);
                             }),
-                            _buildMoodChip('excited', 'Excited', selectedMood, (mood) {
-                              setDialogState(() => selectedMood = mood);
-                            }),
-                            _buildMoodChip('calm', 'Calm', selectedMood, (mood) {
-                              setDialogState(() => selectedMood = mood);
+                            _buildCategoryChipDialog('home', 'Home', selectedCategory, (category) {
+                              setDialogState(() => selectedCategory = category);
                             }),
                           ],
                         ),
@@ -797,29 +809,38 @@ class _JournalPageState extends State<JournalPage> {
                   TextField(
                     controller: titleController,
                     decoration: InputDecoration(
-                      labelText: 'Title',
+                      labelText: 'Item Name',
                       border: const OutlineInputBorder(),
-                      fillColor: Colors.white,
-                      filled: true,
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: moodColor, width: 2),
+                        borderSide: BorderSide(color: color, width: 2),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
-                    controller: contentController,
+                    controller: priceController,
+                    keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      labelText: 'Content',
+                      labelText: 'Price',
+                      prefixText: '\$ ',
                       border: const OutlineInputBorder(),
-                      alignLabelWithHint: true,
-                      fillColor: Colors.white,
-                      filled: true,
                       focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: moodColor, width: 2),
+                        borderSide: BorderSide(color: color, width: 2),
                       ),
                     ),
-                    maxLines: 6,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: notesController,
+                    decoration: InputDecoration(
+                      labelText: 'Notes',
+                      border: const OutlineInputBorder(),
+                      alignLabelWithHint: true,
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: color, width: 2),
+                      ),
+                    ),
+                    maxLines: 3,
                   ),
                 ],
               ),
@@ -831,20 +852,21 @@ class _JournalPageState extends State<JournalPage> {
               ),
               ElevatedButton(
                 onPressed: () {
-                  if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
+                  if (titleController.text.isNotEmpty && priceController.text.isNotEmpty) {
                     setState(() {
-                      entry['title'] = titleController.text;
-                      entry['content'] = contentController.text;
-                      entry['mood'] = selectedMood;
+                      item['title'] = titleController.text;
+                      item['price'] = priceController.text;
+                      item['category'] = selectedCategory;
+                      item['notes'] = notesController.text;
                     });
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Entry updated')),
+                      const SnackBar(content: Text('Item updated')),
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: moodColor,
+                  backgroundColor: color,
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('Save'),
@@ -860,13 +882,5 @@ class _JournalPageState extends State<JournalPage> {
     final now = DateTime.now();
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
-  }
-
-  String _getCurrentTime() {
-    final now = DateTime.now();
-    final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
-    final minute = now.minute.toString().padLeft(2, '0');
-    final period = now.hour >= 12 ? 'PM' : 'AM';
-    return '$hour:$minute $period';
   }
 }

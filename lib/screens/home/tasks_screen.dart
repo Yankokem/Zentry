@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zentry/config/constants.dart';
+import 'package:zentry/services/task_manager.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({super.key});
@@ -14,6 +15,7 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
   String _searchQuery = '';
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
+  final TaskManager _taskManager = TaskManager();
   
   @override
   void initState() {
@@ -35,8 +37,8 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
   }
 
   List<Map<String, dynamic>> _getFilteredTasks() {
-    if (_searchQuery.isEmpty) return _allTasks;
-    return _allTasks.where((task) {
+    if (_searchQuery.isEmpty) return _taskManager.tasks;
+    return _taskManager.tasks.where((task) {
       return task['title']!.toLowerCase().contains(_searchQuery.toLowerCase()) ||
              (task['description'] != null && 
               task['description']!.toLowerCase().contains(_searchQuery.toLowerCase()));
@@ -120,7 +122,7 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              '${_allTasks.where((t) => !t['isDone']!).length} active',
+                              '${_taskManager.tasks.where((t) => !t['isDone']!).length} active',
                               style: const TextStyle(
                                 color: Color(0xFFF9ED69),
                                 fontWeight: FontWeight.bold,
@@ -395,7 +397,7 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
         ),
         onDismissed: (_) {
           setState(() {
-            _allTasks.remove(task);
+            _taskManager.removeTask(task);
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -404,7 +406,7 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
                 label: 'UNDO',
                 onPressed: () {
                   setState(() {
-                    _allTasks.add(task);
+                    _taskManager.addTask(task);
                   });
                 },
               ),
@@ -507,6 +509,26 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
                               ),
                             ),
                           ),
+                          if (task['assignedTo'] != null) ...[
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.person,
+                              size: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
+                                task['assignedTo']!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
@@ -585,6 +607,10 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
             _buildDetailRow(Icons.access_time, 'Time', task['time']!),
             const SizedBox(height: 16),
             _buildDetailRow(Icons.flag_outlined, 'Priority', task['priority']!.toUpperCase()),
+            if (task['assignedTo'] != null) ...[
+              const SizedBox(height: 16),
+              _buildDetailRow(Icons.person_outline, 'Assigned To', task['assignedTo']!),
+            ],
             if (task['description'] != null) ...[
               const SizedBox(height: 16),
               _buildDetailRow(Icons.description_outlined, 'Description', task['description']!),
@@ -663,6 +689,7 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
   void _showEditTaskDialog(Map<String, dynamic> task) {
     final titleController = TextEditingController(text: task['title']);
     final descController = TextEditingController(text: task['description'] ?? '');
+    final assignedToController = TextEditingController(text: task['assignedTo'] ?? '');
     String selectedPriority = task['priority']!;
     String selectedTime = task['time']!;
 
@@ -690,6 +717,15 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: assignedToController,
+                  decoration: const InputDecoration(
+                    labelText: 'Assigned To (optional)',
+                    border: OutlineInputBorder(),
+                    hintText: 'Leave empty for personal task',
+                  ),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
@@ -720,7 +756,6 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
                   readOnly: true,
                   onTap: () async {
                     if (selectedTime == 'Tomorrow') {
-                      // Keep as Tomorrow
                       return;
                     }
                     final time = await showTimePicker(
@@ -748,6 +783,7 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
                   setState(() {
                     task['title'] = titleController.text;
                     task['description'] = descController.text.isEmpty ? null : descController.text;
+                    task['assignedTo'] = assignedToController.text.isEmpty ? null : assignedToController.text;
                     task['time'] = selectedTime;
                     task['priority'] = selectedPriority;
                   });
@@ -768,6 +804,7 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
   void _showAddTaskDialog() {
     final titleController = TextEditingController();
     final descController = TextEditingController();
+    final assignedToController = TextEditingController();
     String selectedPriority = 'medium';
     TimeOfDay selectedTime = TimeOfDay.now();
 
@@ -795,6 +832,15 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: assignedToController,
+                  decoration: const InputDecoration(
+                    labelText: 'Assigned To (optional)',
+                    border: OutlineInputBorder(),
+                    hintText: 'Leave empty for personal task',
+                  ),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
@@ -843,9 +889,10 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
               onPressed: () {
                 if (titleController.text.isNotEmpty) {
                   setState(() {
-                    _allTasks.add({
+                    _taskManager.addTask({
                       'title': titleController.text,
                       'description': descController.text.isEmpty ? null : descController.text,
+                      'assignedTo': assignedToController.text.isEmpty ? null : assignedToController.text,
                       'time': selectedTime.format(context),
                       'priority': selectedPriority,
                       'isDone': false,
@@ -864,71 +911,4 @@ class _TasksPageState extends State<TasksPage> with SingleTickerProviderStateMix
       ),
     );
   }
-
-  // Sample data
-  final List<Map<String, dynamic>> _allTasks = [
-    {
-      'title': 'Complete the final documentation',
-      'description': 'Complete slides and practice delivery',
-      'time': '10:30 AM',
-      'priority': 'high',
-      'isDone': false,
-    },
-    {
-      'title': 'Team meeting preparation',
-      'description': 'Prepare agenda and materials',
-      'time': '2:00 PM',
-      'priority': 'medium',
-      'isDone': false,
-    },
-    {
-      'title': 'Code review - Feature branch',
-      'description': 'Review authentication module',
-      'time': '11:00 AM',
-      'priority': 'low',
-      'isDone': false,
-    },
-    {
-      'title': 'Update project roadmap',
-      'description': 'Q4 planning and milestones',
-      'time': '3:30 PM',
-      'priority': 'medium',
-      'isDone': false,
-    },
-    {
-      'title': 'Client call',
-      'description': 'Discuss requirements and timeline',
-      'time': '4:00 PM',
-      'priority': 'high',
-      'isDone': false,
-    },
-    {
-      'title': 'Buy groceries',
-      'description': 'Milk, eggs, bread, vegetables',
-      'time': 'Tomorrow',
-      'priority': 'medium',
-      'isDone': false,
-    },
-    {
-      'title': 'Call dentist',
-      'description': null,
-      'time': 'Tomorrow',
-      'priority': 'low',
-      'isDone': false,
-    },
-    {
-      'title': 'Workout session',
-      'description': 'Gym - upper body routine',
-      'time': '6:00 AM',
-      'priority': 'medium',
-      'isDone': true,
-    },
-    {
-      'title': 'Review code changes',
-      'description': 'Check pull requests from team',
-      'time': '10:00 AM',
-      'priority': 'high',
-      'isDone': true,
-    },
-  ];
 }
