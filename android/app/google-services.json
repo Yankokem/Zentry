@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "1038744556460-o47i4dnojgpeevnefeib2sicgkiiai7e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.zentry",
+            "certificate_hash": "1e627722a997d95806136a80d53a85f966c9d04b"
+          }
+        },
+        {
           "client_id": "1038744556460-shj37ippgd0ate0nin6hihp8qbonvdee.apps.googleusercontent.com",
           "client_type": 3
         }

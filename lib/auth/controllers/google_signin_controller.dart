@@ -13,7 +13,78 @@ class GoogleSignInController with ChangeNotifier {
   bool get isLoading => _isLoading;
   String get errorMessage => _errorMessage;
 
-  // Handle Google Sign-In
+  // Check if user exists in Firestore by email
+  Future<bool> checkIfUserExists(String email) async {
+    try {
+      return await _firestoreService.userExistsByEmail(email);
+    } catch (e) {
+      print('Error checking if user exists: $e');
+      return false;
+    }
+  }
+
+  // Handle Google Sign-In for signup (with existing account check)
+  Future<Map<String, dynamic>> signUpWithGoogleAndCheckExisting() async {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      print('Starting Google Sign-In process for signup...');
+
+      // Call AuthService to handle Google sign-in
+      final UserCredential userCredential = await _authService.signInWithGoogle();
+      final User? user = userCredential.user;
+
+      if (user == null) {
+        _errorMessage = 'Google sign-in failed. Please try again.';
+        _isLoading = false;
+        notifyListeners();
+        return {'success': false, 'userExists': false};
+      }
+
+      print('Google Sign-In successful for: ${user.email}');
+
+      // Check if user already exists in Firestore
+      final userExists = await _firestoreService.userExistsByEmail(user.email ?? '');
+      
+      if (userExists) {
+        print('User already exists: ${user.email}');
+        _isLoading = false;
+        _errorMessage = '';
+        notifyListeners();
+        return {
+          'success': true,
+          'userExists': true,
+          'user': user,
+          'message': 'Google Account already exists. Sign in with this account?'
+        };
+      }
+
+      // Create new user document in Firestore (user doesn't exist)
+      await _firestoreService.createGoogleUserDocument(user);
+
+      print('User document created in Firestore');
+
+      _isLoading = false;
+      _errorMessage = '';
+      notifyListeners();
+      return {
+        'success': true,
+        'userExists': false,
+        'user': user,
+        'message': 'Account created successfully!'
+      };
+    } catch (e) {
+      _errorMessage = _parseAuthError(e.toString());
+      print('Google Sign-In error: $e');
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'userExists': false, 'error': e.toString()};
+    }
+  }
+
+  // Handle Google Sign-In (legacy method for login page)
   Future<bool> signInWithGoogle() async {
     _isLoading = true;
     _errorMessage = '';
@@ -81,5 +152,16 @@ class GoogleSignInController with ChangeNotifier {
   void clearError() {
     _errorMessage = '';
     notifyListeners();
+  }
+
+  // Sign out from Google and Firebase
+  Future<void> signOut() async {
+    try {
+      await _authService.signOut();
+      print('User signed out successfully');
+    } catch (e) {
+      print('Error signing out: $e');
+      throw Exception('Failed to sign out: $e');
+    }
   }
 }

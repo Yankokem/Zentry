@@ -293,27 +293,56 @@ class _SignupScreenState extends State<SignupScreen> {
                 ListenableBuilder(
                   listenable: _googleController,
                   builder: (context, child) {
-                    return OutlinedButton.icon(
-                      onPressed: _googleController.isLoading
-                          ? null
-                          : _handleGoogleSignUp,
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        side: BorderSide(
-                          color: Theme.of(context).primaryColor,
-                          width: 2,
+                    return Container(
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: OutlinedButton.icon(
+                        onPressed: _googleController.isLoading
+                            ? null
+                            : _handleGoogleSignUp,
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          side: BorderSide.none,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        icon: _googleController.isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'G',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                        label: Text(
+                          _googleController.isLoading
+                              ? 'Signing up...'
+                              : 'Continue with Google',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                      icon: _googleController.isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.g_mobiledata, size: 28),
-                      label: Text(_googleController.isLoading
-                          ? 'Signing up...'
-                          : 'Continue with Google'),
                     );
                   },
                 ),

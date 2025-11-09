@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -56,8 +56,9 @@ class AuthService {
   Future<UserCredential> signInWithGoogle() async {
     try {
       print('Google Sign-In: Starting authentication flow...');
+      print('Google Sign-In: Platform = ${defaultTargetPlatform.name}');
       
-      // For web platform, use Firebase popup (simpler, no OAuth consent screen needed)
+      // For web platform, use Firebase popup
       if (kIsWeb) {
         print('Google Sign-In: Using Firebase popup for web...');
         GoogleAuthProvider googleProvider = GoogleAuthProvider();
@@ -81,8 +82,8 @@ class AuthService {
         return userCredential;
       }
       
-      // For mobile/desktop platforms, use google_sign_in package
-      print('Google Sign-In: Using google_sign_in package for mobile/desktop...');
+      // For mobile and desktop platforms, use google_sign_in package
+      print('Google Sign-In: Using google_sign_in package for ${defaultTargetPlatform.name}...');
       
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -105,7 +106,13 @@ class AuthService {
       // Check if tokens are null
       if (googleAuth.idToken == null) {
         print('Google Sign-In: Missing ID token!');
-        throw Exception('Failed to get Google ID token. Please check Firebase Console configuration.');
+        String platformMessage = '';
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          platformMessage = '\n\nAndroid: Ensure SHA-1 certificate is added to Firebase Console';
+        } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+          platformMessage = '\n\niOS: Ensure Bundle ID matches Firebase Console configuration';
+        }
+        throw Exception('Failed to get Google ID token. Check Firebase Console configuration.$platformMessage');
       }
 
       // Create a new credential

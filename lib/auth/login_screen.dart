@@ -92,14 +92,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   icon: const Icon(Icons.arrow_back, color: Colors.black),
                   onPressed: () => Navigator.pop(context),
                 ),
-                title: const Text(
-                  'Zentry',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
                 centerTitle: true,
               ),
               Expanded(
@@ -125,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         
                         // Welcome Back
                         const Text(
-                          'Welcome Back',
+                          'Zentry',
                           style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
@@ -135,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Sign in to continue your journey wewo',
+                          'Sign in to continue your journey.',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.black87,
@@ -162,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _controller.emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: const InputDecoration(
-                              hintText: '@email.com',
+                              hintText: 'Enter your email address',
                               hintStyle: TextStyle(color: Colors.black38),
                               prefixIcon: Icon(Icons.email_outlined, color: Colors.black),
                               border: InputBorder.none,
@@ -199,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _controller.passwordController,
                             obscureText: !_isPasswordVisible,
                             decoration: InputDecoration(
-                              hintText: 'Minimum 8 characters',
+                              hintText: 'Enter your password',
                               hintStyle: const TextStyle(color: Colors.black38),
                               prefixIcon: const Icon(Icons.lock_outline, color: Colors.black),
                               suffixIcon: IconButton(

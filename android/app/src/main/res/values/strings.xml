@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Placeholder for fallback app signature used by Google Play services.
+      Replace the value below with your actual fallback app signature if needed.
+      Example: <string name="fallback_app_signature">ABCD1234...</string>
+    -->
+    <string name="fallback_app_signature">""</string>
+</resources>
