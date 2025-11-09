@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:zentry/auth/controllers/signup_controller.dart';
 import 'package:zentry/config/routes.dart';
 import 'package:zentry/config/constants.dart';
 
@@ -11,26 +12,32 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final SignupController _controller = SignupController();
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  void _handleSignup() {
+  void _handleSignup() async {
     if (_formKey.currentState!.validate()) {
-      // Navigate to home (no backend for now)
-      Navigator.pushReplacementNamed(context, AppRoutes.home);
+      setState(() {});
+      bool success = await _controller.signup();
+      setState(() {});
+      if (success) {
+        // Show success message and redirect to login
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully! Please log in.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        // Redirect to login page
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
+      }
     }
   }
 
@@ -64,22 +71,45 @@ class _SignupScreenState extends State<SignupScreen> {
                 
                 const SizedBox(height: 60),
                 
-                // Name Field
+                // First Name Field
                 TextFormField(
-                  controller: _nameController,
+                  controller: _controller.firstNameController,
                   keyboardType: TextInputType.name,
                   textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    hintText: 'Enter your full name',
+                    labelText: 'First Name',
+                    hintText: 'Enter your first name',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter your name';
+                      return 'Please enter your first name';
                     }
                     if (value.length < 2) {
-                      return 'Name must be at least 2 characters';
+                      return 'First name must be at least 2 characters';
+                    }
+                    return null;
+                  },
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Last Name Field
+                TextFormField(
+                  controller: _controller.lastNameController,
+                  keyboardType: TextInputType.name,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Last Name',
+                    hintText: 'Enter your last name',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your last name';
+                    }
+                    if (value.length < 2) {
+                      return 'Last name must be at least 2 characters';
                     }
                     return null;
                   },
@@ -89,7 +119,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 
                 // Email Field
                 TextFormField(
-                  controller: _emailController,
+                  controller: _controller.emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
                     labelText: 'Email',
@@ -111,7 +141,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 
                 // Password Field
                 TextFormField(
-                  controller: _passwordController,
+                  controller: _controller.passwordController,
                   obscureText: !_isPasswordVisible,
                   decoration: InputDecoration(
                     labelText: 'Password',
@@ -143,7 +173,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 
                 // Confirm Password Field
                 TextFormField(
-                  controller: _confirmPasswordController,
+                  controller: _controller.confirmPasswordController,
                   obscureText: !_isConfirmPasswordVisible,
                   decoration: InputDecoration(
                     labelText: 'Confirm Password',
@@ -164,7 +194,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Please confirm your password';
                     }
-                    if (value != _passwordController.text) {
+                    if (value != _controller.passwordController.text) {
                       return 'Passwords do not match';
                     }
                     return null;
@@ -173,12 +203,32 @@ class _SignupScreenState extends State<SignupScreen> {
                 
                 const SizedBox(height: 32),
                 
+                // Error Message
+                if (_controller.errorMessage != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Text(
+                      _controller.errorMessage!,
+                      style: TextStyle(color: Colors.red.shade800),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                
+                if (_controller.errorMessage != null) const SizedBox(height: 16),
+                
                 // Sign Up Button
                 SizedBox(
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _handleSignup,
-                    child: const Text('Sign Up'),
+                    onPressed: _controller.isLoading ? null : _handleSignup,
+                    child: _controller.isLoading
+                        ? const CircularProgressIndicator()
+                        : const Text('Sign Up'),
                   ),
                 ),
                 

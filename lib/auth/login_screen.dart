@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:zentry/auth/controllers/login_controller.dart';
 import 'package:zentry/config/routes.dart';
 import 'package:zentry/config/constants.dart';
 
@@ -11,21 +12,23 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final LoginController _controller = LoginController();
   bool _isPasswordVisible = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  void _handleLogin() {
+  void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      // Navigate to home (no backend for now)
-      Navigator.pushReplacementNamed(context, AppRoutes.home);
+      setState(() {});
+      bool success = await _controller.login();
+      setState(() {});
+      if (success) {
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      }
     }
   }
 
@@ -120,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           child: TextFormField(
-                            controller: _emailController,
+                            controller: _controller.emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: const InputDecoration(
                               hintText: '@email.com',
@@ -157,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           child: TextFormField(
-                            controller: _passwordController,
+                            controller: _controller.passwordController,
                             obscureText: !_isPasswordVisible,
                             decoration: InputDecoration(
                               hintText: 'Minimum 8 characters',
@@ -191,24 +194,22 @@ class _LoginScreenState extends State<LoginScreen> {
                         
                         const SizedBox(height: 12),
                         
-                        // Forgot Password
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {
-                              Navigator.pushNamed(context, AppRoutes.forgotPassword);
-                            },
-                            child: const Text(
-                              'Forgot Password?',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 14,
-                              ),
+                        // Error Message
+                        if (_controller.errorMessage != null)
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red.shade200),
+                            ),
+                            child: Text(
+                              _controller.errorMessage!,
+                              style: TextStyle(color: Colors.red.shade800),
+                              textAlign: TextAlign.center,
                             ),
                           ),
-                        ),
-                        
-                        const SizedBox(height: 8),
                         
                         // Login Button
                         Container(
@@ -225,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           child: ElevatedButton(
-                            onPressed: _handleLogin,
+                            onPressed: _controller.isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: Colors.black,
@@ -234,13 +235,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                 borderRadius: BorderRadius.circular(30),
                               ),
                             ),
-                            child: const Text(
-                              'Login',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            child: _controller.isLoading
+                                ? const CircularProgressIndicator()
+                                : const Text(
+                                    'Login',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
                         ),
                         

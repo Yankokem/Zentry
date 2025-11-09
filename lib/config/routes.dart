@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:zentry/screens/auth/login_screen.dart';
-import 'package:zentry/screens/auth/signup_screen.dart';
-import 'package:zentry/screens/home/home_screen.dart';
-import 'package:zentry/screens/launch_screen.dart';
-import 'package:zentry/screens/profile/profile_screen.dart';
+import 'package:zentry/auth/login_screen.dart';
+import 'package:zentry/auth/signup_screen.dart';
+import 'package:zentry/views/home/home_screen.dart';
+import 'package:zentry/views/launch_screen.dart';
+import 'package:zentry/views/profile/profile_screen.dart';
 
 class AppRoutes {
   // Route Names

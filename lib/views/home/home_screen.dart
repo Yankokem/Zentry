@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/widgets/common/floating_nav_bar.dart';
-import 'package:zentry/screens/home/home_page.dart';
-import 'package:zentry/screens/home/tasks_screen.dart';
-import 'package:zentry/screens/home/journal_screen.dart';
-import 'package:zentry/screens/home/wishlist_screen.dart';
+import 'package:zentry/views/home/home_page.dart';
+import 'package:zentry/views/home/tasks_screen.dart';
+import 'package:zentry/views/home/journal_screen.dart';
+import 'package:zentry/views/home/wishlist_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
