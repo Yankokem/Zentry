@@ -3,9 +3,56 @@ import 'package:provider/provider.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/config/routes.dart';
 import 'package:zentry/providers/theme_provider.dart';
+import 'package:zentry/services/firebase/auth_service.dart';
+import 'package:zentry/services/firebase/firestore_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final AuthService _authService = AuthService();
+  final FirestoreService _firestoreService = FirestoreService();
+
+  String _firstName = '';
+  String _fullName = '';
+  String _email = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    try {
+      final user = _authService.currentUser;
+      if (user != null) {
+        final displayName = user.displayName ?? '';
+        if (displayName.isNotEmpty) {
+          _fullName = displayName;
+          _firstName = displayName.split(' ').first;
+        }
+        _email = user.email ?? '';
+
+        // Try to get Firestore-stored names if displayName not present
+        if (_firstName.isEmpty) {
+          final data = await _firestoreService.getUserData(user.uid);
+          if (data != null) {
+            _firstName = (data['firstName'] ?? '') as String;
+            _fullName = (data['fullName'] ?? '') as String;
+          }
+        }
+      }
+    } catch (_) {
+      // ignore and fallback to defaults
+    } finally {
+      if (mounted) setState(() {});
+    }
+  }
 
   void _handleLogout(BuildContext context) {
     showDialog(
@@ -43,9 +90,16 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  String _timeBasedGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+  final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -92,12 +146,14 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // Username with Edit Icon
+            // Username with Edit Icon (show full name)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'John Doe',
+                  _fullName.isNotEmpty
+                      ? _fullName
+                      : (_firstName.isNotEmpty ? _firstName : 'User'),
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -125,7 +181,7 @@ class ProfileScreen extends StatelessWidget {
 
             // Email
             Text(
-              'johndoe@example.com',
+              _email.isNotEmpty ? _email : 'No email available',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[600],
                   ),

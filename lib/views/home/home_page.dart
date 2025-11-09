@@ -1,16 +1,74 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/config/routes.dart';
+import 'package:zentry/services/firebase/auth_service.dart';
+import 'package:zentry/services/firebase/firestore_service.dart';
 import 'package:zentry/widgets/home/stat_card.dart';
 import 'package:zentry/widgets/home/task_card.dart';
 import 'package:zentry/widgets/home/wish_card.dart';
 import 'package:zentry/widgets/home/recent_journal_card.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final AuthService _authService = AuthService();
+  final FirestoreService _firestoreService = FirestoreService();
+
+  String _firstName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final user = _authService.currentUser;
+      String firstName = '';
+
+      if (user != null) {
+        // Try displayName first
+        final displayName = user.displayName ?? '';
+        if (displayName.isNotEmpty) {
+          firstName = displayName.split(' ').first;
+        } else {
+          // Fallback to Firestore stored firstName
+          final data = await _firestoreService.getUserData(user.uid);
+          if (data != null && data['firstName'] != null) {
+            firstName = data['firstName'] as String;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _firstName = firstName.isNotEmpty ? firstName : 'there';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _firstName = 'there');
+      }
+    }
+  }
+
+  String _timeBasedGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final greeting = _timeBasedGreeting();
+
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
@@ -70,12 +128,12 @@ class HomePage extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
                       // Greeting
-                      Text(
-                        'Good Morning!',
+                              Text(
+                                '$greeting, $_firstName!',
                         style:
                             Theme.of(context).textTheme.displayLarge?.copyWith(
                                   color: const Color(0xFF1E1E1E),
-                                  fontSize: 36,
+                                  fontSize: 28,
                                   fontWeight: FontWeight.bold,
                                 ),
                       ),
@@ -84,6 +142,7 @@ class HomePage extends StatelessWidget {
                         'Let\'s make a productive day today',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: const Color(0xFF1E1E1E).withOpacity(0.8),
+                              fontSize: 15,
                             ),
                       ),
                       const SizedBox(height: 16),
