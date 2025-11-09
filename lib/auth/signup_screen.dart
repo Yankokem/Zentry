@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/auth/controllers/signup_controller.dart';
+import 'package:zentry/auth/controllers/google_signin_controller.dart';
 import 'package:zentry/config/routes.dart';
 import 'package:zentry/config/constants.dart';
 
@@ -13,12 +14,20 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final SignupController _controller = SignupController();
+  late final GoogleSignInController _googleController;
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
   @override
+  void initState() {
+    super.initState();
+    _googleController = GoogleSignInController();
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
+    _googleController.dispose();
     super.dispose();
   }
 
@@ -37,6 +46,33 @@ class _SignupScreenState extends State<SignupScreen> {
         );
         // Redirect to login page
         Navigator.pushReplacementNamed(context, AppRoutes.login);
+      }
+    }
+  }
+
+  void _handleGoogleSignUp() async {
+    try {
+      bool success = await _googleController.signInWithGoogle();
+      if (success && mounted) {
+        // Auto-login: navigate directly to home
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      } else if (mounted) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_googleController.errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google sign-up failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -254,19 +290,32 @@ class _SignupScreenState extends State<SignupScreen> {
                 const SizedBox(height: 24),
                 
                 // Social Login Buttons
-                OutlinedButton.icon(
-                  onPressed: () {
-                    // Google signup
+                ListenableBuilder(
+                  listenable: _googleController,
+                  builder: (context, child) {
+                    return OutlinedButton.icon(
+                      onPressed: _googleController.isLoading
+                          ? null
+                          : _handleGoogleSignUp,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(
+                          color: Theme.of(context).primaryColor,
+                          width: 2,
+                        ),
+                      ),
+                      icon: _googleController.isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.g_mobiledata, size: 28),
+                      label: Text(_googleController.isLoading
+                          ? 'Signing up...'
+                          : 'Continue with Google'),
+                    );
                   },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: BorderSide(
-                      color: Theme.of(context).primaryColor,
-                      width: 2,
-                    ),
-                  ),
-                  icon: const Icon(Icons.g_mobiledata, size: 28),
-                  label: const Text('Continue with Google'),
                 ),
                 
                 const SizedBox(height: 40),

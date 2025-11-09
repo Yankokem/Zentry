@@ -64,7 +64,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1038744556460',
     projectId: 'zentry-f40a0',
     storageBucket: 'zentry-f40a0.firebasestorage.app',
-    iosClientId: '1038744556460-lm9d4l2aqo31ojurpd4nq5hmtef2gh9m.apps.googleusercontent.com',
+    iosClientId: '1038744556460-shj37ippgd0ate0nin6hihp8qbonvdee.apps.googleusercontent.com',
     iosBundleId: 'com.example.zentry',
   );
 
@@ -74,7 +74,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1038744556460',
     projectId: 'zentry-f40a0',
     storageBucket: 'zentry-f40a0.firebasestorage.app',
-    iosClientId: '1038744556460-lm9d4l2aqo31ojurpd4nq5hmtef2gh9m.apps.googleusercontent.com',
+    iosClientId: '1038744556460-shj37ippgd0ate0nin6hihp8qbonvdee.apps.googleusercontent.com',
     iosBundleId: 'com.example.zentry',
   );
 

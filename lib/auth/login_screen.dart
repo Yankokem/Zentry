@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/auth/controllers/login_controller.dart';
+import 'package:zentry/auth/controllers/google_signin_controller.dart';
 import 'package:zentry/config/routes.dart';
 import 'package:zentry/config/constants.dart';
 
@@ -13,11 +14,19 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final LoginController _controller = LoginController();
+  late final GoogleSignInController _googleController;
   bool _isPasswordVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _googleController = GoogleSignInController();
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _googleController.dispose();
     super.dispose();
   }
 
@@ -28,6 +37,33 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {});
       if (success) {
         Navigator.pushReplacementNamed(context, AppRoutes.home);
+      }
+    }
+  }
+
+  void _handleGoogleSignIn() async {
+    try {
+      bool success = await _googleController.signInWithGoogle();
+      if (success && mounted) {
+        // Auto-login: navigate directly to home
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      } else if (mounted) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_googleController.errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google sign-in failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -280,46 +316,61 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 32),
                         
                         // Google Login Button
-                        Container(
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(30),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              // Google login
-                            },
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black,
-                              side: BorderSide.none,
-                              shape: RoundedRectangleBorder(
+                        ListenableBuilder(
+                          listenable: _googleController,
+                          builder: (context, child) {
+                            return Container(
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                            ),
-                            icon: const Text(
-                              'G',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                              child: OutlinedButton.icon(
+                                onPressed: _googleController.isLoading
+                                    ? null
+                                    : _handleGoogleSignIn,
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
+                                  side: BorderSide.none,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                ),
+                                icon: _googleController.isLoading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'G',
+                                        style: TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                label: Text(
+                                  _googleController.isLoading
+                                      ? 'Signing in...'
+                                      : 'Continue with Google',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ),
-                            ),
-                            label: const Text(
-                              'Continue with Google',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                         
                         const SizedBox(height: 32),

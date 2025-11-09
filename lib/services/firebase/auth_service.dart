@@ -1,7 +1,20 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  
+  // Initialize GoogleSignIn with clientId for web
+  late final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: kIsWeb 
+      ? '1038744556460-shj37ippgd0ate0nin6hihp8qbonvdee.apps.googleusercontent.com'
+      : null,
+    scopes: [
+      'email',
+      'profile',
+    ],
+  );
 
   // Get current user
   User? get currentUser => _auth.currentUser;
@@ -39,8 +52,93 @@ class AuthService {
     }
   }
 
-  // Sign out
+  // Sign in with Google
+  Future<UserCredential> signInWithGoogle() async {
+    try {
+      print('Google Sign-In: Starting authentication flow...');
+      
+      // For web platform, use Firebase popup (simpler, no OAuth consent screen needed)
+      if (kIsWeb) {
+        print('Google Sign-In: Using Firebase popup for web...');
+        GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        
+        // Add scopes
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        
+        // Set custom parameters
+        googleProvider.setCustomParameters({
+          'prompt': 'select_account'
+        });
+        
+        // Sign in with popup
+        final UserCredential userCredential = 
+            await _auth.signInWithPopup(googleProvider);
+        
+        print('Google Sign-In: Successfully signed in via Firebase popup');
+        print('Google Sign-In: User UID = ${userCredential.user?.uid}');
+        
+        return userCredential;
+      }
+      
+      // For mobile/desktop platforms, use google_sign_in package
+      print('Google Sign-In: Using google_sign_in package for mobile/desktop...');
+      
+      // Trigger the authentication flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        print('Google Sign-In: User cancelled the sign-in');
+        throw Exception('Google sign-in was cancelled');
+      }
+
+      print('Google Sign-In: User selected - ${googleUser.email}');
+
+      // Obtain the auth details from the Google user
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      print('Google Sign-In: Got authentication tokens');
+      print('Google Sign-In: accessToken present = ${googleAuth.accessToken != null}');
+      print('Google Sign-In: idToken present = ${googleAuth.idToken != null}');
+
+      // Check if tokens are null
+      if (googleAuth.idToken == null) {
+        print('Google Sign-In: Missing ID token!');
+        throw Exception('Failed to get Google ID token. Please check Firebase Console configuration.');
+      }
+
+      // Create a new credential
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken!,
+      );
+
+      print('Google Sign-In: Created OAuth credential');
+
+      // Sign in to Firebase with the Google credential
+      final UserCredential userCredential =
+          await _auth.signInWithCredential(credential);
+
+      print('Google Sign-In: Successfully signed into Firebase');
+      print('Google Sign-In: User UID = ${userCredential.user?.uid}');
+
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      print('Google Sign-In: FirebaseAuthException - Code: ${e.code}, Message: ${e.message}');
+      throw _handleAuthException(e);
+    } catch (e) {
+      print('Google Sign-In: General Exception - $e');
+      throw Exception('Google sign-in failed: ${e.toString()}');
+    }
+  }
+
+  // Sign out (also signs out from Google)
   Future<void> signOut() async {
+    if (!kIsWeb) {
+      // Only sign out from google_sign_in on mobile/desktop
+      await _googleSignIn.signOut();
+    }
     await _auth.signOut();
   }
 

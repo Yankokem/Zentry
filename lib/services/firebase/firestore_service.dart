@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -24,6 +25,43 @@ class FirestoreService {
       });
     } catch (e) {
       throw Exception('Failed to create user document: $e');
+    }
+  }
+
+  // Store Google user data in Firestore after Google sign-in
+  Future<void> createGoogleUserDocument(User user) async {
+    try {
+      // Extract name from Google user
+      final displayName = user.displayName ?? '';
+      final nameParts = displayName.split(' ');
+      final firstName = nameParts.isNotEmpty ? nameParts.first : 'User';
+      final lastName =
+          nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      final fullName = displayName.isEmpty ? 'Google User' : displayName;
+
+      // Check if user document already exists
+      final docExists =
+          await _db.collection(usersCollection).doc(user.uid).get();
+
+      if (!docExists.exists) {
+        // Create new user document for Google sign-in
+        await _db.collection(usersCollection).doc(user.uid).set({
+          'uid': user.uid,
+          'firstName': firstName,
+          'lastName': lastName,
+          'fullName': fullName,
+          'email': user.email?.toLowerCase() ?? '',
+          'photoUrl': user.photoURL ?? '',
+          'authProvider': 'google',
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        print('Google user document created for: ${user.email}');
+      } else {
+        print('Google user document already exists for: ${user.email}');
+      }
+    } catch (e) {
+      throw Exception('Failed to create Google user document: $e');
     }
   }
 
