@@ -37,6 +37,7 @@ class _SignupScreenState extends State<SignupScreen> {
       bool success = await _controller.signup();
       setState(() {});
       if (success) {
+        if (!mounted) return;
         // Show success message and redirect to login
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -52,15 +53,25 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _handleGoogleSignUp() async {
     try {
-      bool success = await _googleController.signInWithGoogle();
-      if (success && mounted) {
-        // Auto-login: navigate directly to home
-        Navigator.pushReplacementNamed(context, AppRoutes.home);
-      } else if (mounted) {
+      // Use the signup-specific method that checks for existing accounts
+      final result = await _googleController.signUpWithGoogleAndCheckExisting();
+      
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        if (result['userExists'] == true) {
+          // User already exists - show dialog
+          _showExistingAccountDialog(result['message'] ?? 'Account already exists');
+        } else {
+          // New account created - navigate to home
+          Navigator.pushReplacementNamed(context, AppRoutes.home);
+        }
+      } else {
         // Show error message
+        final errorMsg = result['error']?.toString() ?? _googleController.errorMessage;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_googleController.errorMessage),
+            content: Text(errorMsg),
             backgroundColor: Colors.red,
           ),
         );
@@ -75,6 +86,37 @@ class _SignupScreenState extends State<SignupScreen> {
         );
       }
     }
+  }
+
+  void _showExistingAccountDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Account Already Exists'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              // User chose "No" - sign out and close dialog
+              Navigator.pop(dialogContext);
+              _googleController.signOut();
+            },
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () {
+              // User chose "Yes" - close dialog and navigate to home (already signed in)
+              Navigator.pop(dialogContext);
+              Navigator.pushReplacementNamed(context, AppRoutes.home);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).primaryColor,
+            ),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

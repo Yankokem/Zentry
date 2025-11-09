@@ -55,12 +55,11 @@ class AuthService {
   // Sign in with Google
   Future<UserCredential> signInWithGoogle() async {
     try {
-      print('Google Sign-In: Starting authentication flow...');
-      print('Google Sign-In: Platform = ${defaultTargetPlatform.name}');
+  // Starting Google sign-in flow
       
       // For web platform, use Firebase popup
       if (kIsWeb) {
-        print('Google Sign-In: Using Firebase popup for web...');
+  // Using Firebase popup for web
         GoogleAuthProvider googleProvider = GoogleAuthProvider();
         
         // Add scopes
@@ -76,36 +75,33 @@ class AuthService {
         final UserCredential userCredential = 
             await _auth.signInWithPopup(googleProvider);
         
-        print('Google Sign-In: Successfully signed in via Firebase popup');
-        print('Google Sign-In: User UID = ${userCredential.user?.uid}');
+  // Signed in via Firebase popup
         
         return userCredential;
       }
       
       // For mobile and desktop platforms, use google_sign_in package
-      print('Google Sign-In: Using google_sign_in package for ${defaultTargetPlatform.name}...');
+  // Using google_sign_in package for mobile/desktop
       
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
-        print('Google Sign-In: User cancelled the sign-in');
+  // User cancelled the sign-in
         throw Exception('Google sign-in was cancelled');
       }
 
-      print('Google Sign-In: User selected - ${googleUser.email}');
+  // User selected a Google account
 
       // Obtain the auth details from the Google user
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      print('Google Sign-In: Got authentication tokens');
-      print('Google Sign-In: accessToken present = ${googleAuth.accessToken != null}');
-      print('Google Sign-In: idToken present = ${googleAuth.idToken != null}');
+  // Obtained authentication tokens
 
       // Check if tokens are null
       if (googleAuth.idToken == null) {
-        print('Google Sign-In: Missing ID token!');
+  // Missing ID token
         String platformMessage = '';
         if (defaultTargetPlatform == TargetPlatform.android) {
           platformMessage = '\n\nAndroid: Ensure SHA-1 certificate is added to Firebase Console';
@@ -121,21 +117,20 @@ class AuthService {
         idToken: googleAuth.idToken!,
       );
 
-      print('Google Sign-In: Created OAuth credential');
+  // Created OAuth credential
 
       // Sign in to Firebase with the Google credential
       final UserCredential userCredential =
           await _auth.signInWithCredential(credential);
 
-      print('Google Sign-In: Successfully signed into Firebase');
-      print('Google Sign-In: User UID = ${userCredential.user?.uid}');
+  // Successfully signed into Firebase
 
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      print('Google Sign-In: FirebaseAuthException - Code: ${e.code}, Message: ${e.message}');
+  // FirebaseAuthException during Google sign-in
       throw _handleAuthException(e);
     } catch (e) {
-      print('Google Sign-In: General Exception - $e');
+  // General exception during Google sign-in
       throw Exception('Google sign-in failed: ${e.toString()}');
     }
   }
@@ -143,9 +138,17 @@ class AuthService {
   // Sign out (also signs out from Google)
   Future<void> signOut() async {
     if (!kIsWeb) {
-      // Only sign out from google_sign_in on mobile/desktop
-      await _googleSignIn.signOut();
+      // On mobile/desktop, sign out and disconnect the GoogleSignIn
+      // Disconnect revokes the previous grant and clears the cached
+      // account so the next signIn() will prompt account selection.
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+      try {
+        await _googleSignIn.disconnect();
+      } catch (_) {}
     }
+
     await _auth.signOut();
   }
 

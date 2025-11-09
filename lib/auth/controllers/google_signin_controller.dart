@@ -18,7 +18,7 @@ class GoogleSignInController with ChangeNotifier {
     try {
       return await _firestoreService.userExistsByEmail(email);
     } catch (e) {
-      print('Error checking if user exists: $e');
+      // Error checking user existence
       return false;
     }
   }
@@ -30,7 +30,7 @@ class GoogleSignInController with ChangeNotifier {
     notifyListeners();
 
     try {
-      print('Starting Google Sign-In process for signup...');
+      // Starting Google Sign-In process for signup
 
       // Call AuthService to handle Google sign-in
       final UserCredential userCredential = await _authService.signInWithGoogle();
@@ -43,13 +43,13 @@ class GoogleSignInController with ChangeNotifier {
         return {'success': false, 'userExists': false};
       }
 
-      print('Google Sign-In successful for: ${user.email}');
+      // Google Sign-In successful
 
       // Check if user already exists in Firestore
       final userExists = await _firestoreService.userExistsByEmail(user.email ?? '');
       
       if (userExists) {
-        print('User already exists: ${user.email}');
+        // User already exists
         _isLoading = false;
         _errorMessage = '';
         notifyListeners();
@@ -64,7 +64,7 @@ class GoogleSignInController with ChangeNotifier {
       // Create new user document in Firestore (user doesn't exist)
       await _firestoreService.createGoogleUserDocument(user);
 
-      print('User document created in Firestore');
+      // User document created in Firestore
 
       _isLoading = false;
       _errorMessage = '';
@@ -77,7 +77,7 @@ class GoogleSignInController with ChangeNotifier {
       };
     } catch (e) {
       _errorMessage = _parseAuthError(e.toString());
-      print('Google Sign-In error: $e');
+      // Google Sign-In error
       _isLoading = false;
       notifyListeners();
       return {'success': false, 'userExists': false, 'error': e.toString()};
@@ -91,7 +91,7 @@ class GoogleSignInController with ChangeNotifier {
     notifyListeners();
 
     try {
-      print('Starting Google Sign-In process...');
+      // Starting Google Sign-In process
 
       // Call AuthService to handle Google sign-in
       final UserCredential userCredential = await _authService.signInWithGoogle();
@@ -104,12 +104,10 @@ class GoogleSignInController with ChangeNotifier {
         return false;
       }
 
-      print('Google Sign-In successful for: ${user.email}');
-
       // Create or update user document in Firestore
       await _firestoreService.createGoogleUserDocument(user);
 
-      print('User document created/updated in Firestore');
+  // User document created/updated in Firestore
 
       _isLoading = false;
       _errorMessage = '';
@@ -117,7 +115,6 @@ class GoogleSignInController with ChangeNotifier {
       return true;
     } catch (e) {
       _errorMessage = _parseAuthError(e.toString());
-      print('Google Sign-In error: $e');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -126,7 +123,7 @@ class GoogleSignInController with ChangeNotifier {
 
   // Parse authentication errors into user-friendly messages
   String _parseAuthError(String error) {
-    print('GoogleSignInController: Parsing error - $error');
+    // Parsing auth error
     
     if (error.contains('network') || error.contains('Network')) {
       return 'Network error. Please check your connection.';
@@ -158,9 +155,7 @@ class GoogleSignInController with ChangeNotifier {
   Future<void> signOut() async {
     try {
       await _authService.signOut();
-      print('User signed out successfully');
     } catch (e) {
-      print('Error signing out: $e');
       throw Exception('Failed to sign out: $e');
     }
   }

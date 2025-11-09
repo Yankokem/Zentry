@@ -32,10 +32,8 @@ class LoginController {
     try {
       final email = emailController.text.trim().toLowerCase();
       
-      // First, check if user exists in Firestore
-      print('Checking if user exists: $email');
-      final userExists = await _firestoreService.userExistsByEmail(email);
-      print('User exists result: $userExists');
+  // First, check if user exists in Firestore
+  final userExists = await _firestoreService.userExistsByEmail(email);
 
       if (!userExists) {
         _isLoading = false;
@@ -54,7 +52,6 @@ class LoginController {
     } catch (e) {
       _isLoading = false;
       _errorMessage = _parseAuthError(e.toString());
-      print('Login error: $_errorMessage');
       return false;
     }
   }

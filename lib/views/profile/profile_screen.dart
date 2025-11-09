@@ -57,17 +57,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _handleLogout(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Logout'),
         content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
+            onPressed: () async {
+              // Close dialog first
+              Navigator.pop(dialogContext);
+              // Perform sign out
+              await _authService.signOut();
+              if (!mounted) return;
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 AppRoutes.login,
@@ -90,12 +94,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  String _timeBasedGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  }
+  // Removed time-based greeting (not used in profile)
 
   @override
   Widget build(BuildContext context) {

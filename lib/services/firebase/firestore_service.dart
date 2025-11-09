@@ -56,9 +56,8 @@ class FirestoreService {
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
-        print('Google user document created for: ${user.email}');
       } else {
-        print('Google user document already exists for: ${user.email}');
+        // Document already exists - no action needed
       }
     } catch (e) {
       throw Exception('Failed to create Google user document: $e');
@@ -84,8 +83,7 @@ class FirestoreService {
           .get();
       return query.docs.isNotEmpty;
     } catch (e) {
-      print('Firestore userExistsByEmail error: $e');
-      // If there's an error, throw it so we can see what's happening
+      // If there's an error, throw it so callers can handle it
       throw Exception('Failed to check user existence: $e');
     }
   }

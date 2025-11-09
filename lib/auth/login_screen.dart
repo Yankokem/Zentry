@@ -36,6 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
       bool success = await _controller.login();
       setState(() {});
       if (success) {
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, AppRoutes.home);
       }
     }
