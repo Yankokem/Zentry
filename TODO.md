@@ -1,5 +1,5 @@
-# TODO: Update README.md for Zentry Project
-
-## Tasks
-
-- [x] Update README.md with project overview, features, folder structure, important files, and setup instructions
+- [x] Add an "Add Project" button to the ProjectsPage header next to the search icon
+- [x] Update AddMenuWidget to include "New Project" option (if needed, but since we're adding direct button, maybe not necessary)
+- [x] Create lib/views/home/add_project_page.dart with a form for project details (title, description, team members, status, color)
+- [x] Implement form validation and submission to add project via ProjectManager
+- [ ] Test the add project functionality

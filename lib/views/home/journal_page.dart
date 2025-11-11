@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/services/journal_manager.dart';
+import 'package:zentry/models/journal_entry_model.dart';
 
 class JournalPage extends StatefulWidget {
   const JournalPage({super.key});
@@ -33,12 +34,12 @@ class _JournalPageState extends State<JournalPage> {
     super.dispose();
   }
 
-  List<Map<String, dynamic>> _getFilteredEntries() {
+  List<JournalEntry> _getFilteredEntries() {
     if (_searchQuery.isEmpty) return _journalManager.entries;
-    
+
     return _journalManager.entries.where((entry) {
-      return entry['title']!.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             entry['content']!.toLowerCase().contains(_searchQuery.toLowerCase());
+      return entry.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             entry.content.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
   }
 
@@ -221,9 +222,9 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  Widget _buildEntryCard(Map<String, dynamic> entry) {
-    final moodColor = _getMoodColor(entry['mood'] ?? 'calm');
-    
+  Widget _buildEntryCard(JournalEntry entry) {
+    final moodColor = _getMoodColor(entry.mood);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -265,7 +266,7 @@ class _JournalPageState extends State<JournalPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          entry['title']!,
+                          entry.title,
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -276,7 +277,7 @@ class _JournalPageState extends State<JournalPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          entry['date']!,
+                          entry.date,
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey.shade600,
@@ -294,7 +295,7 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                entry['content']!,
+                entry.content,
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey.shade700,
@@ -313,7 +314,7 @@ class _JournalPageState extends State<JournalPage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      (entry['mood'] ?? 'calm').toUpperCase(),
+                      entry.mood.toUpperCase(),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -329,7 +330,7 @@ class _JournalPageState extends State<JournalPage> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    entry['time']!,
+                    entry.time,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -344,9 +345,9 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  void _showDetail(Map<String, dynamic> entry) {
-    final moodColor = _getMoodColor(entry['mood'] ?? 'calm');
-    
+  void _showDetail(JournalEntry entry) {
+    final moodColor = _getMoodColor(entry.mood);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -372,7 +373,7 @@ class _JournalPageState extends State<JournalPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          entry['title']!,
+                          entry.title,
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -395,7 +396,7 @@ class _JournalPageState extends State<JournalPage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          (entry['mood'] ?? 'calm').toUpperCase(),
+                          entry.mood.toUpperCase(),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -407,7 +408,7 @@ class _JournalPageState extends State<JournalPage> {
                       Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
-                        entry['date']!,
+                        entry.date,
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
@@ -417,7 +418,7 @@ class _JournalPageState extends State<JournalPage> {
                       Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
-                        entry['time']!,
+                        entry.time,
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
@@ -432,7 +433,7 @@ class _JournalPageState extends State<JournalPage> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  entry['content']!,
+                  entry.content,
                   style: TextStyle(
                     fontSize: 16,
                     height: 1.6,
@@ -495,7 +496,7 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  void _showOptions(Map<String, dynamic> entry) {
+  void _showOptions(JournalEntry entry) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -540,7 +541,7 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  void _confirmDelete(Map<String, dynamic> entry) {
+  void _confirmDelete(JournalEntry entry) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -582,33 +583,53 @@ class _JournalPageState extends State<JournalPage> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           final moodColor = _getMoodColor(selectedMood);
-          
+
           return AlertDialog(
-            backgroundColor: Colors.white,
-            title: const Text('New Entry'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.add_circle, color: moodColor, size: 28),
+                const SizedBox(width: 12),
+                const Text(
+                  'New Journal Entry',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Mood Selection Section
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: moodColor.withOpacity(0.1),
+                      color: Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: moodColor.withOpacity(0.3),
-                        width: 1,
-                      ),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'How are you feeling?',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Row(
+                          children: [
+                            Icon(Icons.mood, size: 18, color: Colors.grey.shade600),
+                            const SizedBox(width: 8),
+                            Text(
+                              'How are you feeling?',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         Wrap(
@@ -635,33 +656,88 @@ class _JournalPageState extends State<JournalPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Title',
-                      border: const OutlineInputBorder(),
-                      fillColor: Colors.white,
-                      filled: true,
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: moodColor, width: 2),
-                      ),
+
+                  const SizedBox(height: 20),
+
+                  // Entry Details Section
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: contentController,
-                    decoration: InputDecoration(
-                      labelText: 'What\'s on your mind?',
-                      border: const OutlineInputBorder(),
-                      alignLabelWithHint: true,
-                      fillColor: Colors.white,
-                      filled: true,
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: moodColor, width: 2),
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.edit_note, size: 18, color: Colors.grey.shade600),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Entry Details',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: titleController,
+                          style: const TextStyle(fontSize: 16),
+                          decoration: InputDecoration(
+                            labelText: 'Entry Title',
+                            hintText: 'Give your thoughts a title',
+                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: moodColor, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            suffixIcon: titleController.text.isEmpty
+                                ? const Icon(Icons.error_outline, color: Colors.red, size: 20)
+                                : const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: contentController,
+                          style: const TextStyle(fontSize: 16),
+                          decoration: InputDecoration(
+                            labelText: 'Your Thoughts',
+                            hintText: 'Share what\'s on your mind...',
+                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: moodColor, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          maxLines: 6,
+                        ),
+                      ],
                     ),
-                    maxLines: 6,
                   ),
                 ],
               ),
@@ -669,13 +745,23 @@ class _JournalPageState extends State<JournalPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
               ),
+              const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () {
                   if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
                     setState(() {
-                      _journalManager.addEntry({
+                      _journalManager.addEntryFromMap({
                         'title': titleController.text,
                         'content': contentController.text,
                         'date': _getCurrentDate(),
@@ -685,15 +771,30 @@ class _JournalPageState extends State<JournalPage> {
                     });
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Entry added')),
+                      SnackBar(
+                        content: const Text('Journal entry added'),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: moodColor,
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 2,
                 ),
-                child: const Text('Add'),
+                child: const Text(
+                  'Add Entry',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           );
@@ -730,43 +831,63 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  void _showEditDialog(Map<String, dynamic> entry) {
-    final titleController = TextEditingController(text: entry['title']);
-    final contentController = TextEditingController(text: entry['content']);
-    String selectedMood = entry['mood'] ?? 'happy';
+  void _showEditDialog(JournalEntry entry) {
+    final titleController = TextEditingController(text: entry.title);
+    final contentController = TextEditingController(text: entry.content);
+    String selectedMood = entry.mood;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           final moodColor = _getMoodColor(selectedMood);
-          
+
           return AlertDialog(
-            backgroundColor: Colors.white,
-            title: const Text('Edit Entry'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.edit, color: moodColor, size: 28),
+                const SizedBox(width: 12),
+                const Text(
+                  'Edit Journal Entry',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Mood Selection Section
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: moodColor.withOpacity(0.1),
+                      color: Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: moodColor.withOpacity(0.3),
-                        width: 1,
-                      ),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'How are you feeling?',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Row(
+                          children: [
+                            Icon(Icons.mood, size: 18, color: Colors.grey.shade600),
+                            const SizedBox(width: 8),
+                            Text(
+                              'How are you feeling?',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         Wrap(
@@ -793,33 +914,88 @@ class _JournalPageState extends State<JournalPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Title',
-                      border: const OutlineInputBorder(),
-                      fillColor: Colors.white,
-                      filled: true,
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: moodColor, width: 2),
-                      ),
+
+                  const SizedBox(height: 20),
+
+                  // Entry Details Section
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: contentController,
-                    decoration: InputDecoration(
-                      labelText: 'Content',
-                      border: const OutlineInputBorder(),
-                      alignLabelWithHint: true,
-                      fillColor: Colors.white,
-                      filled: true,
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: moodColor, width: 2),
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.edit_note, size: 18, color: Colors.grey.shade600),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Entry Details',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: titleController,
+                          style: const TextStyle(fontSize: 16),
+                          decoration: InputDecoration(
+                            labelText: 'Entry Title',
+                            hintText: 'Give your thoughts a title',
+                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: moodColor, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            suffixIcon: titleController.text.isNotEmpty
+                                ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: contentController,
+                          style: const TextStyle(fontSize: 16),
+                          decoration: InputDecoration(
+                            labelText: 'Your Thoughts',
+                            hintText: 'Share what\'s on your mind...',
+                            labelStyle: TextStyle(color: Colors.grey.shade600),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: moodColor, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          maxLines: 6,
+                        ),
+                      ],
                     ),
-                    maxLines: 6,
                   ),
                 ],
               ),
@@ -827,27 +1003,57 @@ class _JournalPageState extends State<JournalPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
               ),
+              const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () {
                   if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
+                    final updatedEntry = JournalEntry(
+                      title: titleController.text,
+                      content: contentController.text,
+                      date: entry.date,
+                      time: entry.time,
+                      mood: selectedMood,
+                    );
                     setState(() {
-                      entry['title'] = titleController.text;
-                      entry['content'] = contentController.text;
-                      entry['mood'] = selectedMood;
+                      _journalManager.updateEntry(entry, updatedEntry);
                     });
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Entry updated')),
+                      SnackBar(
+                        content: const Text('Journal entry updated'),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: moodColor,
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 2,
                 ),
-                child: const Text('Save'),
+                child: const Text(
+                  'Save Changes',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           );

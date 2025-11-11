@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/widgets/common/floating_nav_bar.dart';
 import 'package:zentry/views/home/home_page.dart';
-import 'package:zentry/views/home/tasks_screen.dart';
-import 'package:zentry/views/home/journal_screen.dart';
-import 'package:zentry/views/home/wishlist_screen.dart';
+import 'package:zentry/views/home/projects_page.dart'; // NEW
+import 'package:zentry/views/home/journal_page.dart';
+import 'package:zentry/views/home/wishlist_page.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,7 +17,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _pages = [
     const HomePage(),
-    const TasksPage(),
+    const ProjectsPage(), // CHANGED from TasksPage to ProjectsPage
     const JournalPage(),
     const WishlistPage(),
   ];

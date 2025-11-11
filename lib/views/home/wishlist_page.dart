@@ -963,14 +963,14 @@ class _WishlistPageState extends State<WishlistPage> {
                 onPressed: () {
                   if (titleController.text.isNotEmpty && priceController.text.isNotEmpty) {
                     setState(() {
-                      _manager.addItemFromMap({
-                        'title': titleController.text,
-                        'price': priceController.text,
-                        'category': selectedCategory,
-                        'notes': notesController.text.isEmpty ? 'No notes' : notesController.text,
-                        'dateAdded': _getCurrentDate(),
-                        'completed': false, // Default to not completed
-                      });
+                      _manager.addItem(Wish(
+                        title: titleController.text,
+                        price: priceController.text,
+                        category: selectedCategory,
+                        notes: notesController.text.isEmpty ? 'No notes' : notesController.text,
+                        dateAdded: _getCurrentDate(),
+                        completed: false,
+                      ));
                     });
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1249,11 +1249,13 @@ class _WishlistPageState extends State<WishlistPage> {
                 onPressed: () {
                   if (titleController.text.isNotEmpty && priceController.text.isNotEmpty) {
                     setState(() {
-                      _manager.updateItem(item, item.copyWith(
+                      _manager.updateItem(item, Wish(
                         title: titleController.text,
                         price: priceController.text,
                         category: selectedCategory,
                         notes: notesController.text,
+                        dateAdded: item.dateAdded,
+                        completed: item.completed,
                       ));
                     });
                     Navigator.pop(context);

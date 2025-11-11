@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:zentry/auth/login_screen.dart';
 import 'package:zentry/auth/signup_screen.dart';
 import 'package:zentry/views/home/home_screen.dart';
+import 'package:zentry/views/home/tasks_page.dart';
+import 'package:zentry/views/home/journal_page.dart';
+import 'package:zentry/views/home/wishlist_page.dart';
 import 'package:zentry/views/launch_screen.dart';
 import 'package:zentry/views/profile/profile_screen.dart';
 
@@ -55,17 +58,17 @@ class AppRoutes {
 
       case tasks:
         return MaterialPageRoute(
-          builder: (_) => const Placeholder(), // Replace with TasksScreen()
+          builder: (_) => const TasksPage(),
         );
 
       case journal:
         return MaterialPageRoute(
-          builder: (_) => const Placeholder(), // Replace with JournalScreen()
+          builder: (_) => const JournalPage(),
         );
 
       case wishlist:
         return MaterialPageRoute(
-          builder: (_) => const Placeholder(), // Replace with WishlistScreen()
+          builder: (_) => const WishlistPage(),
         );
 
       default:
