@@ -16,7 +16,6 @@ class WishlistPage extends StatefulWidget {
 
 class _WishlistPageState extends State<WishlistPage> {
   String _selectedCategory = 'all';
-  late WishlistController _controller;
 
   @override
   void initState() {
@@ -29,27 +28,22 @@ class _WishlistPageState extends State<WishlistPage> {
     );
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _controller = Provider.of<WishlistProvider>(context, listen: false).controller;
-  }
-
-  List<Wish> _getFilteredItems() {
-    final wishes = _controller.wishes;
+  List<Wish> _getFilteredItems(WishlistController controller) {
+    final wishes = controller.wishes;
     if (_selectedCategory == 'all') return wishes;
     return wishes.where((item) => item.category == _selectedCategory).toList();
   }
 
-  Color _getCategoryColor(String category) {
-    return _controller.getCategoryColor(category);
+  Color _getCategoryColor(WishlistController controller, String category) {
+    return controller.getCategoryColor(category);
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<WishlistProvider>(
       builder: (context, wishlistProvider, child) {
-        final filteredItems = _getFilteredItems();
+        final controller = wishlistProvider.controller;
+        final filteredItems = _getFilteredItems(controller);
 
         return Scaffold(
           backgroundColor: const Color(0xFFF9ED69),
@@ -104,7 +98,7 @@ class _WishlistPageState extends State<WishlistPage> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '${_controller.completedCount}/${_controller.totalCount} items',
+                            '${controller.completedCount}/${controller.totalCount} items',
                             style: const TextStyle(
                               color: Color(0xFFF9ED69),
                               fontWeight: FontWeight.bold,
@@ -119,15 +113,15 @@ class _WishlistPageState extends State<WishlistPage> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _buildCategoryChip('all', 'All'),
+                          _buildCategoryChip('all', 'All', controller),
                           const SizedBox(width: 8),
-                          _buildCategoryChip('tech', 'Tech'),
+                          _buildCategoryChip('tech', 'Tech', controller),
                           const SizedBox(width: 8),
-                          _buildCategoryChip('travel', 'Travel'),
+                          _buildCategoryChip('travel', 'Travel', controller),
                           const SizedBox(width: 8),
-                          _buildCategoryChip('fashion', 'Fashion'),
+                          _buildCategoryChip('fashion', 'Fashion', controller),
                           const SizedBox(width: 8),
-                          _buildCategoryChip('home', 'Home'),
+                          _buildCategoryChip('home', 'Home', controller),
                         ],
                       ),
                     ),
@@ -147,7 +141,7 @@ class _WishlistPageState extends State<WishlistPage> {
                       padding: const EdgeInsets.all(AppConstants.paddingMedium),
                       itemCount: filteredItems.length,
                       itemBuilder: (context, index) {
-                        return _buildWishCard(filteredItems[index]);
+                        return _buildWishCard(filteredItems[index], controller);
                       },
                     ),
             ),
@@ -159,9 +153,9 @@ class _WishlistPageState extends State<WishlistPage> {
     );
   }
 
-  Widget _buildCategoryChip(String category, String label) {
+  Widget _buildCategoryChip(String category, String label, WishlistController controller) {
     final isSelected = _selectedCategory == category;
-    final color = _getCategoryColor(category);
+    final color = _getCategoryColor(controller, category);
     
     return GestureDetector(
       onTap: () {
@@ -191,8 +185,8 @@ class _WishlistPageState extends State<WishlistPage> {
     );
   }
 
-  Widget _buildWishCard(Wish item) {
-    final color = _getCategoryColor(item.category);
+  Widget _buildWishCard(Wish item, WishlistController controller) {
+    final color = _getCategoryColor(controller, item.category);
     final isCompleted = item.completed;
 
     return Container(
@@ -213,7 +207,7 @@ class _WishlistPageState extends State<WishlistPage> {
         ],
       ),
       child: InkWell(
-        onTap: () => _showItemDetails(item),
+        onTap: () => _showItemDetails(item, controller),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -225,7 +219,7 @@ class _WishlistPageState extends State<WishlistPage> {
                   // Checkbox on the left like the image - NOW FUNCTIONAL!
                   GestureDetector(
                     onTap: () async {
-                      await _controller.toggleCompleted(item);
+                      await controller.toggleCompleted(item);
                     },
                     child: Container(
                       width: 40,
@@ -233,12 +227,12 @@ class _WishlistPageState extends State<WishlistPage> {
                       decoration: BoxDecoration(
                         color: isCompleted
                             ? Colors.green.withOpacity(0.1)
-                            : _getCategoryColor(item.category).withOpacity(0.1),
+                            : _getCategoryColor(controller, item.category).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
                         isCompleted ? Icons.check_circle : Icons.circle_outlined,
-                        color: isCompleted ? Colors.green : _getCategoryColor(item.category),
+                        color: isCompleted ? Colors.green : _getCategoryColor(controller, item.category),
                         size: 24,
                       ),
                     ),
@@ -318,7 +312,7 @@ class _WishlistPageState extends State<WishlistPage> {
                   IconButton(
                     icon: const Icon(Icons.more_vert, size: 20),
                     color: Colors.grey.shade600,
-                    onPressed: () => _showOptionsMenu(item),
+                    onPressed: () => _showOptionsMenu(item, controller),
                   ),
                 ],
               ),
@@ -355,7 +349,7 @@ class _WishlistPageState extends State<WishlistPage> {
                   const Spacer(),
                   GestureDetector(
                     onTap: () async {
-                      final success = await _controller.toggleCompleted(item);
+                      final success = await controller.toggleCompleted(item);
                       if (success && mounted) {
                         setState(() {});
                       }
@@ -425,8 +419,8 @@ class _WishlistPageState extends State<WishlistPage> {
     );
   }
 
-  void _showItemDetails(Wish item) {
-    final color = _getCategoryColor(item.category);
+  void _showItemDetails(Wish item, WishlistController controller) {
+    final color = _getCategoryColor(controller, item.category);
     final isCompleted = item.completed;
 
     showModalBottomSheet(
@@ -554,7 +548,7 @@ class _WishlistPageState extends State<WishlistPage> {
                           Switch(
                             value: isCompleted,
                             onChanged: (value) async {
-                              final success = await _controller.toggleCompleted(item);
+                              final success = await controller.toggleCompleted(item);
                               if (success && mounted) {
                                 Navigator.pop(context);
                               }
@@ -603,7 +597,7 @@ class _WishlistPageState extends State<WishlistPage> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        _showEditDialog(item);
+                        _showEditDialog(item, controller);
                       },
                       icon: const Icon(Icons.edit),
                       label: const Text('Edit'),
@@ -619,7 +613,7 @@ class _WishlistPageState extends State<WishlistPage> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        _confirmDelete(item);
+                        _confirmDelete(item, controller);
                       },
                       icon: const Icon(Icons.delete),
                       label: const Text('Delete'),
@@ -639,7 +633,7 @@ class _WishlistPageState extends State<WishlistPage> {
     );
   }
 
-  void _showOptionsMenu(Wish item) {
+  void _showOptionsMenu(Wish item, WishlistController controller) {
     final isCompleted = item.completed;
 
     showModalBottomSheet(
@@ -671,7 +665,7 @@ class _WishlistPageState extends State<WishlistPage> {
               title: Text(isCompleted ? 'Mark as Not Acquired' : 'Mark as Acquired'),
               onTap: () async {
                 Navigator.pop(context);
-                final success = await _controller.toggleCompleted(item);
+                final success = await controller.toggleCompleted(item);
                 if (success && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -687,7 +681,7 @@ class _WishlistPageState extends State<WishlistPage> {
               title: const Text('Edit'),
               onTap: () {
                 Navigator.pop(context);
-                _showEditDialog(item);
+                _showEditDialog(item, controller);
               },
             ),
             ListTile(
@@ -695,7 +689,7 @@ class _WishlistPageState extends State<WishlistPage> {
               title: const Text('Delete'),
               onTap: () {
                 Navigator.pop(context);
-                _confirmDelete(item);
+                _confirmDelete(item, controller);
               },
             ),
             const SizedBox(height: 20),
@@ -705,7 +699,7 @@ class _WishlistPageState extends State<WishlistPage> {
     );
   }
 
-  void _confirmDelete(Wish item) {
+  void _confirmDelete(Wish item, WishlistController controller) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -719,7 +713,7 @@ class _WishlistPageState extends State<WishlistPage> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await _controller.deleteWish(item);
+              final success = await controller.deleteWish(item);
               if (success && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Item deleted')),
@@ -738,20 +732,21 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   void _showAddDialog() {
+    final controller = Provider.of<WishlistProvider>(context, listen: false).controller;
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddWishlistScreen(controller: _controller),
+        builder: (context) => AddWishlistScreen(controller: controller),
       ),
     );
   }
 
-  void _showEditDialog(Wish item) {
+  void _showEditDialog(Wish item, WishlistController controller) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AddWishlistScreen(
-          controller: _controller,
+          controller: controller,
           itemToEdit: item,
         ),
       ),
@@ -881,7 +876,8 @@ class _WishlistPageState extends State<WishlistPage> {
                       return;
                     }
 
-                    final success = await _controller.createCategory(
+                    final controller = Provider.of<WishlistProvider>(context, listen: false).controller;
+                    final success = await controller.createCategory(
                       nameController.text.trim().toLowerCase(),
                       labelController.text.trim(),
                       selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase(),
