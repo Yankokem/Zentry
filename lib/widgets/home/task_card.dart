@@ -78,7 +78,7 @@ class TaskCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.access_time, size: 14, color: Colors.grey),
+                    const Icon(Icons.access_time, size: 14, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       time,
@@ -86,7 +86,7 @@ class TaskCard extends StatelessWidget {
                     ),
                     if (assignedTo != null) ...[
                       const SizedBox(width: 12),
-                      Icon(Icons.person, size: 14, color: Colors.grey),
+                      const Icon(Icons.person, size: 14, color: Colors.grey),
                       const SizedBox(width: 4),
                       Text(
                         assignedTo!,

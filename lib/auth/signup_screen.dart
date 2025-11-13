@@ -396,7 +396,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      "Already have an account? ",
+                      'Already have an account? ',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     TextButton(
