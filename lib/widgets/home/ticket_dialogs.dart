@@ -444,10 +444,10 @@ class TicketDialogs {
                   children: [
                     Icon(Icons.edit, color: _getProjectColorFromTicket(ticket), size: 24),
                     const SizedBox(width: 8),
-                    Expanded(
+                    const Expanded(
                       child: Text(
                         'Edit Ticket',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),

@@ -213,7 +213,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
                 ),
                 child: DropdownButtonFormField<String>(
-                  value: _selectedStatus,
+                  initialValue: _selectedStatus,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                   ),
@@ -259,7 +259,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
                 ),
                 child: DropdownButtonFormField<String>(
-                  value: _selectedColor,
+                  initialValue: _selectedColor,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                   ),
@@ -333,6 +333,6 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
 extension StringExtension on String {
   String capitalize() {
-    return "${this[0].toUpperCase()}${substring(1)}";
+    return '${this[0].toUpperCase()}${substring(1)}';
   }
 }

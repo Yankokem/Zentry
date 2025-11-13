@@ -262,11 +262,11 @@ class _WishlistPageState extends State<WishlistPage> {
                                   color: Colors.green.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Row(
+                                child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(Icons.check, size: 12, color: Colors.green),
-                                    const SizedBox(width: 4),
+                                    SizedBox(width: 4),
                                     Text(
                                       'Acquired',
                                       style: TextStyle(
@@ -570,7 +570,7 @@ class _WishlistPageState extends State<WishlistPage> {
                               });
                               Navigator.pop(context);
                             },
-                            activeColor: Colors.green,
+                            activeThumbColor: Colors.green,
                           ),
                         ],
                       ),

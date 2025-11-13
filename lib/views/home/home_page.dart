@@ -7,6 +7,7 @@ import 'package:zentry/widgets/home/stat_card.dart';
 import 'package:zentry/widgets/home/task_card.dart';
 import 'package:zentry/widgets/home/wish_card.dart';
 import 'package:zentry/widgets/home/recent_journal_card.dart';
+import 'package:zentry/widgets/home/calendar_dialog.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -110,6 +111,16 @@ class _HomePageState extends State<HomePage> {
                           Row(
                             children: [
                               IconButton(
+                                icon: const Icon(Icons.calendar_today_outlined),
+                                color: const Color(0xFF1E1E1E),
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => const CalendarDialog(),
+                                  );
+                                },
+                              ),
+                              IconButton(
                                 icon: const Icon(Icons.notifications_outlined),
                                 color: const Color(0xFF1E1E1E),
                                 onPressed: () {},
@@ -155,8 +166,8 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 24),
 
             // Task Overview Cards
-            Padding(
-              padding: const EdgeInsets.symmetric(
+            const Padding(
+              padding: EdgeInsets.symmetric(
                   horizontal: AppConstants.paddingMedium),
               child: Row(
                 children: [
@@ -168,7 +179,7 @@ class _HomePageState extends State<HomePage> {
                       color: Colors.green,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: StatCard(
                       icon: Icons.access_time_rounded,
@@ -177,7 +188,7 @@ class _HomePageState extends State<HomePage> {
                       color: Colors.orange,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: StatCard(
                       icon: Icons.trending_up_rounded,
@@ -225,21 +236,21 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 8),
 
-            TaskCard(
+            const TaskCard(
               title: 'Complete the final documentation',
               time: '10:30 AM',
               priority: 'high',
               assignedTo: 'John Doe',
               isDone: false,
             ),
-            TaskCard(
+            const TaskCard(
               title: 'Review pull request #342',
               time: '2:00 PM',
               priority: 'medium',
               assignedTo: 'Sarah Lee',
               isDone: false,
             ),
-            TaskCard(
+            const TaskCard(
               title: 'Update server dependencies',
               time: 'Tomorrow',
               priority: 'medium',
@@ -282,14 +293,14 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 8),
 
-            TaskCard(
+            const TaskCard(
               title: 'Buy groceries',
               time: '4:30 PM',
               priority: 'medium',
               assignedTo: null,
               isDone: false,
             ),
-            TaskCard(
+            const TaskCard(
               title: 'Call dentist',
               time: 'Tomorrow',
               priority: 'low',
@@ -410,7 +421,7 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 8),
 
-            RecentJournalCard(
+            const RecentJournalCard(
               date: 'Nov 2, 2025',
               emoji: '😊',
               title: 'A Productive Day',
@@ -459,7 +470,7 @@ class _HomePageState extends State<HomePage> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.paddingMedium),
-                children: [
+                children: const [
                   WishCard(
                     title: 'New MacBook Pro',
                     price: '\$2,499',

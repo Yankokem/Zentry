@@ -1,5 +1,9 @@
-- [x] Add an "Add Project" button to the ProjectsPage header next to the search icon
-- [x] Update AddMenuWidget to include "New Project" option (if needed, but since we're adding direct button, maybe not necessary)
-- [x] Create lib/views/home/add_project_page.dart with a form for project details (title, description, team members, status, color)
-- [x] Implement form validation and submission to add project via ProjectManager
-- [ ] Test the add project functionality
+# TODO: Add Calendar for Project Deadlines
+
+## Steps to Complete
+- [x] Update Project model to include deadline field
+- [x] Add table_calendar dependency to pubspec.yaml
+- [x] Run flutter pub get to install new dependency
+- [x] Create CalendarDialog widget in lib/widgets/home/calendar_dialog.dart
+- [x] Update HomePage to add calendar icon and tap handler
+- [x] Test calendar display and deadline highlighting

@@ -7,6 +7,7 @@ class Project {
   final int totalTickets;
   final int completedTickets;
   final String color;
+  final DateTime? deadline;
 
   Project({
     required this.id,
@@ -17,6 +18,7 @@ class Project {
     required this.totalTickets,
     required this.completedTickets,
     this.color = 'yellow',
+    this.deadline,
   });
 
   double get progressPercentage {
@@ -34,6 +36,7 @@ class Project {
       'totalTickets': totalTickets,
       'completedTickets': completedTickets,
       'color': color,
+      'deadline': deadline?.toIso8601String(),
     };
   }
 
@@ -47,6 +50,7 @@ class Project {
       totalTickets: map['totalTickets'],
       completedTickets: map['completedTickets'],
       color: map['color'] ?? 'yellow',
+      deadline: map['deadline'] != null ? DateTime.parse(map['deadline']) : null,
     );
   }
 }
