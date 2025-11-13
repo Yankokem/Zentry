@@ -473,17 +473,17 @@ class _HomePageState extends State<HomePage> {
                 children: const [
                   WishCard(
                     title: 'New MacBook Pro',
-                    price: '\$2,499',
+                    price: '₱2,499',
                     image: Icons.laptop_mac,
                   ),
                   WishCard(
                     title: 'Trip to Japan',
-                    price: '\$3,500',
+                    price: '₱3,500',
                     image: Icons.flight_takeoff,
                   ),
                   WishCard(
                     title: 'New Camera',
-                    price: '\$1,200',
+                    price: '₱1,200',
                     image: Icons.camera_alt,
                   ),
                 ],

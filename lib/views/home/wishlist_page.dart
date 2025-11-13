@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zentry/config/constants.dart';
-import 'package:zentry/services/wishlist_manager.dart';
+import 'package:zentry/controllers/wishlist_controller.dart';
 import 'package:zentry/models/wish_model.dart';
+import 'add_wishlist_screen.dart';
 
 class WishlistPage extends StatefulWidget {
   const WishlistPage({super.key});
@@ -12,7 +13,7 @@ class WishlistPage extends StatefulWidget {
 }
 
 class _WishlistPageState extends State<WishlistPage> {
-  final WishlistManager _manager = WishlistManager();
+  late WishlistController _controller;
   String _selectedCategory = 'all';
 
   @override
@@ -24,36 +25,39 @@ class _WishlistPageState extends State<WishlistPage> {
         statusBarIconBrightness: Brightness.dark,
       ),
     );
+    
+    // Initialize controller
+    _controller = WishlistController();
+    _controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   List<Wish> _getFilteredItems() {
-    if (_selectedCategory == 'all') return _manager.items;
-    return _manager.items.where((item) => item.category == _selectedCategory).toList();
+    final wishes = _controller.wishes;
+    if (_selectedCategory == 'all') return wishes;
+    return wishes.where((item) => item.category == _selectedCategory).toList();
   }
 
   Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'tech':
-        return const Color(0xFF42A5F5);
-      case 'travel':
-        return const Color(0xFF66BB6A);
-      case 'fashion':
-        return const Color(0xFFAB47BC);
-      case 'home':
-        return const Color(0xFFFFA726);
-      default:
-        return const Color(0xFF78909C);
-    }
+    return _controller.getCategoryColor(category);
   }
 
   @override
   Widget build(BuildContext context) {
-    final filteredItems = _getFilteredItems();
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final filteredItems = _getFilteredItems();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9ED69),
-      body: Column(
-        children: [
+        return Scaffold(
+          backgroundColor: const Color(0xFFF9ED69),
+          body: Column(
+            children: [
           // Header - EXACTLY like journal
           Container(
             width: double.infinity,
@@ -103,7 +107,7 @@ class _WishlistPageState extends State<WishlistPage> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '${_getCompletedCount()}/${_manager.items.length} items',
+                            '${_controller.completedCount}/${_controller.totalCount} items',
                             style: const TextStyle(
                               color: Color(0xFFF9ED69),
                               fontWeight: FontWeight.bold,
@@ -120,13 +124,12 @@ class _WishlistPageState extends State<WishlistPage> {
                         children: [
                           _buildCategoryChip('all', 'All'),
                           const SizedBox(width: 8),
-                          _buildCategoryChip('tech', 'Tech'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('travel', 'Travel'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('fashion', 'Fashion'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('home', 'Home'),
+                          ..._controller.categories.map((category) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildCategoryChip(category.name, category.label),
+                            );
+                          }).toList(),
                         ],
                       ),
                     ),
@@ -153,6 +156,8 @@ class _WishlistPageState extends State<WishlistPage> {
           ),
         ],
       ),
+        );
+      },
     );
   }
 
@@ -219,20 +224,25 @@ class _WishlistPageState extends State<WishlistPage> {
             children: [
               Row(
                 children: [
-                  // Checkbox on the left like the image
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? Colors.green.withOpacity(0.1)
-                          : _getCategoryColor(item.category).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      isCompleted ? Icons.check_circle : Icons.circle_outlined,
-                      color: isCompleted ? Colors.green : _getCategoryColor(item.category),
-                      size: 24,
+                  // Checkbox on the left like the image - NOW FUNCTIONAL!
+                  GestureDetector(
+                    onTap: () async {
+                      await _controller.toggleCompleted(item);
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? Colors.green.withOpacity(0.1)
+                            : _getCategoryColor(item.category).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        isCompleted ? Icons.check_circle : Icons.circle_outlined,
+                        color: isCompleted ? Colors.green : _getCategoryColor(item.category),
+                        size: 24,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -296,7 +306,7 @@ class _WishlistPageState extends State<WishlistPage> {
                             Icon(Icons.attach_money, size: 12, color: Colors.grey.shade600),
                             const SizedBox(width: 4),
                             Text(
-                              '\$${item.price}',
+                              '₱${item.price}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade600,
@@ -346,10 +356,11 @@ class _WishlistPageState extends State<WishlistPage> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _manager.updateItem(item, item.copyWith(completed: !isCompleted));
-                      });
+                    onTap: () async {
+                      final success = await _controller.toggleCompleted(item);
+                      if (success && mounted) {
+                        setState(() {});
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -491,7 +502,7 @@ class _WishlistPageState extends State<WishlistPage> {
                       Icon(Icons.attach_money, size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
-                        '\$${item.price}',
+                        '₱${item.price}',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
@@ -508,7 +519,7 @@ class _WishlistPageState extends State<WishlistPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Checklist section
+                    // Item Acquired Toggle - simplified, checkbox removed
                     Container(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
@@ -518,26 +529,6 @@ class _WishlistPageState extends State<WishlistPage> {
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: isCompleted ? Colors.green : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isCompleted ? Colors.green : Colors.grey.shade400,
-                                width: 2,
-                              ),
-                            ),
-                            child: isCompleted
-                                ? const Icon(
-                                    Icons.check,
-                                    size: 18,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,11 +555,11 @@ class _WishlistPageState extends State<WishlistPage> {
                           ),
                           Switch(
                             value: isCompleted,
-                            onChanged: (value) {
-                              setState(() {
-                                _manager.updateItem(item, item.copyWith(completed: value));
-                              });
-                              Navigator.pop(context);
+                            onChanged: (value) async {
+                              final success = await _controller.toggleCompleted(item);
+                              if (success && mounted) {
+                                Navigator.pop(context);
+                              }
                             },
                             activeThumbColor: Colors.green,
                           ),
@@ -576,6 +567,26 @@ class _WishlistPageState extends State<WishlistPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    if (item.sharedWith.isNotEmpty) ...[
+                      Text(
+                        'Shared With',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: item.sharedWith.map((email) {
+                          return Chip(
+                            label: Text(email),
+                            backgroundColor: Colors.grey.shade200,
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Text(
                       'Notes',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -680,17 +691,17 @@ class _WishlistPageState extends State<WishlistPage> {
                 color: isCompleted ? Colors.orange : Colors.green,
               ),
               title: Text(isCompleted ? 'Mark as Not Acquired' : 'Mark as Acquired'),
-              onTap: () {
-                setState(() {
-                  _manager.updateItem(item, item.copyWith(completed: !isCompleted));
-                });
+              onTap: () async {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(isCompleted ? 'Item marked as not acquired' : 'Item marked as acquired!'),
-                    backgroundColor: isCompleted ? Colors.orange : Colors.green,
-                  ),
-                );
+                final success = await _controller.toggleCompleted(item);
+                if (success && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(isCompleted ? 'Item marked as not acquired' : 'Item marked as acquired!'),
+                      backgroundColor: isCompleted ? Colors.orange : Colors.green,
+                    ),
+                  );
+                }
               },
             ),
             ListTile(
@@ -728,14 +739,14 @@ class _WishlistPageState extends State<WishlistPage> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _manager.removeItem(item);
-              });
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Item deleted')),
-              );
+              final success = await _controller.deleteWish(item);
+              if (success && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Item deleted')),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -749,546 +760,165 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   void _showAddDialog() {
-    final titleController = TextEditingController();
-    final priceController = TextEditingController();
-    final notesController = TextEditingController();
-    String selectedCategory = 'tech';
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final color = _getCategoryColor(selectedCategory);
-
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: [
-                Icon(Icons.add_circle, color: color, size: 28),
-                const SizedBox(width: 12),
-                const Text(
-                  'New Wishlist Item',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Category Selection Section
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.category, size: 18, color: Colors.grey.shade600),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Category',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _buildCategoryChipDialog('tech', 'Tech', selectedCategory, (category) {
-                              setDialogState(() => selectedCategory = category);
-                            }),
-                            _buildCategoryChipDialog('travel', 'Travel', selectedCategory, (category) {
-                              setDialogState(() => selectedCategory = category);
-                            }),
-                            _buildCategoryChipDialog('fashion', 'Fashion', selectedCategory, (category) {
-                              setDialogState(() => selectedCategory = category);
-                            }),
-                            _buildCategoryChipDialog('home', 'Home', selectedCategory, (category) {
-                              setDialogState(() => selectedCategory = category);
-                            }),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Item Details Section
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.shopping_bag, size: 18, color: Colors.grey.shade600),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Item Details',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: titleController,
-                          style: const TextStyle(fontSize: 16),
-                          decoration: InputDecoration(
-                            labelText: 'Item Name',
-                            hintText: 'What do you want to get?',
-                            labelStyle: TextStyle(color: Colors.grey.shade600),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: color, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            suffixIcon: titleController.text.isNotEmpty
-                                ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: priceController,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 16),
-                          decoration: InputDecoration(
-                            labelText: 'Price',
-                            hintText: 'Estimated cost',
-                            prefixText: '\$ ',
-                            labelStyle: TextStyle(color: Colors.grey.shade600),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: color, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            suffixIcon: priceController.text.isNotEmpty
-                                ? const Icon(Icons.attach_money, color: Colors.green, size: 20)
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: notesController,
-                          style: const TextStyle(fontSize: 16),
-                          decoration: InputDecoration(
-                            labelText: 'Notes',
-                            hintText: 'Why do you want this?',
-                            labelStyle: TextStyle(color: Colors.grey.shade600),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: color, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          maxLines: 3,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () {
-                  if (titleController.text.isNotEmpty && priceController.text.isNotEmpty) {
-                    setState(() {
-                      _manager.addItem(Wish(
-                        title: titleController.text,
-                        price: priceController.text,
-                        category: selectedCategory,
-                        notes: notesController.text.isEmpty ? 'No notes' : notesController.text,
-                        dateAdded: _getCurrentDate(),
-                        completed: false,
-                      ));
-                    });
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Wishlist item added'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 2,
-                ),
-                child: const Text(
-                  'Add Item',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildCategoryChipDialog(String category, String label, String selectedCategory, Function(String) onTap) {
-    final isSelected = selectedCategory == category;
-    final color = _getCategoryColor(category);
-    
-    return GestureDetector(
-      onTap: () => onTap(category),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? color : color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? color : color.withOpacity(0.3),
-            width: 2,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : color.withOpacity(0.8),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            fontSize: 14,
-          ),
-        ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddWishlistScreen(controller: _controller),
       ),
     );
   }
 
   void _showEditDialog(Wish item) {
-    final titleController = TextEditingController(text: item.title);
-    final priceController = TextEditingController(text: item.price);
-    final notesController = TextEditingController(text: item.notes);
-    String selectedCategory = item.category;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddWishlistScreen(
+          controller: _controller,
+          itemToEdit: item,
+        ),
+      ),
+    );
+  }
+  void _showAddCategoryDialog() {
+    final nameController = TextEditingController();
+    Color selectedColor = Colors.blue;
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final color = _getCategoryColor(selectedCategory);
-
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: [
-                Icon(Icons.edit, color: color, size: 28),
-                const SizedBox(width: 12),
-                const Text(
-                  'Edit Wishlist Item',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
                 children: [
-                  // Category Selection Section
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.category, size: 18, color: Colors.grey.shade600),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Category',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _buildCategoryChipDialog('tech', 'Tech', selectedCategory, (category) {
-                              setDialogState(() => selectedCategory = category);
-                            }),
-                            _buildCategoryChipDialog('travel', 'Travel', selectedCategory, (category) {
-                              setDialogState(() => selectedCategory = category);
-                            }),
-                            _buildCategoryChipDialog('fashion', 'Fashion', selectedCategory, (category) {
-                              setDialogState(() => selectedCategory = category);
-                            }),
-                            _buildCategoryChipDialog('home', 'Home', selectedCategory, (category) {
-                              setDialogState(() => selectedCategory = category);
-                            }),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Item Details Section
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.shopping_bag, size: 18, color: Colors.grey.shade600),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Item Details',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: titleController,
-                          style: const TextStyle(fontSize: 16),
-                          decoration: InputDecoration(
-                            labelText: 'Item Name',
-                            hintText: 'What do you want to get?',
-                            labelStyle: TextStyle(color: Colors.grey.shade600),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: color, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            suffixIcon: titleController.text.isNotEmpty
-                                ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: priceController,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 16),
-                          decoration: InputDecoration(
-                            labelText: 'Price',
-                            hintText: 'Estimated cost',
-                            prefixText: '\$ ',
-                            labelStyle: TextStyle(color: Colors.grey.shade600),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: color, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            suffixIcon: priceController.text.isNotEmpty
-                                ? const Icon(Icons.attach_money, color: Colors.green, size: 20)
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: notesController,
-                          style: const TextStyle(fontSize: 16),
-                          decoration: InputDecoration(
-                            labelText: 'Notes',
-                            hintText: 'Why do you want this?',
-                            labelStyle: TextStyle(color: Colors.grey.shade600),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: color, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                          ),
-                          maxLines: 3,
-                        ),
-                      ],
-                    ),
-                  ),
+                  Icon(Icons.add_circle, color: selectedColor),
+                  const SizedBox(width: 12),
+                  const Text('Add Custom Category'),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () {
-                  if (titleController.text.isNotEmpty && priceController.text.isNotEmpty) {
-                    setState(() {
-                      _manager.updateItem(item, Wish(
-                        title: titleController.text,
-                        price: priceController.text,
-                        category: selectedCategory,
-                        notes: notesController.text,
-                        dateAdded: item.dateAdded,
-                        completed: item.completed,
-                      ));
-                    });
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Wishlist item updated'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: 'Category Name (e.g., "Books")',
+                        hintText: 'Books',
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 2,
-                ),
-                child: const Text(
-                  'Save Changes',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Category Color',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Color picker - simple grid of colors
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        Colors.blue,
+                        Colors.green,
+                        Colors.purple,
+                        Colors.orange,
+                        Colors.red,
+                        Colors.pink,
+                        Colors.teal,
+                        Colors.indigo,
+                        Colors.amber,
+                        Colors.cyan,
+                        Colors.lime,
+                        Colors.brown,
+                      ].map((color) {
+                        final isSelected = color.value == selectedColor.value;
+                        return GestureDetector(
+                          onTap: () {
+                            setDialogState(() => selectedColor = color);
+                          },
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? Colors.black : Colors.grey.shade300,
+                                width: isSelected ? 3 : 1,
+                              ),
+                            ),
+                            child: isSelected
+                                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          );
-        },
-      ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (nameController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please fill in all fields'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+                    final String name = nameController.text.trim();
+                    final String label = name;
+                    final String nameLower = name.toLowerCase();
+
+                    final success = await _controller.createCategory(
+                      nameLower,
+                      label,
+                      selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase(),
+                    );
+
+                    if (success && mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Category created successfully'),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: selectedColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Create'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1297,8 +927,8 @@ class _WishlistPageState extends State<WishlistPage> {
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
   }
-
-  int _getCompletedCount() {
-    return _manager.items.where((item) => item.completed == true).length;
-  }
 }
+
+
+
+

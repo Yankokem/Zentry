@@ -25,7 +25,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_selectedIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _pages,
+      ),
       extendBody: true,
       bottomNavigationBar: FloatingNavBar(
         currentIndex: _selectedIndex,
