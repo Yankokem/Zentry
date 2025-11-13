@@ -124,13 +124,12 @@ class _WishlistPageState extends State<WishlistPage> {
                         children: [
                           _buildCategoryChip('all', 'All'),
                           const SizedBox(width: 8),
-                          _buildCategoryChip('tech', 'Tech'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('travel', 'Travel'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('fashion', 'Fashion'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('home', 'Home'),
+                          ..._controller.categories.map((category) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildCategoryChip(category.name, category.label),
+                            );
+                          }).toList(),
                         ],
                       ),
                     ),
@@ -568,6 +567,26 @@ class _WishlistPageState extends State<WishlistPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    if (item.sharedWith.isNotEmpty) ...[
+                      Text(
+                        'Shared With',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: item.sharedWith.map((email) {
+                          return Chip(
+                            label: Text(email),
+                            backgroundColor: Colors.grey.shade200,
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Text(
                       'Notes',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -762,7 +781,6 @@ class _WishlistPageState extends State<WishlistPage> {
   }
   void _showAddCategoryDialog() {
     final nameController = TextEditingController();
-    final labelController = TextEditingController();
     Color selectedColor = Colors.blue;
 
     showDialog(
@@ -789,24 +807,7 @@ class _WishlistPageState extends State<WishlistPage> {
                     TextField(
                       controller: nameController,
                       decoration: InputDecoration(
-                        labelText: 'Category Name (lowercase, e.g., "books")',
-                        hintText: 'books',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onChanged: (value) {
-                        // Auto-fill label if empty
-                        if (labelController.text.isEmpty && value.isNotEmpty) {
-                          labelController.text = value[0].toUpperCase() + value.substring(1);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: labelController,
-                      decoration: InputDecoration(
-                        labelText: 'Display Label (e.g., "Books")',
+                        labelText: 'Category Name (e.g., "Books")',
                         hintText: 'Books',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -874,7 +875,7 @@ class _WishlistPageState extends State<WishlistPage> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    if (nameController.text.trim().isEmpty || labelController.text.trim().isEmpty) {
+                    if (nameController.text.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Please fill in all fields'),
@@ -883,10 +884,13 @@ class _WishlistPageState extends State<WishlistPage> {
                       );
                       return;
                     }
+                    final String name = nameController.text.trim();
+                    final String label = name;
+                    final String nameLower = name.toLowerCase();
 
                     final success = await _controller.createCategory(
-                      nameController.text.trim().toLowerCase(),
-                      labelController.text.trim(),
+                      nameLower,
+                      label,
                       selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase(),
                     );
 

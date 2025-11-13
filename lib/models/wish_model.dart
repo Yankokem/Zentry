@@ -6,6 +6,7 @@ class Wish {
   final String notes;
   final String dateAdded;
   final bool completed;
+  final List<String> sharedWith; // List of user emails
 
   Wish({
     this.id,
@@ -15,6 +16,7 @@ class Wish {
     required this.notes,
     required this.dateAdded,
     this.completed = false,
+    this.sharedWith = const [],
   });
 
   // Convert to Map for compatibility with existing code
@@ -26,6 +28,7 @@ class Wish {
       'notes': notes,
       'dateAdded': dateAdded,
       'completed': completed,
+      'sharedWith': sharedWith,
     };
   }
 
@@ -38,6 +41,7 @@ class Wish {
       'notes': notes,
       'dateAdded': dateAdded,
       'completed': completed,
+      'sharedWith': sharedWith,
       'createdAt': dateAdded, // Keep original dateAdded for display
     };
   }
@@ -51,6 +55,7 @@ class Wish {
       notes: map['notes'] ?? '',
       dateAdded: map['dateAdded'] ?? '',
       completed: map['completed'] ?? false,
+      sharedWith: List<String>.from(map['sharedWith'] ?? []),
     );
   }
 
@@ -64,6 +69,7 @@ class Wish {
       notes: data['notes'] ?? '',
       dateAdded: data['dateAdded'] ?? '',
       completed: data['completed'] ?? false,
+      sharedWith: List<String>.from(data['sharedWith'] ?? []),
     );
   }
 
@@ -76,6 +82,7 @@ class Wish {
     String? notes,
     String? dateAdded,
     bool? completed,
+    List<String>? sharedWith,
   }) {
     return Wish(
       id: id ?? this.id,
@@ -85,6 +92,7 @@ class Wish {
       notes: notes ?? this.notes,
       dateAdded: dateAdded ?? this.dateAdded,
       completed: completed ?? this.completed,
+      sharedWith: sharedWith ?? this.sharedWith,
     );
   }
 }

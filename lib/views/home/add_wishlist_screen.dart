@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../config/theme.dart';
 import '../../controllers/wishlist_controller.dart';
 import '../../models/wish_model.dart';
+import '../../services/firebase/user_service.dart';
 
 class AddWishlistScreen extends StatefulWidget {
   final WishlistController controller;
@@ -23,6 +24,8 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
   final _priceController = TextEditingController();
   final _shareWithController = TextEditingController();
   final _notesController = TextEditingController();
+  final _userService = UserService();
+  final List<String> _sharedWithEmails = [];
 
   String _selectedCategory = 'tech';
   bool _isLoading = false;
@@ -35,6 +38,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       _priceController.text = widget.itemToEdit!.price;
       _notesController.text = widget.itemToEdit!.notes;
       _selectedCategory = widget.itemToEdit!.category;
+      _sharedWithEmails.addAll(widget.itemToEdit!.sharedWith);
     }
   }
 
@@ -66,6 +70,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       notes: _notesController.text.trim(),
       dateAdded: widget.itemToEdit?.dateAdded ?? _getCurrentDate(),
       completed: widget.itemToEdit?.completed ?? false,
+      sharedWith: _sharedWithEmails,
     );
 
     bool success;
@@ -93,7 +98,6 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
 
   void _showAddCategoryDialog() {
     final nameController = TextEditingController();
-    final labelController = TextEditingController();
     Color selectedColor = Colors.blue;
 
     showDialog(
@@ -117,30 +121,34 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: InputDecoration(
-                        labelText: 'Category Name (lowercase, e.g., "books")',
-                        hintText: 'books',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onChanged: (value) {
-                        if (labelController.text.isEmpty && value.isNotEmpty) {
-                          labelController.text =
-                              value[0].toUpperCase() + value.substring(1);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: labelController,
-                      decoration: InputDecoration(
-                        labelText: 'Display Label (e.g., "Books")',
-                        hintText: 'Books',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    SizedBox(
+                      width: 300,
+                      child: TextField(
+                        controller: nameController,
+                        decoration: InputDecoration(
+                          labelText: 'Category Name (e.g., "books")',
+                          hintText: 'books',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.grey,
+                              width: 1.5,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.grey,
+                              width: 1.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: selectedColor,
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -202,20 +210,22 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    if (nameController.text.trim().isEmpty ||
-                        labelController.text.trim().isEmpty) {
+                    if (nameController.text.trim().isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Please fill in all fields'),
+                          content: Text('Please enter a category name'),
                           backgroundColor: Colors.red,
                         ),
                       );
                       return;
                     }
 
+                    final categoryName = nameController.text.trim().toLowerCase();
+                    final displayLabel = categoryName[0].toUpperCase() + categoryName.substring(1);
+
                     final success = await widget.controller.createCategory(
-                      nameController.text.trim().toLowerCase(),
-                      labelController.text.trim(),
+                      categoryName,
+                      displayLabel,
                       selectedColor.value
                           .toRadixString(16)
                           .padLeft(8, '0')
@@ -436,24 +446,38 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                   ),
             ),
             const SizedBox(height: 8),
-            TextFormField(
-              controller: _shareWithController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                hintText: 'Enter email address',
-                filled: true,
-                fillColor: AppTheme.surface,
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              validator: (value) {
-                if (value != null && value.trim().isNotEmpty) {
-                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                  if (!emailRegex.hasMatch(value.trim())) {
-                    return 'Please enter a valid email address';
-                  }
-                }
-                return null;
-              },
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ShareWithField(
+                  controller: _shareWithController,
+                  userService: _userService,
+                  onEmailSelected: (email) {
+                    setState(() {
+                      if (!_sharedWithEmails.contains(email)) {
+                        _sharedWithEmails.add(email);
+                      }
+                      _shareWithController.clear();
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                if (_sharedWithEmails.isNotEmpty)
+                  Wrap(
+                    spacing: 8.0,
+                    runSpacing: 4.0,
+                    children: _sharedWithEmails
+                        .map((email) => Chip(
+                              label: Text(email),
+                              onDeleted: () {
+                                setState(() {
+                                  _sharedWithEmails.remove(email);
+                                });
+                              },
+                            ))
+                        .toList(),
+                  ),
+              ],
             ),
             const SizedBox(height: 20),
 
@@ -513,3 +537,136 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     );
   }
 }
+
+class _ShareWithField extends StatefulWidget {
+  final TextEditingController controller;
+  final UserService userService;
+  final Function(String) onEmailSelected;
+
+  const _ShareWithField({
+    required this.controller,
+    required this.userService,
+    required this.onEmailSelected,
+  });
+
+  @override
+  State<_ShareWithField> createState() => _ShareWithFieldState();
+}
+
+class _ShareWithFieldState extends State<_ShareWithField> {
+  List<String> _suggestions = [];
+  bool _isLoading = false;
+  final LayerLink _layerLink = LayerLink();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTextChanged);
+    super.dispose();
+  }
+
+  void _onTextChanged() async {
+    final text = widget.controller.text;
+    if (text.isEmpty) {
+      setState(() {
+        _suggestions = [];
+        _isLoading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final results = await widget.userService.searchUsers(text);
+      setState(() {
+        _suggestions = results;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _suggestions = [];
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: Stack(
+        children: [
+          TextField(
+            controller: widget.controller,
+            decoration: InputDecoration(
+              hintText: 'Enter email to share with',
+              filled: true,
+              fillColor: const Color(0xFFF5F5F5),
+              prefixIcon: const Icon(Icons.email_outlined),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          if (_suggestions.isNotEmpty || _isLoading)
+            CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              offset: const Offset(0, 52),
+              child: Container(
+                width: 300,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: _isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _suggestions.length,
+                        itemBuilder: (context, index) {
+                          final email = _suggestions[index];
+                          return ListTile(
+                            title: Text(email),
+                            onTap: () {
+                              widget.onEmailSelected(email);
+                              setState(() {
+                                _suggestions = [];
+                              });
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
