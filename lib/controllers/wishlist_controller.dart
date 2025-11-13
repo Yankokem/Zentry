@@ -53,12 +53,15 @@ class WishlistController extends ChangeNotifier {
 
     _wishesSubscription = _service.getWishesStream().listen(
       (wishes) {
+        debugPrint('🔥 Wishlist stream received ${wishes.length} items');
         _wishes = wishes;
         _error = null;
         _setLoading(false);
         notifyListeners(); // Explicitly notify on every update
+        debugPrint('✅ notifyListeners() called - AnimatedBuilder should rebuild');
       },
       onError: (error) {
+        debugPrint('❌ Wishlist stream error: $error');
         _error = 'Failed to load wishes: $error';
         _setLoading(false);
         notifyListeners(); // Notify on error too
