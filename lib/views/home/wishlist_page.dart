@@ -235,20 +235,25 @@ class _WishlistPageState extends State<WishlistPage> {
             children: [
               Row(
                 children: [
-                  // Checkbox on the left like the image
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? Colors.green.withOpacity(0.1)
-                          : _getCategoryColor(item.category).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      isCompleted ? Icons.check_circle : Icons.circle_outlined,
-                      color: isCompleted ? Colors.green : _getCategoryColor(item.category),
-                      size: 24,
+                  // Checkbox on the left like the image - NOW FUNCTIONAL!
+                  GestureDetector(
+                    onTap: () async {
+                      await _controller.toggleCompleted(item);
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? Colors.green.withOpacity(0.1)
+                            : _getCategoryColor(item.category).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        isCompleted ? Icons.check_circle : Icons.circle_outlined,
+                        color: isCompleted ? Colors.green : _getCategoryColor(item.category),
+                        size: 24,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -312,7 +317,7 @@ class _WishlistPageState extends State<WishlistPage> {
                             Icon(Icons.attach_money, size: 12, color: Colors.grey.shade600),
                             const SizedBox(width: 4),
                             Text(
-                              '\$${item.price}',
+                              '₱${item.price}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade600,
@@ -508,7 +513,7 @@ class _WishlistPageState extends State<WishlistPage> {
                       Icon(Icons.attach_money, size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
-                        '\$${item.price}',
+                        '₱${item.price}',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
@@ -525,7 +530,7 @@ class _WishlistPageState extends State<WishlistPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Checklist section
+                    // Item Acquired Toggle - simplified, checkbox removed
                     Container(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
@@ -535,26 +540,6 @@ class _WishlistPageState extends State<WishlistPage> {
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: isCompleted ? Colors.green : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isCompleted ? Colors.green : Colors.grey.shade400,
-                                width: 2,
-                              ),
-                            ),
-                            child: isCompleted
-                                ? const Icon(
-                                    Icons.check,
-                                    size: 18,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -909,7 +894,7 @@ class _WishlistPageState extends State<WishlistPage> {
                           decoration: InputDecoration(
                             labelText: 'Price',
                             hintText: 'Estimated cost',
-                            prefixText: '\$ ',
+                            prefixText: ' ',
                             labelStyle: TextStyle(color: Colors.grey.shade600),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -1196,7 +1181,7 @@ class _WishlistPageState extends State<WishlistPage> {
                           decoration: InputDecoration(
                             labelText: 'Price',
                             hintText: 'Estimated cost',
-                            prefixText: '\$ ',
+                            prefixText: ' ',
                             labelStyle: TextStyle(color: Colors.grey.shade600),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
