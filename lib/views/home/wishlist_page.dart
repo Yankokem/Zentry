@@ -123,35 +123,25 @@ class _WishlistPageState extends State<WishlistPage> {
                         children: [
                           _buildCategoryChip('all', 'All'),
                           const SizedBox(width: 8),
-                          // Dynamic category chips
-                          ..._controller.categories.map((category) => Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: _buildCategoryChip(category.name, category.label),
-                              )),
-                          // Add category button
+                          _buildCategoryChip('tech', 'Tech'),
+                          const SizedBox(width: 8),
+                          _buildCategoryChip('travel', 'Travel'),
+                          const SizedBox(width: 8),
+                          _buildCategoryChip('fashion', 'Fashion'),
+                          const SizedBox(width: 8),
+                          _buildCategoryChip('home', 'Home'),
+                          const SizedBox(width: 8),
+                          // Add category button (plus icon)
                           GestureDetector(
                             onTap: _showAddCategoryDialog,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade200,
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(color: Colors.grey.shade400, width: 1.5),
                               ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.add, size: 18, color: Colors.grey.shade700),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Add Category',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade700,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              child: Icon(Icons.add, size: 18, color: Colors.grey.shade700),
                             ),
                           ),
                         ],
