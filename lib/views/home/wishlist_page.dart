@@ -43,18 +43,7 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'tech':
-        return const Color(0xFF42A5F5);
-      case 'travel':
-        return const Color(0xFF66BB6A);
-      case 'fashion':
-        return const Color(0xFFAB47BC);
-      case 'home':
-        return const Color(0xFFFFA726);
-      default:
-        return const Color(0xFF78909C);
-    }
+    return _controller.getCategoryColor(category);
   }
 
   @override
@@ -134,13 +123,37 @@ class _WishlistPageState extends State<WishlistPage> {
                         children: [
                           _buildCategoryChip('all', 'All'),
                           const SizedBox(width: 8),
-                          _buildCategoryChip('tech', 'Tech'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('travel', 'Travel'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('fashion', 'Fashion'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('home', 'Home'),
+                          // Dynamic category chips
+                          ..._controller.categories.map((category) => Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: _buildCategoryChip(category.name, category.label),
+                              )),
+                          // Add category button
+                          GestureDetector(
+                            onTap: _showAddCategoryDialog,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.grey.shade400, width: 1.5),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.add, size: 18, color: Colors.grey.shade700),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Add Category',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1297,9 +1310,168 @@ class _WishlistPageState extends State<WishlistPage> {
     );
   }
 
+  void _showAddCategoryDialog() {
+    final nameController = TextEditingController();
+    final labelController = TextEditingController();
+    Color selectedColor = Colors.blue;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(Icons.add_circle, color: selectedColor),
+                  const SizedBox(width: 12),
+                  const Text('Add Custom Category'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: 'Category Name (lowercase, e.g., "books")',
+                        hintText: 'books',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onChanged: (value) {
+                        // Auto-fill label if empty
+                        if (labelController.text.isEmpty && value.isNotEmpty) {
+                          labelController.text = value[0].toUpperCase() + value.substring(1);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: labelController,
+                      decoration: InputDecoration(
+                        labelText: 'Display Label (e.g., "Books")',
+                        hintText: 'Books',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Category Color',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Color picker - simple grid of colors
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        Colors.blue,
+                        Colors.green,
+                        Colors.purple,
+                        Colors.orange,
+                        Colors.red,
+                        Colors.pink,
+                        Colors.teal,
+                        Colors.indigo,
+                        Colors.amber,
+                        Colors.cyan,
+                        Colors.lime,
+                        Colors.brown,
+                      ].map((color) {
+                        final isSelected = color.value == selectedColor.value;
+                        return GestureDetector(
+                          onTap: () {
+                            setDialogState(() => selectedColor = color);
+                          },
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? Colors.black : Colors.grey.shade300,
+                                width: isSelected ? 3 : 1,
+                              ),
+                            ),
+                            child: isSelected
+                                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (nameController.text.trim().isEmpty || labelController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please fill in all fields'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    final success = await _controller.createCategory(
+                      nameController.text.trim().toLowerCase(),
+                      labelController.text.trim(),
+                      selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase(),
+                    );
+
+                    if (success && mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Category created successfully'),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: selectedColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Create'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   String _getCurrentDate() {
     final now = DateTime.now();
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
   }
 }
+

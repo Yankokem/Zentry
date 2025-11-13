@@ -1,20 +1,27 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../models/wish_model.dart';
+import '../models/category_model.dart';
 import '../services/firebase/wishlist_service.dart';
+import '../services/firebase/category_service.dart';
 
 /// Controller for managing wishlist state and business logic
 /// Uses ChangeNotifier for reactive state management
 class WishlistController extends ChangeNotifier {
   final WishlistService _service = WishlistService();
+  final CategoryService _categoryService = CategoryService();
   
   List<Wish> _wishes = [];
+  List<WishlistCategory> _categories = [];
   bool _isLoading = false;
   String? _error;
   StreamSubscription<List<Wish>>? _wishesSubscription;
+  StreamSubscription<List<WishlistCategory>>? _categoriesSubscription;
 
   // Getters
   List<Wish> get wishes => _wishes;
+  List<WishlistCategory> get categories => _categories;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get hasWishes => _wishes.isNotEmpty;
@@ -36,6 +43,7 @@ class WishlistController extends ChangeNotifier {
   /// Initialize and start listening to wishlist changes
   void initialize() {
     _listenToWishes();
+    _listenToCategories();
   }
 
   /// Listen to real-time wishlist updates from Firestore
@@ -52,6 +60,21 @@ class WishlistController extends ChangeNotifier {
       onError: (error) {
         _error = 'Failed to load wishes: $error';
         _setLoading(false);
+      },
+    );
+  }
+
+  /// Listen to real-time category updates from Firestore
+  void _listenToCategories() {
+    _categoriesSubscription?.cancel();
+
+    _categoriesSubscription = _categoryService.getCategoriesStream().listen(
+      (categories) {
+        _categories = categories;
+        notifyListeners();
+      },
+      onError: (error) {
+        debugPrint('Failed to load categories: $error');
       },
     );
   }
@@ -146,6 +169,49 @@ class WishlistController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Create a new custom category
+  Future<bool> createCategory(String name, String label, String colorHex) async {
+    try {
+      _error = null;
+      final category = WishlistCategory(
+        id: '', // Will be set by Firestore
+        name: name,
+        label: label,
+        colorHex: colorHex,
+        isDefault: false,
+        userId: '',
+      );
+      await _categoryService.createCategory(category);
+      return true;
+    } catch (e) {
+      _error = 'Failed to create category: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Delete a custom category
+  Future<bool> deleteCategory(String id) async {
+    try {
+      _error = null;
+      await _categoryService.deleteCategory(id);
+      return true;
+    } catch (e) {
+      _error = 'Failed to delete category: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Get Color from category name
+  Color getCategoryColor(String categoryName) {
+    final category = _categories.firstWhere(
+      (cat) => cat.name == categoryName,
+      orElse: () => WishlistCategory.defaultCategories.first,
+    );
+    return _categoryService.getColorFromHex(category.colorHex);
+  }
+
   /// Set loading state
   void _setLoading(bool loading) {
     _isLoading = loading;
@@ -155,6 +221,7 @@ class WishlistController extends ChangeNotifier {
   @override
   void dispose() {
     _wishesSubscription?.cancel();
+    _categoriesSubscription?.cancel();
     super.dispose();
   }
 }
