@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/controllers/wishlist_controller.dart';
 import 'package:zentry/models/wish_model.dart';
+import 'package:zentry/providers/wishlist_provider.dart';
 import 'add_wishlist_screen.dart';
 
 class WishlistPage extends StatefulWidget {
@@ -13,8 +15,8 @@ class WishlistPage extends StatefulWidget {
 }
 
 class _WishlistPageState extends State<WishlistPage> {
-  late WishlistController _controller;
   String _selectedCategory = 'all';
+  late WishlistController _controller;
 
   @override
   void initState() {
@@ -25,16 +27,12 @@ class _WishlistPageState extends State<WishlistPage> {
         statusBarIconBrightness: Brightness.dark,
       ),
     );
-    
-    // Initialize controller
-    _controller = WishlistController();
-    _controller.initialize();
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller = Provider.of<WishlistProvider>(context, listen: false).controller;
   }
 
   List<Wish> _getFilteredItems() {
@@ -49,9 +47,8 @@ class _WishlistPageState extends State<WishlistPage> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
+    return Consumer<WishlistProvider>(
+      builder: (context, wishlistProvider, child) {
         final filteredItems = _getFilteredItems();
 
         return Scaffold(
