@@ -23,7 +23,7 @@ class CategoryService {
     }
 
     return _categoriesRef
-        .where('userId', whereIn: ['', _userId])
+        .where('userId', isEqualTo: _userId)
         .snapshots()
         .map((snapshot) {
       // Get custom categories from Firestore
@@ -32,7 +32,7 @@ class CategoryService {
           doc.id,
           doc.data() as Map<String, dynamic>,
         );
-      }).where((cat) => !cat.isDefault).toList();
+      }).toList();
 
       // Combine default + custom categories
       return [...WishlistCategory.defaultCategories, ...customCategories];
@@ -47,7 +47,7 @@ class CategoryService {
       }
 
       final snapshot = await _categoriesRef
-          .where('userId', whereIn: ['', _userId])
+          .where('userId', isEqualTo: _userId)
           .get();
 
       final customCategories = snapshot.docs.map((doc) {
@@ -55,7 +55,7 @@ class CategoryService {
           doc.id,
           doc.data() as Map<String, dynamic>,
         );
-      }).where((cat) => !cat.isDefault).toList();
+      }).toList();
 
       return [...WishlistCategory.defaultCategories, ...customCategories];
     } catch (e) {

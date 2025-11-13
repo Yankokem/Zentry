@@ -130,20 +130,6 @@ class _WishlistPageState extends State<WishlistPage> {
                           _buildCategoryChip('fashion', 'Fashion'),
                           const SizedBox(width: 8),
                           _buildCategoryChip('home', 'Home'),
-                          const SizedBox(width: 8),
-                          // Add category button (plus icon)
-                          GestureDetector(
-                            onTap: _showAddCategoryDialog,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade200,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.grey.shade400, width: 1.5),
-                              ),
-                              child: Icon(Icons.add, size: 18, color: Colors.grey.shade700),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -1464,4 +1450,5 @@ class _WishlistPageState extends State<WishlistPage> {
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
   }
 }
+
 
