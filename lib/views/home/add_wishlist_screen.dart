@@ -78,21 +78,16 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     setState(() => _isLoading = false);
 
     if (success && mounted) {
-      // Give the stream time to update
-      await Future.delayed(const Duration(milliseconds: 300));
-      
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.itemToEdit != null
-                ? 'Wishlist item updated'
-                : 'Wishlist item added'),
-            backgroundColor: AppTheme.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.itemToEdit != null
+              ? 'Wishlist item updated'
+              : 'Wishlist item added'),
+          backgroundColor: AppTheme.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

@@ -56,10 +56,12 @@ class WishlistController extends ChangeNotifier {
         _wishes = wishes;
         _error = null;
         _setLoading(false);
+        notifyListeners(); // Notify listeners when wishes change
       },
       onError: (error) {
         _error = 'Failed to load wishes: $error';
         _setLoading(false);
+        notifyListeners(); // Notify listeners on error
       },
     );
   }
