@@ -4,11 +4,17 @@ import 'package:zentry/models/project_model.dart';
 class ProjectCard extends StatelessWidget {
   final Project project;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onPinToggle;
 
   const ProjectCard({
     super.key,
     required this.project,
     required this.onTap,
+    this.onEdit,
+    this.onDelete,
+    this.onPinToggle,
   });
 
   Color _getProjectColor() {
@@ -61,7 +67,7 @@ class ProjectCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with colored accent
+            // Header with colored accent and action buttons
             Container(
               height: 8,
               decoration: BoxDecoration(
@@ -78,19 +84,32 @@ class ProjectCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title and Status
+                  // Title, Status and Action Buttons
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          project.title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E1E1E),
-                          ),
+                        child: Row(
+                          children: [
+                            Text(
+                              project.title,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E1E1E),
+                              ),
+                            ),
+                            if (project.isPinned) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.push_pin,
+                                size: 16,
+                                color: const Color(0xFFF9ED69),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -108,6 +127,53 @@ class ProjectCard extends StatelessWidget {
                             color: _getStatusColor(),
                           ),
                         ),
+                      ),
+                      const SizedBox(width: 4),
+                      PopupMenuButton<String>(
+                        padding: EdgeInsets.zero,
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            onEdit?.call();
+                          } else if (value == 'delete') {
+                            onDelete?.call();
+                          } else if (value == 'pin') {
+                            onPinToggle?.call();
+                          }
+                        },
+                        itemBuilder: (BuildContext context) => [
+                          PopupMenuItem<String>(
+                            value: 'pin',
+                            child: Row(
+                              children: [
+                                Icon(project.isPinned ? Icons.push_pin : Icons.push_pin_outlined, size: 18),
+                                const SizedBox(width: 8),
+                                Text(project.isPinned ? 'Unpin' : 'Pin'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit, size: 18),
+                                SizedBox(width: 8),
+                                Text('Edit'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete, size: 18),
+                                SizedBox(width: 8),
+                                Text('Delete'),
+                              ],
+                            ),
+                          ),
+                        ],
+                        icon: const Icon(Icons.more_vert, size: 20),
+                        tooltip: 'More options',
                       ),
                     ],
                   ),

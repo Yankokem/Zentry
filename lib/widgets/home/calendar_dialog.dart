@@ -23,10 +23,10 @@ class _CalendarDialogState extends State<CalendarDialog> {
 
   Future<void> _loadProjects() async {
     try {
-      // For now, using sample data from ProjectManager
-      // In future, this can be replaced with Firestore call when available
+      // Load projects asynchronously from ProjectManager
+      final projects = await _projectManager.getProjects();
       setState(() {
-        _projects = _projectManager.projects;
+        _projects = projects;
         _isLoading = false;
       });
     } catch (e) {

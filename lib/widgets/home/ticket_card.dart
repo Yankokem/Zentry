@@ -103,7 +103,7 @@ class TicketCard extends StatelessWidget {
                 // Priority Badge
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
+                    horizontal: 8,
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
@@ -121,7 +121,7 @@ class TicketCard extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       Text(
                         ticket.priority.toUpperCase(),
                         style: TextStyle(
@@ -134,7 +134,7 @@ class TicketCard extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
 
                 // Assigned To
                 Expanded(

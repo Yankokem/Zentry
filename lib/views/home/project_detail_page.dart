@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:zentry/models/project_model.dart';
 import 'package:zentry/models/ticket_model.dart';
 import 'package:zentry/services/project_manager.dart';
+import 'package:zentry/views/home/add_ticket_page.dart';
+import 'package:zentry/views/home/edit_ticket_page.dart';
 import 'package:zentry/widgets/home/ticket_card.dart';
 import 'package:zentry/widgets/home/ticket_dialogs.dart';
 
@@ -49,8 +51,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
   }
 
-  List<Ticket> _getTicketsByStatus(String status) {
-    return _projectManager.getTicketsByStatus(widget.project.id, status);
+  Future<List<Ticket>> _getTicketsByStatus(String status) async {
+    return await _projectManager.getTicketsByStatus(widget.project.id, status);
   }
 
   void _refreshTickets() {
@@ -59,11 +61,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final todoTickets = _getTicketsByStatus('todo');
-    final inProgressTickets = _getTicketsByStatus('in_progress');
-    final inReviewTickets = _getTicketsByStatus('in_review');
-    final doneTickets = _getTicketsByStatus('done');
-
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       body: Column(
@@ -125,7 +122,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         ),
                         // Add Ticket Button
                         GestureDetector(
-                          onTap: () => _showAddTicketDialog(),
+                          onTap: () => _navigateToAddTicketPage(),
                           child: Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
@@ -199,28 +196,28 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 children: [
                   _buildKanbanColumn(
                     'To Do',
-                    todoTickets,
+                    _getTicketsByStatus('todo'),
                     Colors.grey.shade400,
                     'todo',
                   ),
                   const SizedBox(width: 16),
                   _buildKanbanColumn(
                     'In Progress',
-                    inProgressTickets,
+                    _getTicketsByStatus('in_progress'),
                     Colors.orange.shade400,
                     'in_progress',
                   ),
                   const SizedBox(width: 16),
                   _buildKanbanColumn(
                     'In Review',
-                    inReviewTickets,
+                    _getTicketsByStatus('in_review'),
                     Colors.purple.shade400,
                     'in_review',
                   ),
                   const SizedBox(width: 16),
                   _buildKanbanColumn(
                     'Done',
-                    doneTickets,
+                    _getTicketsByStatus('done'),
                     Colors.green.shade400,
                     'done',
                   ),
@@ -235,7 +232,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   Widget _buildKanbanColumn(
     String title,
-    List<Ticket> tickets,
+    Future<List<Ticket>> ticketsFuture,
     Color color,
     String status,
   ) {
@@ -287,23 +284,29 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   ),
                 ),
                 const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${tickets.length}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
+                FutureBuilder<List<Ticket>>(
+                  future: ticketsFuture,
+                  builder: (context, snapshot) {
+                    final count = snapshot.data?.length ?? 0;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -311,44 +314,61 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
           // Tickets List
           Flexible(
-            child: tickets.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.inbox_outlined,
-                            size: 48,
-                            color: Colors.grey.shade300,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No tickets',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade500,
+            child: FutureBuilder<List<Ticket>>(
+              future: ticketsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error loading tickets',
+                      style: TextStyle(color: Colors.red.shade400),
+                    ),
+                  );
+                } else {
+                  final tickets = snapshot.data ?? [];
+                  return tickets.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.inbox_outlined,
+                                  size: 48,
+                                  color: Colors.grey.shade300,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No tickets',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    itemCount: tickets.length,
-                    itemBuilder: (context, index) {
-                      return TicketCard(
-                        ticket: tickets[index],
-                        onTap: () {
-                          _showTicketDetailsSheet(tickets[index]);
-                        },
-                      );
-                    },
-                  ),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          itemCount: tickets.length,
+                          itemBuilder: (context, index) {
+                            return TicketCard(
+                              ticket: tickets[index],
+                              onTap: () {
+                                _showTicketDetailsSheet(tickets[index]);
+                              },
+                            );
+                          },
+                        );
+                }
+              },
+            ),
           ),
         ],
       ),
@@ -438,7 +458,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
-                      _showEditTicketDialog(ticket);
+                      _navigateToEditTicketPage(ticket);
                     },
                     icon: const Icon(Icons.edit),
                     label: const Text('Edit'),
@@ -499,6 +519,31 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
             SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToAddTicketPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddTicketPage(
+          project: widget.project,
+          refreshTickets: _refreshTickets,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToEditTicketPage(Ticket ticket) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditTicketPage(
+          ticket: ticket,
+          project: widget.project,
+          refreshTickets: _refreshTickets,
         ),
       ),
     );

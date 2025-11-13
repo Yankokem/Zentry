@@ -14,6 +14,7 @@ class TicketDialogs {
     String selectedPriority = 'medium';
     String selectedStatus = 'todo';
     String selectedAssignee = project.teamMembers.first;
+    DateTime? selectedDeadline;
 
     showDialog(
       context: context,
@@ -292,51 +293,112 @@ class TicketDialogs {
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Assign To',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(8),
-                              color: Colors.white,
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: selectedAssignee,
-                                isExpanded: true,
-                                items: project.teamMembers
-                                    .map((member) => DropdownMenuItem(
-                                          value: member,
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.person, color: Colors.grey.shade600, size: 16),
-                                              const SizedBox(width: 8),
-                                              Text(member),
-                                            ],
-                                          ),
-                                        ))
-                                    .toList(),
-                                onChanged: (value) {
-                                  setDialogState(() {
-                                    selectedAssignee = value!;
-                                  });
-                                },
+                          const SizedBox(height: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Deadline',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 4),
+                              InkWell(
+                                onTap: () async {
+                                  final pickedDate = await showDatePicker(
+                                    context: context,
+                                    initialDate: selectedDeadline ?? DateTime.now(),
+                                    firstDate: DateTime.now(),
+                                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                                  );
+                                  if (pickedDate != null) {
+                                    setDialogState(() {
+                                      selectedDeadline = pickedDate;
+                                    });
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.white,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.calendar_today, color: Colors.grey.shade600, size: 16),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Text(
+                                          selectedDeadline != null
+                                              ? '${selectedDeadline!.day}/${selectedDeadline!.month}/${selectedDeadline!.year}'
+                                              : 'Select deadline (optional)',
+                                          style: TextStyle(
+                                            color: selectedDeadline != null ? Colors.black : Colors.grey.shade600,
+                                            fontSize: 14,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Assign To',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.shade300),
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.white,
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: selectedAssignee,
+                                    isExpanded: true,
+                                    items: project.teamMembers
+                                        .map((member) => DropdownMenuItem(
+                                              value: member,
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.person, color: Colors.grey.shade600, size: 16),
+                                                  const SizedBox(width: 6),
+                                                  Flexible(
+                                                    child: Text(
+                                                      member,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ))
+                                        .toList(),
+                                    onChanged: (value) {
+                                      setDialogState(() {
+                                        selectedAssignee = value!;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -370,12 +432,14 @@ class TicketDialogs {
 
                   final newTicket = Ticket(
                     ticketNumber: ticketNumber,
+                    userId: '', // This will be set by ProjectManager
                     title: titleController.text,
                     description: descController.text,
                     priority: selectedPriority,
                     status: selectedStatus,
                     assignedTo: selectedAssignee,
                     projectId: project.id,
+                    deadline: selectedDeadline,
                   );
 
                   ProjectManager().addTicket(newTicket);
@@ -425,6 +489,7 @@ class TicketDialogs {
     String selectedPriority = ticket.priority;
     String selectedStatus = ticket.status;
     String selectedAssignee = ticket.assignedTo;
+    DateTime? selectedDeadline = ticket.deadline;
 
     showDialog(
       context: context,
@@ -440,7 +505,6 @@ class TicketDialogs {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.edit, color: _getProjectColorFromTicket(ticket), size: 24),
                     const SizedBox(width: 8),
@@ -733,6 +797,59 @@ class TicketDialogs {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
+                            'Deadline',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: () async {
+                              final pickedDate = await showDatePicker(
+                                context: context,
+                                initialDate: selectedDeadline ?? DateTime.now(),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                              );
+                              if (pickedDate != null) {
+                                setDialogState(() {
+                                  selectedDeadline = pickedDate;
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.white,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.calendar_today, color: Colors.grey.shade600, size: 16),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    selectedDeadline != null
+                                        ? '${selectedDeadline!.day}/${selectedDeadline!.month}/${selectedDeadline!.year}'
+                                        : 'Select deadline (optional)',
+                                    style: TextStyle(
+                                      color: selectedDeadline != null ? Colors.black : Colors.grey.shade600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
                             'Assign To',
                             style: TextStyle(
                               fontSize: 12,
@@ -758,8 +875,13 @@ class TicketDialogs {
                                           child: Row(
                                             children: [
                                               Icon(Icons.person, color: Colors.grey.shade600, size: 16),
-                                              const SizedBox(width: 8),
-                                              Text(member),
+                                              const SizedBox(width: 6),
+                                              Flexible(
+                                                child: Text(
+                                                  member,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ))
@@ -805,6 +927,7 @@ class TicketDialogs {
                     priority: selectedPriority,
                     status: selectedStatus,
                     assignedTo: selectedAssignee,
+                    deadline: selectedDeadline,
                   );
 
                   ProjectManager().updateTicket(ticket.ticketNumber, updatedTicket);

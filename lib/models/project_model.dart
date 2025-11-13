@@ -1,5 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Project {
   final String id;
+  final String userId;
   final String title;
   final String description;
   final List<String> teamMembers;
@@ -8,9 +11,13 @@ class Project {
   final int completedTickets;
   final String color;
   final DateTime? deadline;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final bool isPinned;
 
   Project({
     required this.id,
+    required this.userId,
     required this.title,
     required this.description,
     required this.teamMembers,
@@ -19,7 +26,43 @@ class Project {
     required this.completedTickets,
     this.color = 'yellow',
     this.deadline,
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    this.isPinned = false,
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
+
+  Project copyWith({
+    String? id,
+    String? userId,
+    String? title,
+    String? description,
+    List<String>? teamMembers,
+    String? status,
+    int? totalTickets,
+    int? completedTickets,
+    String? color,
+    DateTime? deadline,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isPinned,
+  }) {
+    return Project(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      teamMembers: teamMembers ?? this.teamMembers,
+      status: status ?? this.status,
+      totalTickets: totalTickets ?? this.totalTickets,
+      completedTickets: completedTickets ?? this.completedTickets,
+      color: color ?? this.color,
+      deadline: deadline ?? this.deadline,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isPinned: isPinned ?? this.isPinned,
+    );
+  }
 
   double get progressPercentage {
     if (totalTickets == 0) return 0.0;
@@ -29,6 +72,7 @@ class Project {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'userId': userId,
       'title': title,
       'description': description,
       'teamMembers': teamMembers,
@@ -37,12 +81,16 @@ class Project {
       'completedTickets': completedTickets,
       'color': color,
       'deadline': deadline?.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'isPinned': isPinned,
     };
   }
 
   factory Project.fromMap(Map<String, dynamic> map) {
     return Project(
       id: map['id'],
+      userId: map['userId'],
       title: map['title'],
       description: map['description'],
       teamMembers: List<String>.from(map['teamMembers']),
@@ -51,6 +99,17 @@ class Project {
       completedTickets: map['completedTickets'],
       color: map['color'] ?? 'yellow',
       deadline: map['deadline'] != null ? DateTime.parse(map['deadline']) : null,
+      createdAt: map['createdAt'] != null
+          ? (map['createdAt'] is Timestamp
+              ? (map['createdAt'] as Timestamp).toDate()
+              : DateTime.parse(map['createdAt']))
+          : null,
+      updatedAt: map['updatedAt'] != null
+          ? (map['updatedAt'] is Timestamp
+              ? (map['updatedAt'] as Timestamp).toDate()
+              : DateTime.parse(map['updatedAt']))
+          : null,
+      isPinned: map['isPinned'] ?? false,
     );
   }
 }

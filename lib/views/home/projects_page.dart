@@ -20,6 +20,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
   final TextEditingController _searchController = TextEditingController();
   final ProjectManager _projectManager = ProjectManager();
 
+  List<Project> _projects = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +33,29 @@ class _ProjectsPageState extends State<ProjectsPage> {
         statusBarIconBrightness: Brightness.dark,
       ),
     );
+
+    _loadProjects();
+  }
+
+  Future<void> _loadProjects() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final projects = await _projectManager.getProjects();
+      setState(() {
+        _projects = projects;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+      print('Error loading projects: $e');
+    }
   }
 
   @override
@@ -38,11 +65,56 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   List<Project> _getFilteredProjects() {
-    if (_searchQuery.isEmpty) return _projectManager.projects;
-    return _projectManager.projects.where((project) {
+    if (_searchQuery.isEmpty) {
+      // Sort pinned projects first
+      final sortedProjects = List<Project>.from(_projects);
+      sortedProjects.sort((a, b) {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return 0; // Keep original order for same pin status
+      });
+      return sortedProjects;
+    }
+    return _projects.where((project) {
       return project.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           project.description.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
+  }
+
+  void _showDeleteConfirmationDialog(Project project) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Project'),
+          content: Text('Are you sure you want to delete "${project.title}"? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  await _projectManager.deleteProject(project.id);
+                  Navigator.of(context).pop();
+                  _loadProjects();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Project "${project.title}" deleted successfully')),
+                  );
+                } catch (e) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error deleting project: $e')),
+                  );
+                }
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -81,9 +153,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                   MaterialPageRoute(
                                     builder: (context) => const AddProjectPage(),
                                   ),
-                                ).then((_) {
-                                  setState(() {});
-                                });
+                                ).then((_) => _loadProjects());
                               },
                             ),
                             IconButton(
@@ -132,7 +202,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              '${_projectManager.projects.length} projects',
+                              '${_projects.length} projects',
                               style: const TextStyle(
                                 color: Color(0xFFF9ED69),
                                 fontWeight: FontWeight.bold,
@@ -174,59 +244,130 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
           // Projects List
           Expanded(
-            child: filteredProjects.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _searchQuery.isNotEmpty
-                              ? Icons.search_off
-                              : Icons.folder_open,
-                          size: 80,
-                          color: Colors.grey.withOpacity(0.3),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _searchQuery.isNotEmpty
-                              ? 'No projects found'
-                              : 'No projects yet',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: Colors.grey,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _searchQuery.isNotEmpty
-                              ? 'Try a different search term'
-                              : 'Create a new project to get started',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.grey,
-                              ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                    itemCount: filteredProjects.length,
-                    itemBuilder: (context, index) {
-                      final project = filteredProjects[index];
-                      return ProjectCard(
-                        project: project,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ProjectDetailPage(
-                                project: project,
-                              ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 64,
+                              color: Colors.red.shade400,
                             ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Error loading projects',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: Colors.red.shade400,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _errorMessage!,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.grey.shade600,
+                                  ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadProjects,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : filteredProjects.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.folder_open_outlined,
+                                  size: 64,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No projects yet',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        color: Colors.grey.shade600,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Create your first project to get started',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: Colors.grey.shade500,
+                                      ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 24),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const AddProjectPage(),
+                                      ),
+                                    ).then((_) => _loadProjects());
+                                  },
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Create Project'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFF9ED69),
+                                    foregroundColor: const Color(0xFF1E1E1E),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                            itemCount: filteredProjects.length,
+                            itemBuilder: (context, index) {
+                              final project = filteredProjects[index];
+                              return ProjectCard(
+                                project: project,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ProjectDetailPage(project: project),
+                                    ),
+                                  ).then((_) => _loadProjects());
+                                },
+                                onEdit: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AddProjectPage(projectToEdit: project),
+                                    ),
+                                  ).then((_) => _loadProjects());
+                                },
+                                onDelete: () => _showDeleteConfirmationDialog(project),
+                                onPinToggle: () async {
+                                  try {
+                                    await _projectManager.togglePinProject(project.id, !project.isPinned);
+                                    _loadProjects();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(project.isPinned ? 'Project unpinned' : 'Project pinned')),
+                                    );
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error toggling pin: $e')),
+                                    );
+                                  }
+                                },
+                              );
+                            },
+                          ),
           ),
         ],
       ),

@@ -1,10 +1,14 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/models/project_model.dart';
+import 'package:zentry/services/firebase/firestore_service.dart';
 import 'package:zentry/services/project_manager.dart';
 
 class AddProjectPage extends StatefulWidget {
-  const AddProjectPage({super.key});
+  final Project? projectToEdit;
+
+  const AddProjectPage({super.key, this.projectToEdit});
 
   @override
   State<AddProjectPage> createState() => _AddProjectPageState();
@@ -14,39 +18,112 @@ class _AddProjectPageState extends State<AddProjectPage> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _teamMembersController = TextEditingController();
+  final _newMemberController = TextEditingController();
   String _selectedStatus = 'Planning';
   String _selectedColor = 'yellow';
+  List<String> _teamMembers = [];
 
   final List<String> _statusOptions = ['Planning', 'In Progress', 'Completed', 'On Hold'];
   final List<String> _colorOptions = ['yellow', 'blue', 'green', 'purple', 'red'];
 
   final ProjectManager _projectManager = ProjectManager();
+  final FirestoreService _firestoreService = FirestoreService();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.projectToEdit != null) {
+      _titleController.text = widget.projectToEdit!.title;
+      _descriptionController.text = widget.projectToEdit!.description;
+      _teamMembers = List.from(widget.projectToEdit!.teamMembers);
+      _selectedStatus = widget.projectToEdit!.status;
+      _selectedColor = widget.projectToEdit!.color;
+    } else {
+      // For new projects, automatically add the current user as a team member
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null && currentUser.email != null) {
+        _teamMembers.add(currentUser.email!);
+      }
+    }
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _teamMembersController.dispose();
+    _newMemberController.dispose();
     super.dispose();
   }
 
-  void _saveProject() {
-    if (_formKey.currentState!.validate()) {
-      final newProject = Project(
-        id: 'proj_${DateTime.now().millisecondsSinceEpoch}',
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        teamMembers: _teamMembersController.text.isEmpty
-            ? []
-            : _teamMembersController.text.split(',').map((e) => e.trim()).toList(),
-        status: _selectedStatus,
-        totalTickets: 0,
-        completedTickets: 0,
-        color: _selectedColor,
-      );
+  Future<void> _addTeamMember() async {
+    final member = _newMemberController.text.trim();
+    if (member.isEmpty) return;
 
-      _projectManager.addProject(newProject);
+    if (_teamMembers.contains(member)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Member already added')),
+        );
+      }
+      return;
+    }
+
+    try {
+      final exists = await _firestoreService.userExistsByEmail(member);
+      if (mounted) {
+        if (exists) {
+          setState(() {
+            _teamMembers.add(member);
+            _newMemberController.clear();
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No account found')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error checking account: $e')),
+        );
+      }
+    }
+  }
+
+  void _removeTeamMember(String member) {
+    setState(() {
+      _teamMembers.remove(member);
+    });
+  }
+
+  void _saveProject() async {
+    if (_formKey.currentState!.validate()) {
+      if (widget.projectToEdit != null) {
+        // Update existing project
+        final updatedProject = widget.projectToEdit!.copyWith(
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          teamMembers: _teamMembers,
+          status: _selectedStatus,
+          color: _selectedColor,
+        );
+        await _projectManager.updateProject(updatedProject);
+      } else {
+        // Create new project
+        final newProject = Project(
+          id: 'proj_${DateTime.now().millisecondsSinceEpoch}',
+          userId: '', // This will be set by ProjectManager
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          teamMembers: _teamMembers,
+          status: _selectedStatus,
+          totalTickets: 0,
+          completedTickets: 0,
+          color: _selectedColor,
+        );
+        await _projectManager.addProject(newProject);
+      }
       Navigator.pop(context);
     }
   }
@@ -59,7 +136,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
         backgroundColor: const Color(0xFFF9ED69),
         elevation: 0,
         title: Text(
-          'Add New Project',
+          widget.projectToEdit != null ? 'Edit Project' : 'Add New Project',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: const Color(0xFF1E1E1E),
@@ -100,11 +177,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
                 children: [
                   Icon(Icons.title, color: Colors.grey.shade600),
                   const SizedBox(width: 8),
-                  Text(
-                    'Project Title',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                  Expanded(
+                    child: Text(
+                      'Project Title',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                   ),
                 ],
               ),
@@ -134,11 +213,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
                 children: [
                   Icon(Icons.description, color: Colors.grey.shade600),
                   const SizedBox(width: 8),
-                  Text(
-                    'Description',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                  Expanded(
+                    child: Text(
+                      'Description',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                   ),
                 ],
               ),
@@ -169,39 +250,84 @@ class _AddProjectPageState extends State<AddProjectPage> {
                 children: [
                   Icon(Icons.group, color: Colors.grey.shade600),
                   const SizedBox(width: 8),
-                  Text(
-                    'Team Members (optional)',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                  Expanded(
+                    child: Text(
+                      'Team Members (emails, optional)',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _teamMembersController,
-                decoration: InputDecoration(
-                  hintText: 'Enter team members separated by commas',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                    borderSide: BorderSide.none,
+              // Add new member input
+              Column(
+                children: [
+                  TextFormField(
+                    controller: _newMemberController,
+                    decoration: InputDecoration(
+                      hintText: 'Enter team member email',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      suffixIcon: IconButton(
+                        onPressed: _addTeamMember,
+                        icon: const Icon(Icons.add, size: 20),
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFFF9ED69),
+                          foregroundColor: const Color(0xFF1E1E1E),
+                          padding: const EdgeInsets.all(8),
+                        ),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value != null && value.isNotEmpty) {
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                          return 'Please enter a valid email address';
+                        }
+                      }
+                      return null;
+                    },
                   ),
-                ),
+                ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
+              // Display current team members
+              if (_teamMembers.isNotEmpty) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _teamMembers.map((member) {
+                    return Chip(
+                      label: Text(member),
+                      deleteIcon: const Icon(Icons.close, size: 16),
+                      onDeleted: () => _removeTeamMember(member),
+                      backgroundColor: Colors.grey.shade100,
+                      deleteIconColor: Colors.red.shade600,
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+              ],
+              const SizedBox(height: 16),
 
               // Status Dropdown
               Row(
                 children: [
                   Icon(Icons.flag, color: Colors.grey.shade600),
                   const SizedBox(width: 8),
-                  Text(
-                    'Status',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                  Expanded(
+                    child: Text(
+                      'Status',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                   ),
                 ],
               ),
@@ -243,11 +369,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
                 children: [
                   Icon(Icons.palette, color: Colors.grey.shade600),
                   const SizedBox(width: 8),
-                  Text(
-                    'Color Theme',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                  Expanded(
+                    child: Text(
+                      'Color Theme',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                   ),
                 ],
               ),
