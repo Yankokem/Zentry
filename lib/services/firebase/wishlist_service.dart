@@ -4,6 +4,19 @@ import '../../models/wish_model.dart';
 
 /// Service class for managing wishlist items in Firestore
 /// Follows the repository pattern for data access
+/// 
+/// Firestore Structure:
+/// wishlists/
+///   {wishId}/
+///     userId: "user-id"
+///     title: "Item Title"
+///     price: "99.99"
+///     category: "tech"
+///     notes: "Notes"
+///     dateAdded: "Nov 13, 2025"
+///     completed: false
+///     createdAt: Timestamp
+///     updatedAt: Timestamp
 class WishlistService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -13,24 +26,19 @@ class WishlistService {
   /// Get the current user's ID
   String? get _userId => _auth.currentUser?.uid;
 
-  /// Get reference to user's wishlist collection
-  CollectionReference? get _userWishlistRef {
-    if (_userId == null) return null;
-    return _db
-        .collection('users')
-        .doc(_userId)
-        .collection(wishlistCollection);
-  }
+  /// Get reference to the top-level wishlists collection
+  CollectionReference get _wishlistRef => _db.collection(wishlistCollection);
 
   /// Create a new wishlist item
   /// Returns the document ID of the created item
   Future<String> createWish(Wish wish) async {
     try {
-      if (_userWishlistRef == null) {
+      if (_userId == null) {
         throw Exception('User not authenticated');
       }
 
-      final docRef = await _userWishlistRef!.add({
+      final docRef = await _wishlistRef.add({
+        'userId': _userId, // Store user ID for filtering
         ...wish.toFirestore(),
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -45,11 +53,12 @@ class WishlistService {
   /// Get all wishlist items for the current user
   /// Returns a stream that updates in real-time
   Stream<List<Wish>> getWishesStream() {
-    if (_userWishlistRef == null) {
+    if (_userId == null) {
       return Stream.value([]);
     }
 
-    return _userWishlistRef!
+    return _wishlistRef
+        .where('userId', isEqualTo: _userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
@@ -65,11 +74,12 @@ class WishlistService {
   /// Get all wishlist items (one-time fetch)
   Future<List<Wish>> getWishes() async {
     try {
-      if (_userWishlistRef == null) {
+      if (_userId == null) {
         throw Exception('User not authenticated');
       }
 
-      final snapshot = await _userWishlistRef!
+      final snapshot = await _wishlistRef
+          .where('userId', isEqualTo: _userId)
           .orderBy('createdAt', descending: true)
           .get();
 
@@ -87,19 +97,26 @@ class WishlistService {
   /// Get a single wishlist item by ID
   Future<Wish?> getWishById(String id) async {
     try {
-      if (_userWishlistRef == null) {
+      if (_userId == null) {
         throw Exception('User not authenticated');
       }
 
-      final doc = await _userWishlistRef!.doc(id).get();
+      final doc = await _wishlistRef.doc(id).get();
       
       if (!doc.exists) {
         return null;
       }
 
+      final data = doc.data() as Map<String, dynamic>;
+      
+      // Verify the wish belongs to the current user
+      if (data['userId'] != _userId) {
+        throw Exception('Unauthorized access to wish');
+      }
+
       return Wish.fromFirestore(
         doc.id,
-        doc.data() as Map<String, dynamic>,
+        data,
       );
     } catch (e) {
       throw Exception('Failed to get wish: $e');
@@ -109,12 +126,19 @@ class WishlistService {
   /// Update an existing wishlist item
   Future<void> updateWish(String id, Wish wish) async {
     try {
-      if (_userWishlistRef == null) {
+      if (_userId == null) {
         throw Exception('User not authenticated');
       }
 
-      await _userWishlistRef!.doc(id).update({
+      // Verify ownership before updating
+      final existingDoc = await _wishlistRef.doc(id).get();
+      if (!existingDoc.exists || existingDoc['userId'] != _userId) {
+        throw Exception('Unauthorized: wish not found or does not belong to user');
+      }
+
+      await _wishlistRef.doc(id).update({
         ...wish.toFirestore(),
+        'userId': _userId, // Ensure userId is maintained
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
@@ -125,11 +149,17 @@ class WishlistService {
   /// Toggle the completed status of a wish
   Future<void> toggleCompleted(String id, bool completed) async {
     try {
-      if (_userWishlistRef == null) {
+      if (_userId == null) {
         throw Exception('User not authenticated');
       }
 
-      await _userWishlistRef!.doc(id).update({
+      // Verify ownership before updating
+      final existingDoc = await _wishlistRef.doc(id).get();
+      if (!existingDoc.exists || existingDoc['userId'] != _userId) {
+        throw Exception('Unauthorized: wish not found or does not belong to user');
+      }
+
+      await _wishlistRef.doc(id).update({
         'completed': completed,
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -141,11 +171,17 @@ class WishlistService {
   /// Delete a wishlist item
   Future<void> deleteWish(String id) async {
     try {
-      if (_userWishlistRef == null) {
+      if (_userId == null) {
         throw Exception('User not authenticated');
       }
 
-      await _userWishlistRef!.doc(id).delete();
+      // Verify ownership before deleting
+      final existingDoc = await _wishlistRef.doc(id).get();
+      if (!existingDoc.exists || existingDoc['userId'] != _userId) {
+        throw Exception('Unauthorized: wish not found or does not belong to user');
+      }
+
+      await _wishlistRef.doc(id).delete();
     } catch (e) {
       throw Exception('Failed to delete wish: $e');
     }
@@ -153,11 +189,12 @@ class WishlistService {
 
   /// Get wishes by category
   Stream<List<Wish>> getWishesByCategory(String category) {
-    if (_userWishlistRef == null) {
+    if (_userId == null) {
       return Stream.value([]);
     }
 
-    return _userWishlistRef!
+    return _wishlistRef
+        .where('userId', isEqualTo: _userId)
         .where('category', isEqualTo: category)
         .orderBy('createdAt', descending: true)
         .snapshots()
@@ -174,11 +211,12 @@ class WishlistService {
   /// Get count of completed wishes
   Future<int> getCompletedCount() async {
     try {
-      if (_userWishlistRef == null) {
+      if (_userId == null) {
         return 0;
       }
 
-      final snapshot = await _userWishlistRef!
+      final snapshot = await _wishlistRef
+          .where('userId', isEqualTo: _userId)
           .where('completed', isEqualTo: true)
           .get();
 
@@ -191,11 +229,13 @@ class WishlistService {
   /// Delete all wishes (for testing purposes)
   Future<void> deleteAllWishes() async {
     try {
-      if (_userWishlistRef == null) {
+      if (_userId == null) {
         throw Exception('User not authenticated');
       }
 
-      final snapshot = await _userWishlistRef!.get();
+      final snapshot = await _wishlistRef
+          .where('userId', isEqualTo: _userId)
+          .get();
       
       for (var doc in snapshot.docs) {
         await doc.reference.delete();
