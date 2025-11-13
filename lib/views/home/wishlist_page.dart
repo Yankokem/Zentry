@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zentry/config/constants.dart';
-import 'package:zentry/services/wishlist_manager.dart';
+import 'package:zentry/controllers/wishlist_controller.dart';
 import 'package:zentry/models/wish_model.dart';
 
 class WishlistPage extends StatefulWidget {
@@ -12,7 +12,7 @@ class WishlistPage extends StatefulWidget {
 }
 
 class _WishlistPageState extends State<WishlistPage> {
-  final WishlistManager _manager = WishlistManager();
+  late WishlistController _controller;
   String _selectedCategory = 'all';
 
   @override
@@ -24,11 +24,22 @@ class _WishlistPageState extends State<WishlistPage> {
         statusBarIconBrightness: Brightness.dark,
       ),
     );
+    
+    // Initialize controller
+    _controller = WishlistController();
+    _controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   List<Wish> _getFilteredItems() {
-    if (_selectedCategory == 'all') return _manager.items;
-    return _manager.items.where((item) => item.category == _selectedCategory).toList();
+    final wishes = _controller.wishes;
+    if (_selectedCategory == 'all') return wishes;
+    return wishes.where((item) => item.category == _selectedCategory).toList();
   }
 
   Color _getCategoryColor(String category) {
@@ -48,12 +59,15 @@ class _WishlistPageState extends State<WishlistPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredItems = _getFilteredItems();
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final filteredItems = _getFilteredItems();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9ED69),
-      body: Column(
-        children: [
+        return Scaffold(
+          backgroundColor: const Color(0xFFF9ED69),
+          body: Column(
+            children: [
           // Header - EXACTLY like journal
           Container(
             width: double.infinity,
@@ -103,7 +117,7 @@ class _WishlistPageState extends State<WishlistPage> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '${_getCompletedCount()}/${_manager.items.length} items',
+                            '${_controller.completedCount}/${_controller.totalCount} items',
                             style: const TextStyle(
                               color: Color(0xFFF9ED69),
                               fontWeight: FontWeight.bold,
@@ -153,6 +167,8 @@ class _WishlistPageState extends State<WishlistPage> {
           ),
         ],
       ),
+        );
+      },
     );
   }
 
@@ -346,10 +362,11 @@ class _WishlistPageState extends State<WishlistPage> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _manager.updateItem(item, item.copyWith(completed: !isCompleted));
-                      });
+                    onTap: () async {
+                      final success = await _controller.toggleCompleted(item);
+                      if (success && mounted) {
+                        setState(() {});
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -564,11 +581,11 @@ class _WishlistPageState extends State<WishlistPage> {
                           ),
                           Switch(
                             value: isCompleted,
-                            onChanged: (value) {
-                              setState(() {
-                                _manager.updateItem(item, item.copyWith(completed: value));
-                              });
-                              Navigator.pop(context);
+                            onChanged: (value) async {
+                              final success = await _controller.toggleCompleted(item);
+                              if (success && mounted) {
+                                Navigator.pop(context);
+                              }
                             },
                             activeColor: Colors.green,
                           ),
@@ -680,17 +697,17 @@ class _WishlistPageState extends State<WishlistPage> {
                 color: isCompleted ? Colors.orange : Colors.green,
               ),
               title: Text(isCompleted ? 'Mark as Not Acquired' : 'Mark as Acquired'),
-              onTap: () {
-                setState(() {
-                  _manager.updateItem(item, item.copyWith(completed: !isCompleted));
-                });
+              onTap: () async {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(isCompleted ? 'Item marked as not acquired' : 'Item marked as acquired!'),
-                    backgroundColor: isCompleted ? Colors.orange : Colors.green,
-                  ),
-                );
+                final success = await _controller.toggleCompleted(item);
+                if (success && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(isCompleted ? 'Item marked as not acquired' : 'Item marked as acquired!'),
+                      backgroundColor: isCompleted ? Colors.orange : Colors.green,
+                    ),
+                  );
+                }
               },
             ),
             ListTile(
@@ -728,14 +745,14 @@ class _WishlistPageState extends State<WishlistPage> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _manager.removeItem(item);
-              });
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Item deleted')),
-              );
+              final success = await _controller.deleteWish(item);
+              if (success && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Item deleted')),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -960,29 +977,30 @@ class _WishlistPageState extends State<WishlistPage> {
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (titleController.text.isNotEmpty && priceController.text.isNotEmpty) {
-                    setState(() {
-                      _manager.addItem(Wish(
-                        title: titleController.text,
-                        price: priceController.text,
-                        category: selectedCategory,
-                        notes: notesController.text.isEmpty ? 'No notes' : notesController.text,
-                        dateAdded: _getCurrentDate(),
-                        completed: false,
-                      ));
-                    });
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Wishlist item added'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    final success = await _controller.createWish(Wish(
+                      title: titleController.text,
+                      price: priceController.text,
+                      category: selectedCategory,
+                      notes: notesController.text.isEmpty ? 'No notes' : notesController.text,
+                      dateAdded: _getCurrentDate(),
+                      completed: false,
+                    ));
+                    
+                    if (success && mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Wishlist item added'),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                      ),
-                    );
+                      );
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -1246,29 +1264,31 @@ class _WishlistPageState extends State<WishlistPage> {
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (titleController.text.isNotEmpty && priceController.text.isNotEmpty) {
-                    setState(() {
-                      _manager.updateItem(item, Wish(
-                        title: titleController.text,
-                        price: priceController.text,
-                        category: selectedCategory,
-                        notes: notesController.text,
-                        dateAdded: item.dateAdded,
-                        completed: item.completed,
-                      ));
-                    });
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Wishlist item updated'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    final success = await _controller.updateWish(Wish(
+                      id: item.id,
+                      title: titleController.text,
+                      price: priceController.text,
+                      category: selectedCategory,
+                      notes: notesController.text,
+                      dateAdded: item.dateAdded,
+                      completed: item.completed,
+                    ));
+                    
+                    if (success && mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Wishlist item updated'),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                      ),
-                    );
+                      );
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -1296,9 +1316,5 @@ class _WishlistPageState extends State<WishlistPage> {
     final now = DateTime.now();
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
-  }
-
-  int _getCompletedCount() {
-    return _manager.items.where((item) => item.completed == true).length;
   }
 }

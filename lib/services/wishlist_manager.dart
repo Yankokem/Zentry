@@ -1,36 +1,14 @@
 import '../models/wish_model.dart';
 
+/// Legacy WishlistManager - kept for backward compatibility
+/// New code should use WishlistController and WishlistService
 class WishlistManager {
   static final WishlistManager _instance = WishlistManager._internal();
   factory WishlistManager() => _instance;
   WishlistManager._internal();
 
-  final List<Wish> _items = [
-    Wish(
-      title: 'New MacBook Pro',
-      price: '2499',
-      category: 'tech',
-      notes: 'M3 chip, 16GB RAM, perfect for coding',
-      dateAdded: 'Nov 5, 2025',
-      completed: false,
-    ),
-    Wish(
-      title: 'Trip to Japan',
-      price: '3500',
-      category: 'travel',
-      notes: 'Visit Tokyo, Kyoto, and Mount Fuji',
-      dateAdded: 'Nov 4, 2025',
-      completed: false,
-    ),
-    Wish(
-      title: 'Sony A7 IV Camera',
-      price: '1200',
-      category: 'tech',
-      notes: 'For photography hobby',
-      dateAdded: 'Nov 3, 2025',
-      completed: false,
-    ),
-  ];
+  // Sample data cleared - now using Firestore
+  final List<Wish> _items = [];
 
   List<Wish> get items => _items;
 
