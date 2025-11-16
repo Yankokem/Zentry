@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zentry/config/constants.dart';
@@ -23,6 +24,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   List<Project> _projects = [];
   bool _isLoading = true;
   String? _errorMessage;
+  String _selectedCategory = 'all';
 
   @override
   void initState() {
@@ -65,20 +67,29 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   List<Project> _getFilteredProjects() {
-    if (_searchQuery.isEmpty) {
-      // Sort pinned projects first
-      final sortedProjects = List<Project>.from(_projects);
-      sortedProjects.sort((a, b) {
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-        return 0; // Keep original order for same pin status
-      });
-      return sortedProjects;
+    List<Project> filtered = _projects;
+
+    // Filter by category
+    if (_selectedCategory != 'all') {
+      filtered = filtered.where((project) => project.category == _selectedCategory).toList();
     }
-    return _projects.where((project) {
-      return project.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          project.description.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+
+    // Filter by search query
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((project) {
+        return project.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            project.description.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
+
+    // Sort pinned projects first
+    filtered.sort((a, b) {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return 0; // Keep original order for same pin status
+    });
+
+    return filtered;
   }
 
   void _showDeleteConfirmationDialog(Project project) {
@@ -114,6 +125,32 @@ class _ProjectsPageState extends State<ProjectsPage> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildCategoryChip(String label, String category) {
+    final isSelected = _selectedCategory == category;
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          _selectedCategory = category;
+        });
+      },
+      backgroundColor: Colors.white,
+      selectedColor: const Color(0xFF1E1E1E),
+      checkmarkColor: const Color(0xFFF9ED69),
+      labelStyle: TextStyle(
+        color: isSelected ? const Color(0xFFF9ED69) : const Color(0xFF1E1E1E),
+        fontWeight: FontWeight.w500,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? const Color(0xFF1E1E1E) : Colors.grey.shade300,
+        ),
+      ),
     );
   }
 
@@ -211,6 +248,22 @@ class _ProjectsPageState extends State<ProjectsPage> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Category Filter Chips
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildCategoryChip('All', 'all'),
+                            const SizedBox(width: 8),
+                            _buildCategoryChip('Workspace', 'workspace'),
+                            const SizedBox(width: 8),
+                            _buildCategoryChip('Shared', 'shared'),
+                            const SizedBox(width: 8),
+                            _buildCategoryChip('Personal', 'personal'),
+                          ],
+                        ),
                       ),
                     ] else ...[
                       TextField(

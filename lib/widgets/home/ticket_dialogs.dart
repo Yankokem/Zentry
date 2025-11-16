@@ -3,6 +3,74 @@ import 'package:zentry/models/project_model.dart';
 import 'package:zentry/models/ticket_model.dart';
 import 'package:zentry/services/project_manager.dart';
 
+class MultiSelectDialog extends StatefulWidget {
+  final String title;
+  final List<String> items;
+  final List<String> selectedItems;
+  final ValueChanged<List<String>> onSelectionChanged;
+
+  const MultiSelectDialog({
+    super.key,
+    required this.title,
+    required this.items,
+    required this.selectedItems,
+    required this.onSelectionChanged,
+  });
+
+  @override
+  State<MultiSelectDialog> createState() => _MultiSelectDialogState();
+}
+
+class _MultiSelectDialogState extends State<MultiSelectDialog> {
+  late List<String> _selectedItems;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedItems = List.from(widget.selectedItems);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widget.items.map((item) {
+            return CheckboxListTile(
+              title: Text(item),
+              value: _selectedItems.contains(item),
+              onChanged: (bool? checked) {
+                setState(() {
+                  if (checked == true) {
+                    _selectedItems.add(item);
+                  } else {
+                    _selectedItems.remove(item);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            widget.onSelectionChanged(_selectedItems);
+            Navigator.pop(context);
+          },
+          child: const Text('OK'),
+        ),
+      ],
+    );
+  }
+}
+
 class TicketDialogs {
   static void showAddTicketDialog(
     BuildContext context,
@@ -13,7 +81,7 @@ class TicketDialogs {
     final descController = TextEditingController();
     String selectedPriority = 'medium';
     String selectedStatus = 'todo';
-    String selectedAssignee = project.teamMembers.first;
+    List<String> selectedAssignees = [];
     DateTime? selectedDeadline;
 
     showDialog(
@@ -362,39 +430,47 @@ class TicketDialogs {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey.shade300),
-                                  borderRadius: BorderRadius.circular(8),
-                                  color: Colors.white,
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: selectedAssignee,
-                                    isExpanded: true,
-                                    items: project.teamMembers
-                                        .map((member) => DropdownMenuItem(
-                                              value: member,
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.person, color: Colors.grey.shade600, size: 16),
-                                                  const SizedBox(width: 6),
-                                                  Flexible(
-                                                    child: Text(
-                                                      member,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ))
-                                        .toList(),
-                                    onChanged: (value) {
-                                      setDialogState(() {
-                                        selectedAssignee = value!;
-                                      });
-                                    },
+                              InkWell(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => MultiSelectDialog(
+                                      title: 'Assign To',
+                                      items: project.teamMembers,
+                                      selectedItems: selectedAssignees,
+                                      onSelectionChanged: (selected) {
+                                        setDialogState(() {
+                                          selectedAssignees = selected;
+                                        });
+                                      },
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.white,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.person, color: Colors.grey.shade600, size: 16),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          selectedAssignees.isNotEmpty
+                                              ? selectedAssignees.join(', ')
+                                              : 'Select assignees',
+                                          style: TextStyle(
+                                            color: selectedAssignees.isNotEmpty ? Colors.black : Colors.grey.shade600,
+                                            fontSize: 14,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -437,7 +513,7 @@ class TicketDialogs {
                     description: descController.text,
                     priority: selectedPriority,
                     status: selectedStatus,
-                    assignedTo: selectedAssignee,
+                    assignedTo: selectedAssignees,
                     projectId: project.id,
                     deadline: selectedDeadline,
                   );
@@ -488,7 +564,7 @@ class TicketDialogs {
     final descController = TextEditingController(text: ticket.description);
     String selectedPriority = ticket.priority;
     String selectedStatus = ticket.status;
-    String selectedAssignee = ticket.assignedTo;
+    List<String> selectedAssignees = ticket.assignedTo;
     DateTime? selectedDeadline = ticket.deadline;
 
     showDialog(
@@ -858,39 +934,47 @@ class TicketDialogs {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(8),
-                              color: Colors.white,
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: selectedAssignee,
-                                isExpanded: true,
-                                items: teamMembers
-                                    .map((member) => DropdownMenuItem(
-                                          value: member,
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.person, color: Colors.grey.shade600, size: 16),
-                                              const SizedBox(width: 6),
-                                              Flexible(
-                                                child: Text(
-                                                  member,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ))
-                                    .toList(),
-                                onChanged: (value) {
-                                  setDialogState(() {
-                                    selectedAssignee = value!;
-                                  });
-                                },
+                          InkWell(
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => MultiSelectDialog(
+                                  title: 'Assign To',
+                                  items: teamMembers,
+                                  selectedItems: selectedAssignees,
+                                  onSelectionChanged: (selected) {
+                                    setDialogState(() {
+                                      selectedAssignees = selected;
+                                    });
+                                  },
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.white,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.person, color: Colors.grey.shade600, size: 16),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      selectedAssignees.isNotEmpty
+                                          ? selectedAssignees.join(', ')
+                                          : 'Select assignees',
+                                      style: TextStyle(
+                                        color: selectedAssignees.isNotEmpty ? Colors.black : Colors.grey.shade600,
+                                        fontSize: 14,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
+                                ],
                               ),
                             ),
                           ),
@@ -926,7 +1010,7 @@ class TicketDialogs {
                     description: descController.text,
                     priority: selectedPriority,
                     status: selectedStatus,
-                    assignedTo: selectedAssignee,
+                    assignedTo: selectedAssignees,
                     deadline: selectedDeadline,
                   );
 

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/models/project_model.dart';
+import 'package:zentry/services/firebase/user_service.dart';
 
-class ProjectCard extends StatelessWidget {
+class ProjectCard extends StatefulWidget {
   final Project project;
   final VoidCallback onTap;
   final VoidCallback? onEdit;
@@ -17,8 +18,39 @@ class ProjectCard extends StatelessWidget {
     this.onPinToggle,
   });
 
+  @override
+  State<ProjectCard> createState() => _ProjectCardState();
+}
+
+class _ProjectCardState extends State<ProjectCard> {
+  final UserService _userService = UserService();
+  Map<String, Map<String, String>> _userDetails = {};
+  bool _isLoadingUsers = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserDetails();
+  }
+
+  Future<void> _loadUserDetails() async {
+    if (widget.project.teamMembers.isNotEmpty) {
+      final details = await _userService.getUsersDetailsByEmails(widget.project.teamMembers);
+      if (mounted) {
+        setState(() {
+          _userDetails = details;
+          _isLoadingUsers = false;
+        });
+      }
+    } else {
+      setState(() {
+        _isLoadingUsers = false;
+      });
+    }
+  }
+
   Color _getProjectColor() {
-    switch (project.color) {
+    switch (widget.project.color) {
       case 'yellow':
         return const Color(0xFFF9ED69);
       case 'blue':
@@ -35,7 +67,7 @@ class ProjectCard extends StatelessWidget {
   }
 
   Color _getStatusColor() {
-    switch (project.status) {
+    switch (widget.project.status) {
       case 'In Progress':
         return Colors.orange;
       case 'Planning':
@@ -47,10 +79,24 @@ class ProjectCard extends StatelessWidget {
     }
   }
 
+  String _getTeamMembersDisplay() {
+    if (_isLoadingUsers) return 'Loading...';
+
+    final displayNames = widget.project.teamMembers.map((email) {
+      final details = _userDetails[email];
+      return _userService.getDisplayName(details ?? {}, email);
+    }).toList();
+
+    final firstThree = displayNames.take(3).join(', ');
+    final remaining = displayNames.length - 3;
+
+    return remaining > 0 ? '$firstThree +$remaining more' : firstThree;
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -91,14 +137,14 @@ class ProjectCard extends StatelessWidget {
                         child: Row(
                           children: [
                             Text(
-                              project.title,
+                              widget.project.title,
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF1E1E1E),
                               ),
                             ),
-                            if (project.isPinned) ...[
+                            if (widget.project.isPinned) ...[
                               const SizedBox(width: 8),
                               Icon(
                                 Icons.push_pin,
@@ -120,7 +166,7 @@ class ProjectCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          project.status,
+                          widget.project.status,
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -133,11 +179,11 @@ class ProjectCard extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         onSelected: (value) {
                           if (value == 'edit') {
-                            onEdit?.call();
+                            widget.onEdit?.call();
                           } else if (value == 'delete') {
-                            onDelete?.call();
+                            widget.onDelete?.call();
                           } else if (value == 'pin') {
-                            onPinToggle?.call();
+                            widget.onPinToggle?.call();
                           }
                         },
                         itemBuilder: (BuildContext context) => [
@@ -145,9 +191,9 @@ class ProjectCard extends StatelessWidget {
                             value: 'pin',
                             child: Row(
                               children: [
-                                Icon(project.isPinned ? Icons.push_pin : Icons.push_pin_outlined, size: 18),
+                                Icon(widget.project.isPinned ? Icons.push_pin : Icons.push_pin_outlined, size: 18),
                                 const SizedBox(width: 8),
-                                Text(project.isPinned ? 'Unpin' : 'Pin'),
+                                Text(widget.project.isPinned ? 'Unpin' : 'Pin'),
                               ],
                             ),
                           ),
@@ -155,9 +201,9 @@ class ProjectCard extends StatelessWidget {
                             value: 'edit',
                             child: Row(
                               children: [
-                                Icon(Icons.edit, size: 18),
+                                Icon(Icons.settings, size: 18),
                                 SizedBox(width: 8),
-                                Text('Edit'),
+                                Text('Manage'),
                               ],
                             ),
                           ),
@@ -182,7 +228,7 @@ class ProjectCard extends StatelessWidget {
 
                   // Description
                   Text(
-                    project.description,
+                    widget.project.description,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -205,10 +251,7 @@ class ProjectCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          project.teamMembers.take(3).join(', ') +
-                              (project.teamMembers.length > 3
-                                  ? ' +${project.teamMembers.length - 3} more'
-                                  : ''),
+                          _getTeamMembersDisplay(),
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey.shade700,
@@ -238,7 +281,7 @@ class ProjectCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${project.completedTickets}/${project.totalTickets} tickets',
+                            '${widget.project.completedTickets}/${widget.project.totalTickets} tickets',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade600,
@@ -251,8 +294,8 @@ class ProjectCard extends StatelessWidget {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: LinearProgressIndicator(
-                          value: project.totalTickets > 0
-                              ? project.completedTickets / project.totalTickets
+                          value: widget.project.totalTickets > 0
+                              ? widget.project.completedTickets / widget.project.totalTickets
                               : 0,
                           backgroundColor: Colors.grey.shade200,
                           valueColor: AlwaysStoppedAnimation<Color>(

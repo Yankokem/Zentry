@@ -51,88 +51,73 @@ class _WishlistPageState extends State<WishlistPage> {
     final filteredItems = _getFilteredItems();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9ED69),
+      backgroundColor: Colors.grey.shade100,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF9ED69),
+        elevation: 0,
+        title: const Text(
+          'My Wishlist',
+          style: TextStyle(
+            color: Color(0xFF1E1E1E),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '${_getCompletedCount()}/${_manager.items.length} items',
+              style: const TextStyle(
+                color: Color(0xFFF9ED69),
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            color: const Color(0xFF1E1E1E),
+            onPressed: _showAddDialog,
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          // Header - EXACTLY like journal
           Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              color: Color(0xFFF9ED69),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.all(AppConstants.paddingLarge),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const SizedBox.shrink(),
-                        IconButton(
-                          icon: const Icon(Icons.add),
-                          color: const Color(0xFF1E1E1E),
-                          onPressed: _showAddDialog,
-                        ),
-                      ],
-                    ),
-                    Text(
-                      'My Wishlist',
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1E1E1E),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Things I want to get',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFF1E1E1E).withOpacity(0.7),
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '${_getCompletedCount()}/${_manager.items.length} items',
-                            style: const TextStyle(
-                              color: Color(0xFFF9ED69),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildCategoryChip('all', 'All'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('tech', 'Tech'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('travel', 'Travel'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('fashion', 'Fashion'),
-                          const SizedBox(width: 8),
-                          _buildCategoryChip('home', 'Home'),
-                        ],
-                      ),
-                    ),
-                  ],
+            color: const Color(0xFFF9ED69),
+            padding: const EdgeInsets.all(AppConstants.paddingLarge),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Things I want to get',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF1E1E1E).withOpacity(0.7),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildCategoryChip('all', 'All'),
+                      const SizedBox(width: 8),
+                      _buildCategoryChip('tech', 'Tech'),
+                      const SizedBox(width: 8),
+                      _buildCategoryChip('travel', 'Travel'),
+                      const SizedBox(width: 8),
+                      _buildCategoryChip('fashion', 'Fashion'),
+                      const SizedBox(width: 8),
+                      _buildCategoryChip('home', 'Home'),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 

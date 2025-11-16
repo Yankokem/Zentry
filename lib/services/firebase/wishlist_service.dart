@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/wish_model.dart';
@@ -50,25 +51,114 @@ class WishlistService {
     }
   }
 
-  /// Get all wishlist items for the current user
+  /// Get all wishlist items for the current user (owned and shared)
   /// Returns a stream that updates in real-time
   Stream<List<Wish>> getWishesStream() {
     if (_userId == null) {
       return Stream.value([]);
     }
 
-    return _wishlistRef
+    final userEmail = _auth.currentUser?.email;
+    if (userEmail == null) {
+      return Stream.value([]);
+    }
+
+    final controller = StreamController<List<Wish>>();
+
+    // Query for wishes owned by the user
+    final ownedWishesStream = _wishlistRef
         .where('userId', isEqualTo: _userId)
         .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return Wish.fromFirestore(
-          doc.id,
-          doc.data() as Map<String, dynamic>,
-        );
-      }).toList();
+        .snapshots();
+
+    // Query for wishes shared with the user
+    final sharedWishesStream = _wishlistRef
+        .where('sharedWith', arrayContains: userEmail)
+        .snapshots();
+
+    List<Wish> currentOwnedWishes = [];
+    List<Wish> currentSharedWishes = [];
+
+    StreamSubscription? ownedSubscription;
+    StreamSubscription? sharedSubscription;
+
+    void emitCombined() {
+      if (!controller.isClosed) {
+        _emitCombinedWishes(controller, currentOwnedWishes, currentSharedWishes);
+      }
+    }
+
+    ownedSubscription = ownedWishesStream.listen(
+      (snapshot) {
+        try {
+          currentOwnedWishes = snapshot.docs.map((doc) =>
+            Wish.fromFirestore(doc.id, doc.data() as Map<String, dynamic>)
+          ).toList();
+          emitCombined();
+        } catch (e) {
+          if (!controller.isClosed) {
+            controller.addError(e);
+          }
+        }
+      },
+      onError: (error) {
+        if (!controller.isClosed) {
+          controller.addError(error);
+        }
+      },
+    );
+
+    sharedSubscription = sharedWishesStream.listen(
+      (snapshot) {
+        try {
+          currentSharedWishes = snapshot.docs.map((doc) =>
+            Wish.fromFirestore(doc.id, doc.data() as Map<String, dynamic>)
+          ).toList();
+          emitCombined();
+        } catch (e) {
+          if (!controller.isClosed) {
+            controller.addError(e);
+          }
+        }
+      },
+      onError: (error) {
+        if (!controller.isClosed) {
+          controller.addError(error);
+        }
+      },
+    );
+
+    controller.onCancel = () async {
+      await ownedSubscription?.cancel();
+      await sharedSubscription?.cancel();
+      await controller.close();
+    };
+
+    return controller.stream;
+  }
+
+  void _emitCombinedWishes(StreamController<List<Wish>> controller, List<Wish> owned, List<Wish> shared) {
+    final allWishes = <String, Wish>{};
+
+    // Add owned wishes
+    for (final wish in owned) {
+      allWishes[wish.id!] = wish;
+    }
+
+    // Add shared wishes (will overwrite if already present)
+    for (final wish in shared) {
+      allWishes[wish.id!] = wish;
+    }
+
+    final sortedWishes = allWishes.values.toList();
+    // Sort by createdAt descending (assuming createdAt is a string date)
+    sortedWishes.sort((a, b) {
+      final aDate = a.dateAdded;
+      final bDate = b.dateAdded;
+      return bDate.compareTo(aDate);
     });
+
+    controller.add(sortedWishes);
   }
 
   /// Get all wishlist items (one-time fetch)

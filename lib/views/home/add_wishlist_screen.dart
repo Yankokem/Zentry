@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../config/constants.dart';
 import '../../config/theme.dart';
 import '../../controllers/wishlist_controller.dart';
 import '../../models/wish_model.dart';
+import '../../services/firebase/firestore_service.dart';
 import '../../services/firebase/user_service.dart';
 
 class AddWishlistScreen extends StatefulWidget {
@@ -22,10 +24,13 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _priceController = TextEditingController();
-  final _shareWithController = TextEditingController();
+  final _newMemberController = TextEditingController();
   final _notesController = TextEditingController();
   final _userService = UserService();
-  final List<String> _sharedWithEmails = [];
+  final _firestoreService = FirestoreService();
+  List<String> _teamMembers = [];
+  List<String> _suggestedEmails = [];
+  bool _isSearching = false;
 
   String _selectedCategory = 'tech';
   bool _isLoading = false;
@@ -38,7 +43,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       _priceController.text = widget.itemToEdit!.price;
       _notesController.text = widget.itemToEdit!.notes;
       _selectedCategory = widget.itemToEdit!.category;
-      _sharedWithEmails.addAll(widget.itemToEdit!.sharedWith);
+      _teamMembers.addAll(widget.itemToEdit!.sharedWith);
     }
   }
 
@@ -46,7 +51,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
   void dispose() {
     _titleController.dispose();
     _priceController.dispose();
-    _shareWithController.dispose();
+    _newMemberController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -70,7 +75,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       notes: _notesController.text.trim(),
       dateAdded: widget.itemToEdit?.dateAdded ?? _getCurrentDate(),
       completed: widget.itemToEdit?.completed ?? false,
-      sharedWith: _sharedWithEmails,
+      sharedWith: _teamMembers,
     );
 
     bool success;
@@ -256,6 +261,106 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     );
   }
 
+  Future<void> _searchUsers(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _suggestedEmails.clear();
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      final suggestions = await _userService.searchUsers(query);
+      if (mounted) {
+        setState(() {
+          _suggestedEmails = suggestions.where((email) => !_teamMembers.contains(email)).toList();
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _suggestedEmails.clear();
+          _isSearching = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _addSharedWith() async {
+    final member = _newMemberController.text.trim();
+    if (member.isEmpty) return;
+
+    if (_teamMembers.contains(member)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This email is already added to the shared list'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final exists = await _firestoreService.userExistsByEmail(member);
+      if (mounted) {
+        if (exists) {
+          setState(() {
+            _teamMembers.add(member);
+            _newMemberController.clear();
+            _suggestedEmails.clear();
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Email added successfully'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No account found with this email'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error checking account: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _selectSuggestedEmail(String email) {
+    setState(() {
+      _newMemberController.text = email;
+      _suggestedEmails.clear();
+    });
+  }
+
+  void _removeSharedWith(String email) {
+    setState(() {
+      _teamMembers.remove(email);
+    });
+  }
+
   String _getCurrentDate() {
     final now = DateTime.now();
     final months = [
@@ -280,16 +385,16 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF9ED69),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: AppTheme.textDark),
+          icon: const Icon(Icons.close, color: Color(0xFF1E1E1E)),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           widget.itemToEdit != null ? 'Edit Wishlist Item' : 'New Wishlist Item',
           style: const TextStyle(
-            color: AppTheme.textDark,
+            color: Color(0xFF1E1E1E),
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
@@ -446,39 +551,107 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                   ),
             ),
             const SizedBox(height: 8),
+            // Add new member input
             Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ShareWithField(
-                  controller: _shareWithController,
-                  userService: _userService,
-                  onEmailSelected: (email) {
-                    setState(() {
-                      if (!_sharedWithEmails.contains(email)) {
-                        _sharedWithEmails.add(email);
-                      }
-                      _shareWithController.clear();
-                    });
-                  },
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _newMemberController,
+                        onChanged: _searchUsers,
+                        decoration: InputDecoration(
+                          hintText: 'Enter email to share with',
+                          filled: true,
+                          fillColor: AppTheme.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          suffixIcon: _isSearching
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                )
+                              : null,
+                        ),
+                        validator: (value) {
+                          if (value != null && value.isNotEmpty) {
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                              return 'Please enter a valid email address';
+                            }
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _addSharedWith,
+                      icon: const Icon(Icons.add, size: 20),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: AppTheme.textDark,
+                        padding: const EdgeInsets.all(12),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                if (_sharedWithEmails.isNotEmpty)
-                  Wrap(
-                    spacing: 8.0,
-                    runSpacing: 4.0,
-                    children: _sharedWithEmails
-                        .map((email) => Chip(
-                              label: Text(email),
-                              onDeleted: () {
-                                setState(() {
-                                  _sharedWithEmails.remove(email);
-                                });
-                              },
-                            ))
-                        .toList(),
+                // Suggestions dropdown
+                if (_suggestedEmails.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _suggestedEmails.length,
+                      itemBuilder: (context, index) {
+                        final email = _suggestedEmails[index];
+                        return ListTile(
+                          title: Text(email),
+                          onTap: () => _selectSuggestedEmail(email),
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                        );
+                      },
+                    ),
                   ),
               ],
             ),
+            const SizedBox(height: 16),
+            // Display current shared with emails
+            if (_teamMembers.isNotEmpty) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _teamMembers.map((email) {
+                  return Chip(
+                    label: Text(email),
+                    deleteIcon: const Icon(Icons.close, size: 16),
+                    onDeleted: () => _removeSharedWith(email),
+                    backgroundColor: Colors.grey.shade100,
+                    deleteIconColor: Colors.red.shade600,
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+            ],
             const SizedBox(height: 20),
 
             // Notes
@@ -538,135 +711,5 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
   }
 }
 
-class _ShareWithField extends StatefulWidget {
-  final TextEditingController controller;
-  final UserService userService;
-  final Function(String) onEmailSelected;
 
-  const _ShareWithField({
-    required this.controller,
-    required this.userService,
-    required this.onEmailSelected,
-  });
-
-  @override
-  State<_ShareWithField> createState() => _ShareWithFieldState();
-}
-
-class _ShareWithFieldState extends State<_ShareWithField> {
-  List<String> _suggestions = [];
-  bool _isLoading = false;
-  final LayerLink _layerLink = LayerLink();
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onTextChanged);
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onTextChanged);
-    super.dispose();
-  }
-
-  void _onTextChanged() async {
-    final text = widget.controller.text;
-    if (text.isEmpty) {
-      setState(() {
-        _suggestions = [];
-        _isLoading = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final results = await widget.userService.searchUsers(text);
-      setState(() {
-        _suggestions = results;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _suggestions = [];
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: Stack(
-        children: [
-          TextField(
-            controller: widget.controller,
-            decoration: InputDecoration(
-              hintText: 'Enter email to share with',
-              filled: true,
-              fillColor: const Color(0xFFF5F5F5),
-              prefixIcon: const Icon(Icons.email_outlined),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          if (_suggestions.isNotEmpty || _isLoading)
-            CompositedTransformFollower(
-              link: _layerLink,
-              showWhenUnlinked: false,
-              offset: const Offset(0, 52),
-              child: Container(
-                width: 300,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: _isLoading
-                    ? const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _suggestions.length,
-                        itemBuilder: (context, index) {
-                          final email = _suggestions[index];
-                          return ListTile(
-                            title: Text(email),
-                            onTap: () {
-                              widget.onEmailSelected(email);
-                              setState(() {
-                                _suggestions = [];
-                              });
-                            },
-                          );
-                        },
-                      ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
 

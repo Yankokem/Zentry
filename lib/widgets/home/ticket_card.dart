@@ -148,7 +148,7 @@ class TicketCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          ticket.assignedTo,
+                          ticket.assignedTo.isNotEmpty ? ticket.assignedTo.join(', ') : 'Unassigned',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade700,

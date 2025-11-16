@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zentry/models/project_model.dart';
 import 'package:zentry/models/ticket_model.dart';
+import 'package:zentry/services/firebase/user_service.dart';
 import 'package:zentry/services/project_manager.dart';
 import 'package:zentry/views/home/add_ticket_page.dart';
 import 'package:zentry/views/home/edit_ticket_page.dart';
@@ -22,6 +23,9 @@ class ProjectDetailPage extends StatefulWidget {
 
 class _ProjectDetailPageState extends State<ProjectDetailPage> {
   final ProjectManager _projectManager = ProjectManager();
+  final UserService _userService = UserService();
+  Map<String, Map<String, String>> _userDetails = {};
+  bool _isLoadingUsers = true;
 
   @override
   void initState() {
@@ -32,6 +36,23 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         statusBarIconBrightness: Brightness.dark,
       ),
     );
+    _loadUserDetails();
+  }
+
+  Future<void> _loadUserDetails() async {
+    if (widget.project.teamMembers.isNotEmpty) {
+      final details = await _userService.getUsersDetailsByEmails(widget.project.teamMembers);
+      if (mounted) {
+        setState(() {
+          _userDetails = details;
+          _isLoadingUsers = false;
+        });
+      }
+    } else {
+      setState(() {
+        _isLoadingUsers = false;
+      });
+    }
   }
 
   Color _getProjectColor() {
@@ -147,33 +168,37 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       spacing: 8,
                       runSpacing: 8,
                       children: widget.project.teamMembers.map((member) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.person,
-                                size: 14,
-                                color: Color(0xFF1E1E1E),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                member,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                        final displayName = _userService.getDisplayName(_userDetails[member] ?? {}, member);
+                        return Tooltip(
+                          message: member,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E1E1E).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.person,
+                                  size: 14,
                                   color: Color(0xFF1E1E1E),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  displayName,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1E1E1E),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       }).toList(),
@@ -445,7 +470,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             // Details Grid
             _buildDetailRow(Icons.flag_outlined, 'Priority', ticket.priority.toUpperCase()),
             const SizedBox(height: 12),
-            _buildDetailRow(Icons.person_outline, 'Assigned To', ticket.assignedTo),
+            _buildDetailRow(Icons.person_outline, 'Assigned To', ticket.assignedTo.isNotEmpty ? ticket.assignedTo.map((email) => _userService.getDisplayName(_userDetails[email] ?? {}, email)).join(', ') : 'Unassigned'),
             const SizedBox(height: 12),
             _buildDetailRow(Icons.assignment_outlined, 'Status', _formatStatus(ticket.status)),
 

@@ -14,6 +14,7 @@ class Project {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isPinned;
+  final String category;
 
   Project({
     required this.id,
@@ -29,6 +30,7 @@ class Project {
     DateTime? createdAt,
     DateTime? updatedAt,
     this.isPinned = false,
+    this.category = 'workspace',
   }) : createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -46,6 +48,7 @@ class Project {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isPinned,
+    String? category,
   }) {
     return Project(
       id: id ?? this.id,
@@ -61,6 +64,7 @@ class Project {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isPinned: isPinned ?? this.isPinned,
+      category: category ?? this.category,
     );
   }
 
@@ -84,6 +88,7 @@ class Project {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isPinned': isPinned,
+      'category': category,
     };
   }
 
@@ -110,6 +115,7 @@ class Project {
               : DateTime.parse(map['updatedAt']))
           : null,
       isPinned: map['isPinned'] ?? false,
+      category: map['category'] ?? 'workspace',
     );
   }
 }

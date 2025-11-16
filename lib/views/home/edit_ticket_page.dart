@@ -3,6 +3,69 @@ import 'package:zentry/models/project_model.dart';
 import 'package:zentry/models/ticket_model.dart';
 import 'package:zentry/services/project_manager.dart';
 
+class MultiSelectDialog extends StatefulWidget {
+  final String title;
+  final List<String> items;
+  final List<String> selectedItems;
+
+  const MultiSelectDialog({
+    super.key,
+    required this.title,
+    required this.items,
+    required this.selectedItems,
+  });
+
+  @override
+  State<MultiSelectDialog> createState() => _MultiSelectDialogState();
+}
+
+class _MultiSelectDialogState extends State<MultiSelectDialog> {
+  late List<String> _selectedItems;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedItems = List.from(widget.selectedItems);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widget.items.map((item) {
+            return CheckboxListTile(
+              title: Text(item),
+              value: _selectedItems.contains(item),
+              onChanged: (bool? checked) {
+                setState(() {
+                  if (checked == true) {
+                    _selectedItems.add(item);
+                  } else {
+                    _selectedItems.remove(item);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _selectedItems),
+          child: const Text('OK'),
+        ),
+      ],
+    );
+  }
+}
+
 class EditTicketPage extends StatefulWidget {
   final Ticket ticket;
   final Project project;
@@ -25,7 +88,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
   final descController = TextEditingController();
   String selectedPriority = '';
   String selectedStatus = '';
-  String selectedAssignee = '';
+  List<String> selectedAssignees = [];
   DateTime? selectedDeadline;
 
   @override
@@ -35,7 +98,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
     descController.text = widget.ticket.description;
     selectedPriority = widget.ticket.priority;
     selectedStatus = widget.ticket.status;
-    selectedAssignee = widget.ticket.assignedTo;
+    selectedAssignees = widget.ticket.assignedTo;
     selectedDeadline = widget.ticket.deadline;
   }
 
@@ -346,28 +409,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
                     const SizedBox(height: 16),
                     _buildDateField(),
                     const SizedBox(height: 16),
-                    _buildDropdownField(
-                      label: 'Assign To',
-                      value: selectedAssignee,
-                      items: widget.project.teamMembers
-                          .map((member) => DropdownMenuItem(
-                                value: member,
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.person, color: Colors.grey.shade600, size: 18),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        member,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (value) => setState(() => selectedAssignee = value!),
-                    ),
+                    _buildMultiSelectField(),
                   ],
                 ),
               ),
@@ -479,6 +521,66 @@ class _EditTicketPageState extends State<EditTicketPage> {
     );
   }
 
+  Widget _buildMultiSelectField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Assign To',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () async {
+            final result = await showDialog<List<String>>(
+              context: context,
+              builder: (context) => MultiSelectDialog(
+                title: 'Select Assignees',
+                items: widget.project.teamMembers,
+                selectedItems: selectedAssignees,
+              ),
+            );
+            if (result != null) {
+              setState(() {
+                selectedAssignees = result;
+              });
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.grey.shade50,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.group, color: Colors.grey.shade600, size: 18),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    selectedAssignees.isNotEmpty
+                        ? selectedAssignees.join(', ')
+                        : 'Select assignees',
+                    style: TextStyle(
+                      color: selectedAssignees.isNotEmpty ? Colors.black : Colors.grey.shade600,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _saveChanges() {
     if (_formKey.currentState!.validate()) {
       final updatedTicket = widget.ticket.copyWith(
@@ -486,7 +588,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
         description: descController.text,
         priority: selectedPriority,
         status: selectedStatus,
-        assignedTo: selectedAssignee,
+        assignedTo: selectedAssignees,
         deadline: selectedDeadline,
       );
 

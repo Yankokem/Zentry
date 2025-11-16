@@ -7,7 +7,7 @@ class Ticket {
   final String description;
   final String priority;
   final String status; // 'todo', 'in_progress', 'in_review', 'done'
-  final String assignedTo;
+  final List<String> assignedTo;
   final String projectId;
   final DateTime? deadline;
   final DateTime createdAt;
@@ -45,6 +45,15 @@ class Ticket {
   }
 
   factory Ticket.fromMap(Map<String, dynamic> map) {
+    List<String> assignedTo = [];
+    if (map['assignedTo'] != null) {
+      if (map['assignedTo'] is List) {
+        assignedTo = List<String>.from(map['assignedTo']);
+      } else if (map['assignedTo'] is String) {
+        assignedTo = [map['assignedTo']];
+      }
+    }
+
     return Ticket(
       ticketNumber: map['ticketNumber'],
       userId: map['userId'],
@@ -52,7 +61,7 @@ class Ticket {
       description: map['description'],
       priority: map['priority'],
       status: map['status'],
-      assignedTo: map['assignedTo'],
+      assignedTo: assignedTo,
       projectId: map['projectId'],
       deadline: map['deadline'] != null ? DateTime.parse(map['deadline']) : null,
       createdAt: map['createdAt'] != null
@@ -75,7 +84,7 @@ class Ticket {
     String? description,
     String? priority,
     String? status,
-    String? assignedTo,
+    List<String>? assignedTo,
     String? projectId,
     DateTime? deadline,
     DateTime? createdAt,

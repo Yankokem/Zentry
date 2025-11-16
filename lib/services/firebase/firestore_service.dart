@@ -162,7 +162,18 @@ class FirestoreService {
         }
       }
 
-      return allProjects;
+      // Categorize projects based on ownership
+      final categorizedProjects = allProjects.map((project) {
+        if (project.userId == userId) {
+          // User is the owner - set category to 'workspace'
+          return project.copyWith(category: 'workspace');
+        } else {
+          // User is shared - set category to 'shared'
+          return project.copyWith(category: 'shared');
+        }
+      }).toList();
+
+      return categorizedProjects;
     } catch (e) {
       throw Exception('Failed to get user projects: $e');
     }

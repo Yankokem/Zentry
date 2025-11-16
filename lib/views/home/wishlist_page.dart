@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/controllers/wishlist_controller.dart';
 import 'package:zentry/models/wish_model.dart';
+import 'package:zentry/services/firebase/user_service.dart';
 import 'add_wishlist_screen.dart';
 
 class WishlistPage extends StatefulWidget {
@@ -15,6 +16,9 @@ class WishlistPage extends StatefulWidget {
 class _WishlistPageState extends State<WishlistPage> {
   late WishlistController _controller;
   String _selectedCategory = 'all';
+  final UserService _userService = UserService();
+  Map<String, Map<String, String>> _userDetails = {};
+  bool _isLoadingUsers = true;
 
   @override
   void initState() {
@@ -25,10 +29,32 @@ class _WishlistPageState extends State<WishlistPage> {
         statusBarIconBrightness: Brightness.dark,
       ),
     );
-    
+
     // Initialize controller
     _controller = WishlistController();
     _controller.initialize();
+    _loadUserDetails();
+  }
+
+  Future<void> _loadUserDetails() async {
+    setState(() => _isLoadingUsers = true);
+    final allEmails = <String>{};
+    for (final wish in _controller.wishes) {
+      allEmails.addAll(wish.sharedWith);
+    }
+
+    final details = <String, Map<String, String>>{};
+    for (final email in allEmails) {
+      final userDetails = await _userService.getUserDetailsByEmail(email);
+      details[email] = userDetails;
+    }
+
+    if (mounted) {
+      setState(() {
+        _userDetails = details;
+        _isLoadingUsers = false;
+      });
+    }
   }
 
   @override
@@ -163,31 +189,25 @@ class _WishlistPageState extends State<WishlistPage> {
 
   Widget _buildCategoryChip(String category, String label) {
     final isSelected = _selectedCategory == category;
-    final color = _getCategoryColor(category);
-    
-    return GestureDetector(
-      onTap: () {
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
         setState(() {
           _selectedCategory = category;
         });
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? color : color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? color : color.withOpacity(0.3),
-            width: 2,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : color.withOpacity(0.8),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            fontSize: 14,
-          ),
+      backgroundColor: Colors.white,
+      selectedColor: const Color(0xFF1E1E1E),
+      checkmarkColor: const Color(0xFFF9ED69),
+      labelStyle: TextStyle(
+        color: isSelected ? const Color(0xFFF9ED69) : const Color(0xFF1E1E1E),
+        fontWeight: FontWeight.w500,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? const Color(0xFF1E1E1E) : Colors.grey.shade300,
         ),
       ),
     );
@@ -317,10 +337,39 @@ class _WishlistPageState extends State<WishlistPage> {
                       ],
                     ),
                   ),
-                  IconButton(
+                  PopupMenuButton<String>(
+                    padding: EdgeInsets.zero,
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _showEditDialog(item);
+                      } else if (value == 'delete') {
+                        _confirmDelete(item);
+                      }
+                    },
+                    itemBuilder: (BuildContext context) => [
+                      const PopupMenuItem<String>(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18),
+                            SizedBox(width: 8),
+                            Text('Delete'),
+                          ],
+                        ),
+                      ),
+                    ],
                     icon: const Icon(Icons.more_vert, size: 20),
-                    color: Colors.grey.shade600,
-                    onPressed: () => _showOptionsMenu(item),
+                    tooltip: 'More options',
                   ),
                 ],
               ),
@@ -579,8 +628,10 @@ class _WishlistPageState extends State<WishlistPage> {
                         spacing: 8,
                         runSpacing: 8,
                         children: item.sharedWith.map((email) {
+                          final userDetails = _userDetails[email] ?? {'fullName': '', 'email': email};
+                          final displayName = _userService.getDisplayName(userDetails, email);
                           return Chip(
-                            label: Text(email),
+                            label: Text(displayName),
                             backgroundColor: Colors.grey.shade200,
                           );
                         }).toList(),
