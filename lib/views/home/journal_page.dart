@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/services/journal_manager.dart';
 import 'package:zentry/models/journal_entry_model.dart';
+import 'add_journal_screen.dart';
 
 class JournalPage extends StatefulWidget {
   const JournalPage({super.key});
@@ -103,7 +104,14 @@ class _JournalPageState extends State<JournalPage> {
                             IconButton(
                               icon: const Icon(Icons.add),
                               color: const Color(0xFF1E1E1E),
-                              onPressed: _showAddDialog,
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AddJournalScreen(),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -286,10 +294,43 @@ class _JournalPageState extends State<JournalPage> {
                       ],
                     ),
                   ),
-                  IconButton(
+                  PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert, size: 20),
-                    color: Colors.grey.shade600,
-                    onPressed: () => _showOptions(entry),
+                    color: Colors.white,
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddJournalScreen(entryToEdit: entry),
+                          ),
+                        );
+                      } else if (value == 'delete') {
+                        _confirmDelete(entry);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18),
+                            SizedBox(width: 8),
+                            Text('Delete'),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -496,50 +537,7 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  void _showOptions(JournalEntry entry) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(Icons.edit, color: Color(0xFF1E1E1E)),
-              title: const Text('Edit'),
-              onTap: () {
-                Navigator.pop(context);
-                _showEditDialog(entry);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDelete(entry);
-              },
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   void _confirmDelete(JournalEntry entry) {
     showDialog(
