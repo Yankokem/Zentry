@@ -7,7 +7,7 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String usersCollection = 'users';
   static const String projectsCollection = 'projects';
-  static const String ticketsCollection = 'tickets';
+  static const String ticketsSubcollection = 'tickets'; // Tickets are now subcollection under projects
 
   // Store user data in Firestore after signup
   Future<void> createUserDocument({
@@ -194,10 +194,11 @@ class FirestoreService {
   // Delete a project
   Future<void> deleteProject(String projectId) async {
     try {
-      // Delete all tickets for this project first
+      // Delete all tickets for this project (now in subcollection)
       final ticketsQuery = await _db
-          .collection(ticketsCollection)
-          .where('projectId', isEqualTo: projectId)
+          .collection(projectsCollection)
+          .doc(projectId)
+          .collection(ticketsSubcollection)
           .get();
 
       final batch = _db.batch();
@@ -214,10 +215,15 @@ class FirestoreService {
 
   // ===== TICKET OPERATIONS =====
 
-  // Create a new ticket
+  // Create a new ticket (now stored in project subcollection)
   Future<void> createTicket(Ticket ticket) async {
     try {
-      await _db.collection(ticketsCollection).doc(ticket.ticketNumber).set({
+      await _db
+          .collection(projectsCollection)
+          .doc(ticket.projectId)
+          .collection(ticketsSubcollection)
+          .doc(ticket.ticketNumber)
+          .set({
         ...ticket.toMap(),
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -227,28 +233,43 @@ class FirestoreService {
     }
   }
 
-  // Get all tickets for a user
+  // Get all tickets for a user (across all their projects)
   Future<List<Ticket>> getUserTickets(String userId) async {
     try {
-      final querySnapshot = await _db
-          .collection(ticketsCollection)
+      // First get all user projects
+      final projectsSnapshot = await _db
+          .collection(projectsCollection)
           .where('userId', isEqualTo: userId)
           .get();
 
-      return querySnapshot.docs
-          .map((doc) => Ticket.fromMap(doc.data()))
-          .toList();
+      final allTickets = <Ticket>[];
+
+      // For each project, get its tickets from subcollection
+      for (final projectDoc in projectsSnapshot.docs) {
+        final ticketsSnapshot = await projectDoc.reference
+            .collection(ticketsSubcollection)
+            .get();
+
+        final tickets = ticketsSnapshot.docs
+            .map((doc) => Ticket.fromMap(doc.data()))
+            .toList();
+
+        allTickets.addAll(tickets);
+      }
+
+      return allTickets;
     } catch (e) {
       throw Exception('Failed to get user tickets: $e');
     }
   }
 
-  // Get tickets for a specific project
+  // Get tickets for a specific project (from subcollection)
   Future<List<Ticket>> getProjectTickets(String projectId) async {
     try {
       final querySnapshot = await _db
-          .collection(ticketsCollection)
-          .where('projectId', isEqualTo: projectId)
+          .collection(projectsCollection)
+          .doc(projectId)
+          .collection(ticketsSubcollection)
           .get();
 
       return querySnapshot.docs
@@ -259,12 +280,13 @@ class FirestoreService {
     }
   }
 
-  // Get tickets by status for a project
+  // Get tickets by status for a project (from subcollection)
   Future<List<Ticket>> getProjectTicketsByStatus(String projectId, String status) async {
     try {
       final querySnapshot = await _db
-          .collection(ticketsCollection)
-          .where('projectId', isEqualTo: projectId)
+          .collection(projectsCollection)
+          .doc(projectId)
+          .collection(ticketsSubcollection)
           .where('status', isEqualTo: status)
           .get();
 
@@ -276,10 +298,15 @@ class FirestoreService {
     }
   }
 
-  // Update a ticket
-  Future<void> updateTicket(String ticketNumber, Map<String, dynamic> data) async {
+  // Update a ticket (in project subcollection)
+  Future<void> updateTicket(String projectId, String ticketNumber, Map<String, dynamic> data) async {
     try {
-      await _db.collection(ticketsCollection).doc(ticketNumber).update({
+      await _db
+          .collection(projectsCollection)
+          .doc(projectId)
+          .collection(ticketsSubcollection)
+          .doc(ticketNumber)
+          .update({
         ...data,
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -288,10 +315,15 @@ class FirestoreService {
     }
   }
 
-  // Delete a ticket
-  Future<void> deleteTicket(String ticketNumber) async {
+  // Delete a ticket (from project subcollection)
+  Future<void> deleteTicket(String projectId, String ticketNumber) async {
     try {
-      await _db.collection(ticketsCollection).doc(ticketNumber).delete();
+      await _db
+          .collection(projectsCollection)
+          .doc(projectId)
+          .collection(ticketsSubcollection)
+          .doc(ticketNumber)
+          .delete();
     } catch (e) {
       throw Exception('Failed to delete ticket: $e');
     }
@@ -311,11 +343,12 @@ class FirestoreService {
             snapshot.docs.map((doc) => Project.fromMap(doc.data())).toList());
   }
 
-  // Listen to tickets changes for a project
+  // Listen to tickets changes for a project (from subcollection)
   Stream<List<Ticket>> listenToProjectTickets(String projectId) {
     return _db
-        .collection(ticketsCollection)
-        .where('projectId', isEqualTo: projectId)
+        .collection(projectsCollection)
+        .doc(projectId)
+        .collection(ticketsSubcollection)
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => Ticket.fromMap(doc.data())).toList());

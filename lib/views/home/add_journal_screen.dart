@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../config/constants.dart';
 import '../../config/theme.dart';
 import '../../models/journal_entry_model.dart';
-import '../../services/journal_manager.dart';
+import '../../models/mood_model.dart';
+import '../../services/firebase/journal_service.dart';
+import '../../services/firebase/mood_service.dart';
 
 class AddJournalScreen extends StatefulWidget {
   final JournalEntry? entryToEdit;
@@ -20,9 +21,11 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
-  final _journalManager = JournalManager();
+  final _journalService = JournalService();
+  final _moodService = MoodService();
 
   String _selectedMood = 'happy';
+  List<Mood> _moods = Mood.defaultMoods;
   bool _isLoading = false;
 
   @override
@@ -33,6 +36,21 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
       _contentController.text = widget.entryToEdit!.content;
       _selectedMood = widget.entryToEdit!.mood;
     }
+    _loadMoods();
+  }
+
+  void _loadMoods() {
+    // Set initial value from cache
+    _moods = Mood.defaultMoods;
+    
+    // Listen to real-time updates from Firestore
+    _moodService.getMoodsStream().listen((moods) {
+      if (mounted) {
+        setState(() {
+          _moods = moods;
+        });
+      }
+    });
   }
 
   @override
@@ -42,21 +60,208 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
     super.dispose();
   }
 
-  Color _getMoodColor(String mood) {
-    switch (mood) {
-      case 'happy':
-        return const Color(0xFFFDD835);
-      case 'sad':
-        return const Color(0xFF42A5F5);
-      case 'angry':
-        return const Color(0xFFEF5350);
-      case 'excited':
-        return const Color(0xFFAB47BC);
-      case 'calm':
-        return const Color(0xFF66BB6A);
-      default:
-        return Colors.grey;
+  void _showAddMoodDialog() {
+    final nameController = TextEditingController();
+    Color selectedColor = Colors.blue;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(Icons.add_circle, color: selectedColor),
+                  const SizedBox(width: 12),
+                  const Text('Add Custom Feeling'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 300,
+                      child: TextField(
+                        controller: nameController,
+                        decoration: InputDecoration(
+                          labelText: 'Feeling Name (e.g., "grateful")',
+                          hintText: 'grateful',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: selectedColor, width: 2),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Feeling Color',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        Colors.blue, Colors.green, Colors.purple, Colors.orange,
+                        Colors.red, Colors.pink, Colors.teal, Colors.indigo,
+                        Colors.amber, Colors.cyan, Colors.lime, Colors.brown,
+                      ].map((color) {
+                        final isSelected = color.value == selectedColor.value;
+                        return GestureDetector(
+                          onTap: () => setDialogState(() => selectedColor = color),
+                          child: Container(
+                            width: 40, height: 40,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? Colors.black : Colors.grey,
+                                width: isSelected ? 3 : 1,
+                              ),
+                            ),
+                            child: isSelected
+                                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (nameController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter a feeling name'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    final moodName = nameController.text.trim().toLowerCase();
+                    final displayLabel = moodName[0].toUpperCase() + moodName.substring(1);
+                    // Format color hex properly (AARRGGBB format)
+                    final colorHex = selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase();
+
+                    try {
+                      await _moodService.createMood(Mood(
+                        name: moodName,
+                        label: displayLabel,
+                        colorHex: colorHex,
+                      ));
+
+                      if (mounted) {
+                        Navigator.pop(context);
+                        // Refresh moods to get the newly created one
+                        _loadMoods();
+                        // Auto-select the newly created mood
+                        setState(() => _selectedMood = moodName);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Feeling created successfully'),
+                            backgroundColor: AppTheme.success,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: selectedColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Create'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteMoodDialog(Mood mood) {
+    if (mood.isDefault) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot delete default feelings'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
     }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Feeling'),
+        content: Text('Are you sure you want to delete "${mood.label}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await _moodService.deleteMood(mood.id!);
+                Navigator.pop(context);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Feeling deleted'),
+                      backgroundColor: AppTheme.success,
+                    ),
+                  );
+                  // Reset to default mood if deleted mood was selected
+                  if (_selectedMood == mood.name) {
+                    setState(() => _selectedMood = 'happy');
+                  }
+                }
+              } catch (e) {
+                Navigator.pop(context);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _saveJournalEntry() async {
@@ -66,68 +271,50 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
 
     setState(() => _isLoading = true);
 
-    final entry = JournalEntry(
-      title: _titleController.text.trim(),
-      content: _contentController.text.trim(),
-      date: widget.entryToEdit?.date ?? _getCurrentDate(),
-      time: widget.entryToEdit?.time ?? _getCurrentTime(),
-      mood: _selectedMood,
-    );
-
-    if (widget.entryToEdit != null) {
-      _journalManager.updateEntry(widget.entryToEdit!, entry);
-    } else {
-      _journalManager.addEntryFromMap({
-        'title': entry.title,
-        'content': entry.content,
-        'date': entry.date,
-        'time': entry.time,
-        'mood': entry.mood,
-      });
-    }
-
-    setState(() => _isLoading = false);
-
-    if (mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(widget.entryToEdit != null
-              ? 'Journal entry updated'
-              : 'Journal entry added'),
-          backgroundColor: AppTheme.success,
-          behavior: SnackBarBehavior.floating,
-        ),
+    try {
+      final entry = JournalEntry(
+        title: _titleController.text.trim(),
+        content: _contentController.text.trim(),
+        date: widget.entryToEdit?.date ?? _getCurrentDate(),
+        time: widget.entryToEdit?.time ?? _getCurrentTime(),
+        mood: _selectedMood,
       );
+
+      if (widget.entryToEdit != null) {
+        // Update existing entry in Firestore
+        await _journalService.updateEntry(widget.entryToEdit!.id!, entry);
+      } else {
+        // Create new entry in Firestore
+        await _journalService.createEntry(entry);
+      }
+
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.entryToEdit != null
+                ? 'Journal entry updated'
+                : 'Journal entry added'),
+            backgroundColor: AppTheme.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
-  }
-
-  Widget _buildMoodChip(String mood, String label, String selectedMood, Function(String) onTap) {
-    final isSelected = selectedMood == mood;
-    final moodColor = _getMoodColor(mood);
-
-    return GestureDetector(
-      onTap: () => onTap(mood),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? moodColor : moodColor.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? moodColor : moodColor.withOpacity(0.3),
-            width: 2,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : moodColor.withOpacity(0.8),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            fontSize: 14,
-          ),
-        ),
-      ),
-    );
   }
 
   String _getCurrentDate() {
@@ -178,25 +365,53 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                   ),
             ),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            Row(
               children: [
-                _buildMoodChip('happy', 'Happy', _selectedMood, (mood) {
-                  setState(() => _selectedMood = mood);
-                }),
-                _buildMoodChip('sad', 'Sad', _selectedMood, (mood) {
-                  setState(() => _selectedMood = mood);
-                }),
-                _buildMoodChip('angry', 'Angry', _selectedMood, (mood) {
-                  setState(() => _selectedMood = mood);
-                }),
-                _buildMoodChip('excited', 'Excited', _selectedMood, (mood) {
-                  setState(() => _selectedMood = mood);
-                }),
-                _buildMoodChip('calm', 'Calm', _selectedMood, (mood) {
-                  setState(() => _selectedMood = mood);
-                }),
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _moods.map((mood) {
+                      final isSelected = _selectedMood == mood.name;
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedMood = mood.name),
+                        onLongPress: () => _showDeleteMoodDialog(mood),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected ? mood.color : mood.color.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected ? mood.color : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Text(
+                            mood.label,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: isSelected ? Colors.white : AppTheme.textDark,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _showAddMoodDialog,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.shade400, width: 1.5),
+                    ),
+                    child: const Icon(Icons.add, size: 20, color: AppTheme.textDark),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -237,7 +452,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
             const SizedBox(height: 8),
             TextFormField(
               controller: _contentController,
-              maxLines: 8,
+              maxLines: 19,
               decoration: const InputDecoration(
                 hintText: 'Share what\'s on your mind...',
                 filled: true,

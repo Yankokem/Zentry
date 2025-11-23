@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zentry/config/constants.dart';
-import 'package:zentry/services/journal_manager.dart';
+import 'package:zentry/services/firebase/journal_service.dart';
+import 'package:zentry/services/firebase/mood_service.dart';
 import 'package:zentry/models/journal_entry_model.dart';
+import 'package:zentry/models/mood_model.dart';
 import 'add_journal_screen.dart';
 
 class JournalPage extends StatefulWidget {
@@ -16,7 +18,11 @@ class _JournalPageState extends State<JournalPage> {
   bool _isSearching = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-  final JournalManager _journalManager = JournalManager();
+  final JournalService _journalService = JournalService();
+  final MoodService _moodService = MoodService();
+  List<JournalEntry> _entries = [];
+  List<Mood> _moods = Mood.defaultMoods;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -27,6 +33,43 @@ class _JournalPageState extends State<JournalPage> {
         statusBarIconBrightness: Brightness.dark,
       ),
     );
+    _loadEntries();
+    _loadMoods();
+  }
+
+  void _loadEntries() {
+    _journalService.getEntriesStream().listen((entries) {
+      if (mounted) {
+        setState(() {
+          _entries = entries;
+          _isLoading = false;
+        });
+      }
+    }, onError: (error) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading entries: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
+  }
+
+  void _loadMoods() {
+    // Start with default moods immediately
+    _moods = Mood.defaultMoods;
+    
+    // Then listen for updates from Firestore (will include custom moods)
+    _moodService.getMoodsStream().listen((moods) {
+      if (mounted) {
+        setState(() {
+          _moods = moods;
+        });
+      }
+    });
   }
 
   @override
@@ -36,28 +79,28 @@ class _JournalPageState extends State<JournalPage> {
   }
 
   List<JournalEntry> _getFilteredEntries() {
-    if (_searchQuery.isEmpty) return _journalManager.entries;
+    if (_searchQuery.isEmpty) return _entries;
 
-    return _journalManager.entries.where((entry) {
+    return _entries.where((entry) {
       return entry.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
              entry.content.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
   }
 
-  Color _getMoodColor(String mood) {
-    switch (mood) {
-      case 'happy':
-        return const Color(0xFFFDD835);
-      case 'sad':
-        return const Color(0xFF42A5F5);
-      case 'angry':
-        return const Color(0xFFEF5350);
-      case 'excited':
-        return const Color(0xFFAB47BC);
-      case 'calm':
-        return const Color(0xFF66BB6A);
-      default:
+  Color _getMoodColor(String moodName) {
+    try {
+      // Try exact match first
+      final mood = _moods.firstWhere((m) => m.name == moodName);
+      return mood.color;
+    } catch (e) {
+      // Fallback: try case-insensitive match
+      try {
+        final mood = _moods.firstWhere((m) => m.name.toLowerCase() == moodName.toLowerCase());
+        return mood.color;
+      } catch (e2) {
+        // Last resort: return grey
         return Colors.grey;
+      }
     }
   }
 
@@ -143,7 +186,7 @@ class _JournalPageState extends State<JournalPage> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              '${_journalManager.entries.length} entries',
+                              '${_entries.length} entries',
                               style: const TextStyle(
                                 color: Color(0xFFF9ED69),
                                 fontWeight: FontWeight.bold,
@@ -187,42 +230,48 @@ class _JournalPageState extends State<JournalPage> {
           Expanded(
             child: Container(
               color: Colors.grey.shade100,
-              child: filteredEntries.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _searchQuery.isNotEmpty ? Icons.search_off : Icons.book_outlined,
-                            size: 80,
-                            color: Colors.grey.withOpacity(0.3),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _searchQuery.isNotEmpty ? 'No entries found' : 'No entries yet',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  color: Colors.grey,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _searchQuery.isNotEmpty 
-                                ? 'Try different keywords'
-                                : 'Tap + to write your first entry',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.grey,
-                                ),
-                          ),
-                        ],
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF1E1E1E),
                       ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                      itemCount: filteredEntries.length,
-                      itemBuilder: (context, index) {
-                        return _buildEntryCard(filteredEntries[index]);
-                      },
-                    ),
+                  : filteredEntries.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _searchQuery.isNotEmpty ? Icons.search_off : Icons.book_outlined,
+                                size: 80,
+                                color: Colors.grey.withOpacity(0.3),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _searchQuery.isNotEmpty ? 'No entries found' : 'No entries yet',
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      color: Colors.grey,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _searchQuery.isNotEmpty 
+                                    ? 'Try different keywords'
+                                    : 'Tap + to write your first entry',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Colors.grey,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                          itemCount: filteredEntries.length,
+                          itemBuilder: (context, index) {
+                            return _buildEntryCard(filteredEntries[index]);
+                          },
+                        ),
             ),
           ),
         ],
@@ -551,14 +600,23 @@ class _JournalPageState extends State<JournalPage> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _journalManager.removeEntry(entry);
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Entry deleted')),
-              );
+            onPressed: () async {
+              try {
+                await _journalService.deleteEntry(entry.id!);
+                Navigator.pop(context);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Entry deleted')),
+                  );
+                }
+              } catch (e) {
+                Navigator.pop(context);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -756,28 +814,37 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
-                    setState(() {
-                      _journalManager.addEntryFromMap({
-                        'title': titleController.text,
-                        'content': contentController.text,
-                        'date': _getCurrentDate(),
-                        'time': _getCurrentTime(),
-                        'mood': selectedMood,
-                      });
-                    });
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Journal entry added'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    );
+                    try {
+                      final newEntry = JournalEntry(
+                        title: titleController.text,
+                        content: contentController.text,
+                        date: _getCurrentDate(),
+                        time: _getCurrentTime(),
+                        mood: selectedMood,
+                      );
+                      await _journalService.createEntry(newEntry);
+                      Navigator.pop(context);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Journal entry added'),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -1014,29 +1081,38 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
-                    final updatedEntry = JournalEntry(
-                      title: titleController.text,
-                      content: contentController.text,
-                      date: entry.date,
-                      time: entry.time,
-                      mood: selectedMood,
-                    );
-                    setState(() {
-                      _journalManager.updateEntry(entry, updatedEntry);
-                    });
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Journal entry updated'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    );
+                    try {
+                      final updatedEntry = JournalEntry(
+                        id: entry.id,
+                        title: titleController.text,
+                        content: contentController.text,
+                        date: entry.date,
+                        time: entry.time,
+                        mood: selectedMood,
+                      );
+                      await _journalService.updateEntry(entry.id!, updatedEntry);
+                      Navigator.pop(context);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Journal entry updated'),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      }
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(

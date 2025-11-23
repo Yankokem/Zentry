@@ -607,7 +607,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       onTap: () {
         if (!isCurrentStatus) {
           final updatedTicket = ticket.copyWith(status: statusValue);
-          _projectManager.updateTicket(ticket.ticketNumber, updatedTicket);
+          _projectManager.updateTicket(ticket.projectId, ticket.ticketNumber, updatedTicket);
           Navigator.pop(context);
           _refreshTickets();
           
@@ -671,7 +671,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           ),
           ElevatedButton(
             onPressed: () {
-              _projectManager.deleteTicket(ticket.ticketNumber);
+              _projectManager.deleteTicket(ticket.projectId, ticket.ticketNumber);
               Navigator.pop(context);
               _refreshTickets();
               

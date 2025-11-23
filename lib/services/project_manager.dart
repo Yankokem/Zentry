@@ -58,14 +58,14 @@ class ProjectManager {
     await _firestoreService.createTicket(ticketWithUser);
   }
 
-  // Update ticket
-  Future<void> updateTicket(String ticketNumber, Ticket updatedTicket) async {
-    await _firestoreService.updateTicket(ticketNumber, updatedTicket.toMap());
+  // Update ticket (now requires projectId)
+  Future<void> updateTicket(String projectId, String ticketNumber, Ticket updatedTicket) async {
+    await _firestoreService.updateTicket(projectId, ticketNumber, updatedTicket.toMap());
   }
 
-  // Delete ticket
-  Future<void> deleteTicket(String ticketNumber) async {
-    await _firestoreService.deleteTicket(ticketNumber);
+  // Delete ticket (now requires projectId)
+  Future<void> deleteTicket(String projectId, String ticketNumber) async {
+    await _firestoreService.deleteTicket(projectId, ticketNumber);
   }
 
   // Update project

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../models/category_model.dart';
 
 /// Service for managing wishlist categories in Firestore
+/// Categories are stored in a dedicated 'wishlist_categories' collection with userId filter
 class CategoryService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -13,7 +14,7 @@ class CategoryService {
   /// Get the current user's ID
   String? get _userId => _auth.currentUser?.uid;
 
-  /// Get reference to the categories collection
+  /// Get reference to categories collection
   CollectionReference get _categoriesRef => _db.collection(categoriesCollection);
 
   /// Get all categories for the current user (default + custom)
@@ -78,6 +79,7 @@ class CategoryService {
 
       final docRef = await _categoriesRef.add({
         ...customCategory.toFirestore(),
+        'userId': _userId,
         'createdAt': FieldValue.serverTimestamp(),
       });
 

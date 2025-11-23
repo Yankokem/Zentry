@@ -592,7 +592,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
         deadline: selectedDeadline,
       );
 
-      ProjectManager().updateTicket(widget.ticket.ticketNumber, updatedTicket);
+      ProjectManager().updateTicket(widget.ticket.projectId, widget.ticket.ticketNumber, updatedTicket);
       widget.refreshTickets();
       Navigator.pop(context);
 

@@ -1014,7 +1014,7 @@ class TicketDialogs {
                     deadline: selectedDeadline,
                   );
 
-                  ProjectManager().updateTicket(ticket.ticketNumber, updatedTicket);
+                  ProjectManager().updateTicket(ticket.projectId, ticket.ticketNumber, updatedTicket);
                   Navigator.pop(context);
                   refreshTickets();
 
