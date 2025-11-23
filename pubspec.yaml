@@ -32,6 +32,9 @@ dependencies:
   # Encryption
   encrypt: ^5.0.3
   crypto: ^3.0.3
+  
+  # Rich Text Editor
+  flutter_quill: ^11.5.0
 
   cupertino_icons: ^1.0.6
 

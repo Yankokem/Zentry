@@ -6,14 +6,19 @@ import '../../services/firebase/journal_service.dart';
 import '../../services/firebase/mood_service.dart';
 import '../../widgets/journal/rich_text_editor.dart';
 
-class AddJournalScreen extends StatefulWidget {
-  const AddJournalScreen({super.key});
+class EditJournalScreen extends StatefulWidget {
+  final JournalEntry entry;
+
+  const EditJournalScreen({
+    super.key,
+    required this.entry,
+  });
 
   @override
-  State<AddJournalScreen> createState() => _AddJournalScreenState();
+  State<EditJournalScreen> createState() => _EditJournalScreenState();
 }
 
-class _AddJournalScreenState extends State<AddJournalScreen> {
+class _EditJournalScreenState extends State<EditJournalScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _contentEditorController = RichTextEditorController();
@@ -27,9 +32,10 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
   @override
   void initState() {
     super.initState();
+    _titleController.text = widget.entry.title;
+    _contentEditorController.setJsonContent(widget.entry.content);
+    _selectedMood = widget.entry.mood;
     _loadMoods();
-    // Initialize with empty content
-    _contentEditorController.clear();
   }
 
   void _loadMoods() {
@@ -83,14 +89,10 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                       child: TextField(
                         controller: nameController,
                         decoration: InputDecoration(
-                          labelText: 'Feeling Name (e.g., "grateful")',
-                          hintText: 'grateful',
+                          labelText: 'Feeling Name',
+                          hintText: 'e.g., Peaceful',
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: selectedColor, width: 2),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
                       ),
@@ -111,20 +113,22 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                       ].map((color) {
                         final isSelected = color.value == selectedColor.value;
                         return GestureDetector(
-                          onTap: () => setDialogState(() => selectedColor = color),
+                          onTap: () {
+                            setDialogState(() {
+                              selectedColor = color;
+                            });
+                          },
                           child: Container(
-                            width: 40, height: 40,
+                            width: 48,
+                            height: 48,
                             decoration: BoxDecoration(
                               color: color,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: isSelected ? Colors.black : Colors.grey,
-                                width: isSelected ? 3 : 1,
+                                color: isSelected ? Colors.black : Colors.transparent,
+                                width: 3,
                               ),
                             ),
-                            child: isSelected
-                                ? const Icon(Icons.check, color: Colors.white, size: 20)
-                                : null,
                           ),
                         );
                       }).toList(),
@@ -151,7 +155,6 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
 
                     final moodName = nameController.text.trim().toLowerCase();
                     final displayLabel = moodName[0].toUpperCase() + moodName.substring(1);
-                    // Format color hex properly (AARRGGBB format)
                     final colorHex = selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase();
 
                     try {
@@ -163,24 +166,15 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
 
                       if (mounted) {
                         Navigator.pop(context);
-                        // Refresh moods to get the newly created one
                         _loadMoods();
-                        // Auto-select the newly created mood
-                        setState(() => _selectedMood = moodName);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Feeling created successfully'),
-                            backgroundColor: AppTheme.success,
-                          ),
-                        );
+                        setState(() {
+                          _selectedMood = moodName;
+                        });
                       }
                     } catch (e) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: Colors.red,
-                          ),
+                          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
                         );
                       }
                     }
@@ -199,64 +193,6 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
     );
   }
 
-  void _showDeleteMoodDialog(Mood mood) {
-    if (mood.isDefault) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot delete default feelings'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Feeling'),
-        content: Text('Are you sure you want to delete "${mood.label}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await _moodService.deleteMood(mood.id!);
-                Navigator.pop(context);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Feeling deleted'),
-                      backgroundColor: AppTheme.success,
-                    ),
-                  );
-                  // Reset to default mood if deleted mood was selected
-                  if (_selectedMood == mood.name) {
-                    setState(() => _selectedMood = 'happy');
-                  }
-                }
-              } catch (e) {
-                Navigator.pop(context);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _saveJournalEntry() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -268,13 +204,12 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
       final entry = JournalEntry(
         title: _titleController.text.trim(),
         content: _contentEditorController.getJsonContent(),
-        date: _getCurrentDate(),
-        time: _getCurrentTime(),
+        date: widget.entry.date,
+        time: widget.entry.time,
         mood: _selectedMood,
       );
 
-      // Create new entry in Firestore
-      await _journalService.createEntry(entry);
+      await _journalService.updateEntry(widget.entry.id!, entry);
 
       setState(() => _isLoading = false);
 
@@ -282,7 +217,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Journal entry added'),
+            content: Text('Journal entry updated'),
             backgroundColor: AppTheme.success,
             behavior: SnackBarBehavior.floating,
           ),
@@ -303,26 +238,6 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
     }
   }
 
-  String _getCurrentDate() {
-    final now = DateTime.now();
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[now.month - 1]} ${now.day}, ${now.year}';
-  }
-
-  String _getCurrentTime() {
-    final now = DateTime.now();
-    final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
-    final minute = now.minute.toString().padLeft(2, '0');
-    final period = now.hour >= 12 ? 'PM' : 'AM';
-    return '$hour:$minute $period';
-  }
-
-
-
-
-
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -335,7 +250,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'New Journal Entry',
+          'Edit Journal Entry',
           style: TextStyle(
             color: Color(0xFF1E1E1E),
             fontSize: 20,
@@ -366,16 +281,19 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                     children: _moods.map((mood) {
                       final isSelected = _selectedMood == mood.name;
                       return GestureDetector(
-                        onTap: () => setState(() => _selectedMood = mood.name),
-                        onLongPress: () => _showDeleteMoodDialog(mood),
+                        onTap: () {
+                          setState(() {
+                            _selectedMood = mood.name;
+                          });
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: isSelected ? mood.color : mood.color.withOpacity(0.2),
+                            color: isSelected ? mood.color : AppTheme.surface,
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: isSelected ? mood.color : Colors.transparent,
-                              width: 2,
+                              color: isSelected ? mood.color : Colors.grey.shade400,
+                              width: isSelected ? 2 : 1.5,
                             ),
                           ),
                           child: Text(
@@ -470,7 +388,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                         ),
                       )
                     : const Text(
-                        'Add Entry',
+                        'Save Changes',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,

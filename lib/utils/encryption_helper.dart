@@ -39,13 +39,29 @@ class EncryptionHelper {
         return encryptedText.substring(10);
       }
 
+      // Check if it's already plain text (not base64 encoded)
+      if (!_looksLikeBase64(encryptedText)) {
+        // Likely plain text from before encryption was implemented
+        return encryptedText;
+      }
+
       final encrypter = encrypt.Encrypter(encrypt.AES(_key));
       final decrypted = encrypter.decrypt64(encryptedText, iv: _iv);
       return decrypted;
     } catch (e) {
-      // If decryption fails, show a placeholder message instead of encrypted text
+      // Decryption failed - could be corrupted data or wrong key
+      // Return a message that allows the user to edit and re-save
       return '[Unable to decrypt - please re-enter this entry]';
     }
+  }
+
+  /// Check if text looks like base64-encoded data
+  static bool _looksLikeBase64(String text) {
+    // Base64 strings contain only A-Z, a-z, 0-9, +, /, and = (padding)
+    // Must be at least 16 chars (minimum encrypted string length)
+    if (text.length < 16) return false;
+    final base64Pattern = RegExp(r'^[A-Za-z0-9+/]+=*$');
+    return base64Pattern.hasMatch(text);
   }
 
   /// Hash text using SHA-256 (one-way, for verification)
@@ -57,8 +73,6 @@ class EncryptionHelper {
 
   /// Check if text appears to be encrypted
   static bool isEncrypted(String text) {
-    // Base64 strings typically contain only alphanumeric chars, +, /, and =
-    final base64Pattern = RegExp(r'^[A-Za-z0-9+/=]+$');
-    return base64Pattern.hasMatch(text) && text.length > 20;
+    return _looksLikeBase64(text);
   }
 }

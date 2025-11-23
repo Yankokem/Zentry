@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/journal_entry_model.dart';
-import '../../utils/encryption_helper.dart';
 
 /// Service class for managing journal entries in Firestore
 /// Follows the repository pattern for data access
@@ -38,14 +37,10 @@ class JournalService {
         throw Exception('User not authenticated');
       }
 
-      // Encrypt sensitive data before storing
-      final encryptedTitle = EncryptionHelper.encryptText(entry.title);
-      final encryptedContent = EncryptionHelper.encryptText(entry.content);
-
       final docData = {
         'userId': _userId,
-        'title': encryptedTitle,
-        'content': encryptedContent,
+        'title': entry.title,
+        'content': entry.content,
         'date': entry.date,
         'time': entry.time,
         'mood': entry.mood,
@@ -72,16 +67,9 @@ class JournalService {
         .where('userId', isEqualTo: _userId)
         .snapshots()
         .map((snapshot) {
-      // Get entries, decrypt, and sort them locally
+      // Get entries and sort them locally
       final entries = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
-        // Decrypt title and content
-        if (data['title'] != null) {
-          data['title'] = EncryptionHelper.decryptText(data['title']);
-        }
-        if (data['content'] != null) {
-          data['content'] = EncryptionHelper.decryptText(data['content']);
-        }
         return JournalEntry.fromFirestore(doc.id, data);
       }).toList();
       
@@ -105,13 +93,6 @@ class JournalService {
 
       final entries = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
-        // Decrypt title and content
-        if (data['title'] != null) {
-          data['title'] = EncryptionHelper.decryptText(data['title']);
-        }
-        if (data['content'] != null) {
-          data['content'] = EncryptionHelper.decryptText(data['content']);
-        }
         return JournalEntry.fromFirestore(doc.id, data);
       }).toList();
       
@@ -144,14 +125,6 @@ class JournalService {
         throw Exception('Unauthorized access to journal entry');
       }
 
-      // Decrypt title and content
-      if (data['title'] != null) {
-        data['title'] = EncryptionHelper.decryptText(data['title']);
-      }
-      if (data['content'] != null) {
-        data['content'] = EncryptionHelper.decryptText(data['content']);
-      }
-
       return JournalEntry.fromFirestore(doc.id, data);
     } catch (e) {
       throw Exception('Failed to get journal entry: $e');
@@ -171,14 +144,10 @@ class JournalService {
         throw Exception('Unauthorized: entry not found or does not belong to user');
       }
 
-      // Encrypt sensitive data before updating
-      final encryptedTitle = EncryptionHelper.encryptText(entry.title);
-      final encryptedContent = EncryptionHelper.encryptText(entry.content);
-
       await _journalRef.doc(id).update({
         'userId': _userId,
-        'title': encryptedTitle,
-        'content': encryptedContent,
+        'title': entry.title,
+        'content': entry.content,
         'date': entry.date,
         'time': entry.time,
         'mood': entry.mood,
@@ -243,13 +212,6 @@ class JournalService {
 
       final entries = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
-        // Decrypt title and content for searching
-        if (data['title'] != null) {
-          data['title'] = EncryptionHelper.decryptText(data['title']);
-        }
-        if (data['content'] != null) {
-          data['content'] = EncryptionHelper.decryptText(data['content']);
-        }
         return JournalEntry.fromFirestore(doc.id, data);
       }).toList();
 

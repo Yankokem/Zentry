@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zentry/config/constants.dart';
@@ -6,6 +7,8 @@ import 'package:zentry/services/firebase/mood_service.dart';
 import 'package:zentry/models/journal_entry_model.dart';
 import 'package:zentry/models/mood_model.dart';
 import 'add_journal_screen.dart';
+import 'edit_journal_screen.dart';
+import '../../widgets/journal/rich_text_viewer.dart';
 
 class JournalPage extends StatefulWidget {
   const JournalPage({super.key});
@@ -351,7 +354,7 @@ class _JournalPageState extends State<JournalPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => AddJournalScreen(entryToEdit: entry),
+                            builder: (context) => EditJournalScreen(entry: entry),
                           ),
                         );
                       } else if (value == 'delete') {
@@ -385,7 +388,7 @@ class _JournalPageState extends State<JournalPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                entry.content,
+                _getPlainTextFromContent(entry.content),
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey.shade700,
@@ -521,15 +524,8 @@ class _JournalPageState extends State<JournalPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  entry.content,
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 1.6,
-                    color: Colors.grey.shade800,
-                  ),
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: RichTextViewer(content: entry.content),
               ),
             ),
             Container(
@@ -550,7 +546,12 @@ class _JournalPageState extends State<JournalPage> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        _showEditDialog(entry);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditJournalScreen(entry: entry),
+                          ),
+                        );
                       },
                       icon: const Icon(Icons.edit),
                       label: const Text('Edit'),
@@ -1134,6 +1135,27 @@ class _JournalPageState extends State<JournalPage> {
         },
       ),
     );
+  }
+
+  /// Extract plain text from delta JSON content
+  String _getPlainTextFromContent(String content) {
+    try {
+      // Try to parse as delta JSON
+      final decoded = json.decode(content);
+      if (decoded is List) {
+        // Extract text from delta operations
+        final buffer = StringBuffer();
+        for (var op in decoded) {
+          if (op is Map && op.containsKey('insert')) {
+            buffer.write(op['insert']);
+          }
+        }
+        return buffer.toString().trim();
+      }
+    } catch (e) {
+      // If parsing fails, return as-is (backward compatibility)
+    }
+    return content;
   }
 
   String _getCurrentDate() {
