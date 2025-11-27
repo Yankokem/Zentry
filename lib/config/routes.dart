@@ -9,6 +9,7 @@ import 'package:zentry/views/home/wishlist_page.dart';
 import 'package:zentry/views/launch_screen.dart';
 import 'package:zentry/views/profile/profile_screen.dart';
 import 'package:zentry/views/admin/admin_bug_report_details.dart';
+import 'package:zentry/views/admin/admin_account_action.dart';
 
 class AppRoutes {
   // Route Names
@@ -33,6 +34,7 @@ class AppRoutes {
 
   // Admin
   static const String adminBugReportDetails = '/admin/bug-report-details';
+  static const String adminAccountAction = '/admin/account-action';
 
   // Route Generator
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -85,6 +87,15 @@ class AppRoutes {
       case adminBugReportDetails:
         return MaterialPageRoute(
           builder: (_) => AdminBugReportDetailsPage(report: settings.arguments as Map<String, dynamic>),
+        );
+
+      case adminAccountAction:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => AdminAccountActionPage(
+            user: args['user'] as Map<String, dynamic>,
+            action: args['action'] as String,
+          ),
         );
 
       default:

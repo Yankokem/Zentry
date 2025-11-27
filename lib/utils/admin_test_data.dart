@@ -61,4 +61,40 @@ class AdminTestData {
     }
     users.value = list;
   }
+
+  static void suspendUser(String id, String reason, String duration) {
+    final list = List<Map<String, dynamic>>.from(users.value);
+    final idx = list.indexWhere((u) => u['id'] == id);
+    if (idx != -1) {
+      list[idx] = Map<String, dynamic>.from(list[idx])
+        ..['status'] = 'suspended'
+        ..['suspensionReason'] = reason
+        ..['suspensionDuration'] = duration;
+      users.value = list;
+    }
+  }
+
+  static void banUser(String id, String reason) {
+    final list = List<Map<String, dynamic>>.from(users.value);
+    final idx = list.indexWhere((u) => u['id'] == id);
+    if (idx != -1) {
+      list[idx] = Map<String, dynamic>.from(list[idx])
+        ..['status'] = 'banned'
+        ..['banReason'] = reason;
+      users.value = list;
+    }
+  }
+
+  static void activateUser(String id) {
+    final list = List<Map<String, dynamic>>.from(users.value);
+    final idx = list.indexWhere((u) => u['id'] == id);
+    if (idx != -1) {
+      list[idx] = Map<String, dynamic>.from(list[idx])
+        ..['status'] = 'active'
+        ..remove('suspensionReason')
+        ..remove('suspensionDuration')
+        ..remove('banReason');
+      users.value = list;
+    }
+  }
 }
