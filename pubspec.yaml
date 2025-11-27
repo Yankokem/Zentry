@@ -52,7 +52,6 @@ flutter:
 
   assets:
     - assets/images/
-    - assets/icons/
 
   # Launcher icon configuration. After pulling these changes run:
   # flutter pub get; flutter pub run flutter_launcher_icons:main

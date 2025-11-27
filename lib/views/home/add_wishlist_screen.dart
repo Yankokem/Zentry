@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../config/constants.dart';
 import '../../config/theme.dart';
 import '../../controllers/wishlist_controller.dart';
 import '../../models/wish_model.dart';
@@ -28,7 +27,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
   final _notesController = TextEditingController();
   final _userService = UserService();
   final _firestoreService = FirestoreService();
-  List<String> _teamMembers = [];
+  final List<String> _teamMembers = [];
   List<String> _suggestedEmails = [];
   bool _isSearching = false;
 

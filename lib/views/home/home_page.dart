@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/config/routes.dart';
+import 'package:zentry/utils/admin_mode.dart';
 import 'package:zentry/services/firebase/auth_service.dart';
 import 'package:zentry/services/firebase/firestore_service.dart';
 import 'package:zentry/widgets/home/stat_card.dart';
@@ -124,6 +125,37 @@ class _HomePageState extends State<HomePage> {
                                 icon: const Icon(Icons.notifications_outlined),
                                 color: const Color(0xFF1E1E1E),
                                 onPressed: () {},
+                              ),
+                              // Admin mode toggle for testing (front-end only)
+                              ValueListenableBuilder<bool>(
+                                valueListenable: AdminMode.enabled,
+                                builder: (context, isAdmin, _) {
+                                  return IconButton(
+                                    icon: Icon(
+                                      Icons.admin_panel_settings,
+                                      color: isAdmin
+                                          ? Theme.of(context).colorScheme.secondary
+                                          : const Color(0xFF1E1E1E),
+                                    ),
+                                    tooltip: 'Admin Mode (test)',
+                                    onPressed: () {
+                                      AdminMode.toggle();
+                                      final newVal = AdminMode.enabled.value;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(newVal
+                                              ? 'Admin mode enabled (test)'
+                                              : 'Admin mode disabled'),
+                                          duration: const Duration(seconds: 1),
+                                        ),
+                                      );
+                                      if (newVal) {
+                                        Navigator.pushNamed(
+                                            context, AppRoutes.adminDashboard);
+                                      }
+                                    },
+                                  );
+                                },
                               ),
                               IconButton(
                                 icon: const Icon(Icons.person_outline),

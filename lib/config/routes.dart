@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:zentry/auth/login_screen.dart';
 import 'package:zentry/auth/signup_screen.dart';
 import 'package:zentry/views/home/home_screen.dart';
+import 'package:zentry/views/admin/admin_dashboard.dart';
 import 'package:zentry/views/home/tasks_page.dart';
 import 'package:zentry/views/home/journal_page.dart';
 import 'package:zentry/views/home/wishlist_page.dart';
 import 'package:zentry/views/launch_screen.dart';
 import 'package:zentry/views/profile/profile_screen.dart';
+import 'package:zentry/views/admin/admin_bug_report_details.dart';
 
 class AppRoutes {
   // Route Names
@@ -16,6 +18,7 @@ class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   static const String home = '/home';
   static const String profile = '/profile';
+  static const String adminDashboard = '/admin';
 
   // Tasks
   static const String tasks = '/tasks';
@@ -27,6 +30,9 @@ class AppRoutes {
 
   // Wishlist
   static const String wishlist = '/wishlist';
+
+  // Admin
+  static const String adminBugReportDetails = '/admin/bug-report-details';
 
   // Route Generator
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -56,6 +62,11 @@ class AppRoutes {
           builder: (_) => const ProfileScreen(),
         );
 
+      case adminDashboard:
+        return MaterialPageRoute(
+          builder: (_) => const AdminDashboard(),
+        );
+
       case tasks:
         return MaterialPageRoute(
           builder: (_) => const TasksPage(),
@@ -69,6 +80,11 @@ class AppRoutes {
       case wishlist:
         return MaterialPageRoute(
           builder: (_) => const WishlistPage(),
+        );
+
+      case adminBugReportDetails:
+        return MaterialPageRoute(
+          builder: (_) => AdminBugReportDetailsPage(report: settings.arguments as Map<String, dynamic>),
         );
 
       default:

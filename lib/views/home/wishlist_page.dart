@@ -155,7 +155,7 @@ class _WishlistPageState extends State<WishlistPage> {
                               padding: const EdgeInsets.only(right: 8.0),
                               child: _buildCategoryChip(category.name, category.label),
                             );
-                          }).toList(),
+                          }),
                         ],
                       ),
                     ),

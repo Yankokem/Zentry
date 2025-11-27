@@ -146,10 +146,10 @@ class _ProjectCardState extends State<ProjectCard> {
                             ),
                             if (widget.project.isPinned) ...[
                               const SizedBox(width: 8),
-                              Icon(
+                              const Icon(
                                 Icons.push_pin,
                                 size: 16,
-                                color: const Color(0xFFF9ED69),
+                                color: Color(0xFFF9ED69),
                               ),
                             ],
                           ],

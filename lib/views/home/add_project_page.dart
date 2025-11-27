@@ -199,13 +199,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
         backgroundColor: const Color(0xFFF9ED69),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: const Color(0xFF1E1E1E)),
+          icon: const Icon(Icons.close, color: Color(0xFF1E1E1E)),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           widget.projectToEdit != null ? 'Edit Project' : 'New Project',
           style: const TextStyle(
-            color: const Color(0xFF1E1E1E),
+            color: Color(0xFF1E1E1E),
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),

@@ -1,1 +1,2 @@
-- [x] Update wishlist category filter chips to match projects page style using FilterChip widget
+- [x] Remove AdminManagementPage import and usage from admin_dashboard.dart
+- [x] Delete admin_management.dart file
