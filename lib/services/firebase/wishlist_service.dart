@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../../models/wish_model.dart';
 
 /// Service class for managing wishlist items in Firestore
@@ -38,15 +39,23 @@ class WishlistService {
         throw Exception('User not authenticated');
       }
 
-      final docRef = await _wishlistRef.add({
+      final firestoreData = {
         'userId': _userId, // Store user ID for filtering
         ...wish.toFirestore(),
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      debugPrint('💾 Saving to Firestore: $firestoreData');
+      debugPrint('📧 SharedWith array: ${wish.sharedWith}');
+
+      final docRef = await _wishlistRef.add(firestoreData);
+
+      debugPrint('✅ Document created with ID: ${docRef.id}');
 
       return docRef.id;
     } catch (e) {
+      debugPrint('❌ Error creating wish: $e');
       throw Exception('Failed to create wish: $e');
     }
   }

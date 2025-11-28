@@ -57,6 +57,58 @@ class _WishlistPageState extends State<WishlistPage> {
     }
   }
 
+  double _calculateSharedWithStackWidth(int count) {
+    // Each avatar overlaps by 8px (18px spacing on 28px diameter)
+    return count > 0 ? (count - 1) * 18.0 + 28.0 : 28.0;
+  }
+
+  List<Widget> _buildSharedWithAvatarStack(List<String> sharedWith) {
+    final avatarWidgets = <Widget>[];
+    
+    for (int i = 0; i < sharedWith.length; i++) {
+      final email = sharedWith[i];
+      final details = _userDetails[email] ?? {};
+      final fullName = details['fullName'] ?? '';
+      final displayName = fullName.isNotEmpty ? fullName : _userService.getDisplayName(details, email);
+      final profileUrl = details['profilePictureUrl'] ?? '';
+      
+      avatarWidgets.add(
+        Positioned(
+          left: i * 22.0,
+          child: Tooltip(
+            message: displayName,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundImage: profileUrl.isNotEmpty
+                    ? NetworkImage(profileUrl)
+                    : null,
+                backgroundColor: Colors.grey.shade300,
+                child: profileUrl.isEmpty
+                    ? Text(
+                        displayName.isNotEmpty
+                            ? displayName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    
+    return avatarWidgets;
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -476,9 +528,25 @@ class _WishlistPageState extends State<WishlistPage> {
     );
   }
 
-  void _showItemDetails(Wish item) {
+  void _showItemDetails(Wish item) async {
     final color = _getCategoryColor(item.category);
     final isCompleted = item.completed;
+
+    // Load user details for this specific item
+    if (item.sharedWith.isNotEmpty) {
+      for (final email in item.sharedWith) {
+        if (!_userDetails.containsKey(email)) {
+          final details = await _userService.getUserDetailsByEmail(email);
+          if (mounted) {
+            setState(() {
+              _userDetails[email] = details;
+            });
+          }
+        }
+      }
+    }
+
+    if (!mounted) return;
 
     showModalBottomSheet(
       context: context,
@@ -624,17 +692,64 @@ class _WishlistPageState extends State<WishlistPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: item.sharedWith.map((email) {
-                          final userDetails = _userDetails[email] ?? {'fullName': '', 'email': email};
-                          final displayName = _userService.getDisplayName(userDetails, email);
-                          return Chip(
-                            label: Text(displayName),
-                            backgroundColor: Colors.grey.shade200,
-                          );
-                        }).toList(),
+                      SizedBox(
+                        height: 32,
+                        width: _calculateSharedWithStackWidth(item.sharedWith.length),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: item.sharedWith.asMap().entries.map((entry) {
+                            final i = entry.key;
+                            final email = entry.value;
+                            final details = _userDetails[email] ?? {};
+                            final fullName = details['fullName'] ?? '';
+                            final displayName = fullName.isNotEmpty ? fullName : email;
+                            final profileUrl = details['profilePictureUrl'] ?? '';
+                            
+                            return Positioned(
+                              left: i * 22.0,
+                              child: GestureDetector(
+                                onDoubleTap: () {
+                                  // Show name in SnackBar for mobile users
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(displayName),
+                                      duration: const Duration(seconds: 2),
+                                      behavior: SnackBarBehavior.floating,
+                                      margin: const EdgeInsets.all(16),
+                                    ),
+                                  );
+                                },
+                                child: Tooltip(
+                                  message: displayName,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 18,
+                                      backgroundImage: profileUrl.isNotEmpty
+                                          ? NetworkImage(profileUrl)
+                                          : null,
+                                      backgroundColor: Colors.grey.shade300,
+                                      child: profileUrl.isEmpty
+                                          ? Text(
+                                              displayName.isNotEmpty
+                                                  ? displayName[0].toUpperCase()
+                                                  : '?',
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],

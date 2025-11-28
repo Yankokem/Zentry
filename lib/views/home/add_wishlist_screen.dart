@@ -66,6 +66,8 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
 
     setState(() => _isLoading = true);
 
+    debugPrint('📝 Saving wishlist with ${_teamMembers.length} shared members: $_teamMembers');
+
     final wish = Wish(
       id: widget.itemToEdit?.id,
       title: _titleController.text.trim(),
@@ -76,6 +78,8 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       completed: widget.itemToEdit?.completed ?? false,
       sharedWith: _teamMembers,
     );
+
+    debugPrint('📦 Wish object sharedWith: ${wish.sharedWith}');
 
     bool success;
     if (widget.itemToEdit != null) {
@@ -94,6 +98,14 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
               ? 'Wishlist item updated'
               : 'Wishlist item added'),
           backgroundColor: AppTheme.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to save wishlist item'),
+          backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -347,11 +359,57 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     }
   }
 
-  void _selectSuggestedEmail(String email) {
-    setState(() {
-      _newMemberController.text = email;
-      _suggestedEmails.clear();
-    });
+  void _selectSuggestedEmail(String email) async {
+    if (_teamMembers.contains(email)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This email is already added to the shared list'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final exists = await _firestoreService.userExistsByEmail(email);
+      if (mounted) {
+        if (exists) {
+          setState(() {
+            _teamMembers.add(email);
+            _newMemberController.clear();
+            _suggestedEmails.clear();
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Email added successfully'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No account found with this email'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error checking account: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _removeSharedWith(String email) {
@@ -553,53 +611,27 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
             // Add new member input
             Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _newMemberController,
-                        onChanged: _searchUsers,
-                        decoration: InputDecoration(
-                          hintText: 'Enter email to share with',
-                          filled: true,
-                          fillColor: AppTheme.surface,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          suffixIcon: _isSearching
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                )
-                              : null,
-                        ),
-                        validator: (value) {
-                          if (value != null && value.isNotEmpty) {
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
-                              return 'Please enter a valid email address';
-                            }
-                          }
-                          return null;
-                        },
-                      ),
+                TextFormField(
+                  controller: _newMemberController,
+                  onChanged: _searchUsers,
+                  decoration: InputDecoration(
+                    hintText: 'Enter email to share with',
+                    filled: true,
+                    fillColor: AppTheme.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: _addSharedWith,
-                      icon: const Icon(Icons.add, size: 20),
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: AppTheme.textDark,
-                        padding: const EdgeInsets.all(12),
-                      ),
-                    ),
-                  ],
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty) {
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                        return 'Please enter a valid email address';
+                      }
+                    }
+                    return null;
+                  },
                 ),
                 // Suggestions dropdown
                 if (_suggestedEmails.isNotEmpty)
@@ -640,9 +672,24 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                 future: _userService.getUsersDetailsByEmails(_teamMembers),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                    // Skeleton loading for shared members
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: List.generate(
+                          _teamMembers.length,
+                          (index) => Container(
+                            height: 32,
+                            width: 100,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                        ),
+                      ),
                     );
                   }
 
