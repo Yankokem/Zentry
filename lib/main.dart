@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'config/theme.dart';
 import 'config/routes.dart';
 import 'providers/theme_provider.dart';
+import 'providers/wishlist_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -22,8 +23,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => WishlistProvider()),
+      ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           return MaterialApp(

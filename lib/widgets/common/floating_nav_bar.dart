@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/config/constants.dart';
+import 'package:zentry/controllers/wishlist_controller.dart';
 import 'package:zentry/widgets/home/add_menu_widget.dart';
 
 class FloatingNavBar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
+  final WishlistController? wishlistController;
 
   const FloatingNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.wishlistController,
   });
 
   @override
@@ -66,7 +69,7 @@ class FloatingNavBar extends StatelessWidget {
   }
 
   void _showAddMenu(BuildContext context) {
-    AddMenuWidget.show(context);
+    AddMenuWidget.show(context, wishlistController: wishlistController);
   }
 }
 

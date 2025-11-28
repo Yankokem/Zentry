@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:zentry/widgets/common/floating_nav_bar.dart';
 import 'package:zentry/views/home/home_page.dart';
 import 'package:zentry/views/home/projects_page.dart'; // NEW
 import 'package:zentry/views/home/journal_page.dart';
 import 'package:zentry/views/home/wishlist_page.dart';
+import 'package:zentry/providers/wishlist_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +26,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final wishlistProvider = Provider.of<WishlistProvider>(context);
+
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
@@ -37,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _selectedIndex = index;
           });
         },
+        wishlistController: wishlistProvider.isInitialized ? wishlistProvider.controller : null,
       ),
     );
   }

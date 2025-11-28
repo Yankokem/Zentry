@@ -86,58 +86,61 @@ class _RichTextEditorState extends State<RichTextEditor> {
                       bottomRight: Radius.circular(12),
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildToolbarButton(
-                        icon: Icons.format_bold,
-                        onPressed: () => _formatText(quill.Attribute.bold),
-                        tooltip: 'Bold',
-                        isActive: _isFormatActive(quill.Attribute.bold),
-                      ),
-                      _buildToolbarButton(
-                        icon: Icons.format_italic,
-                        onPressed: () => _formatText(quill.Attribute.italic),
-                        tooltip: 'Italic',
-                        isActive: _isFormatActive(quill.Attribute.italic),
-                      ),
-                      _buildToolbarButton(
-                        icon: Icons.format_underline,
-                        onPressed: () => _formatText(quill.Attribute.underline),
-                        tooltip: 'Underline',
-                        isActive: _isFormatActive(quill.Attribute.underline),
-                      ),
-                      _buildToolbarButton(
-                        icon: Icons.format_strikethrough,
-                        onPressed: () => _formatText(quill.Attribute.strikeThrough),
-                        tooltip: 'Strikethrough',
-                        isActive: _isFormatActive(quill.Attribute.strikeThrough),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildToolbarButton(
-                        icon: Icons.format_list_bulleted,
-                        onPressed: () => _formatText(quill.Attribute.ul),
-                        tooltip: 'Bullet List',
-                        isActive: _isFormatActive(quill.Attribute.ul),
-                      ),
-                      _buildToolbarButton(
-                        icon: Icons.check_box_outlined,
-                        onPressed: () => _formatText(quill.Attribute.unchecked),
-                        tooltip: 'Checkbox',
-                        isActive: _isFormatActive(quill.Attribute.unchecked),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildToolbarButton(
-                        icon: Icons.undo,
-                        onPressed: () => widget.controller._quillController.undo(),
-                        tooltip: 'Undo',
-                      ),
-                      _buildToolbarButton(
-                        icon: Icons.redo,
-                        onPressed: () => widget.controller._quillController.redo(),
-                        tooltip: 'Redo',
-                      ),
-                    ],
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildToolbarButton(
+                          icon: Icons.format_bold,
+                          onPressed: () => _formatText(quill.Attribute.bold),
+                          tooltip: 'Bold',
+                          isActive: _isFormatActive(quill.Attribute.bold),
+                        ),
+                        _buildToolbarButton(
+                          icon: Icons.format_italic,
+                          onPressed: () => _formatText(quill.Attribute.italic),
+                          tooltip: 'Italic',
+                          isActive: _isFormatActive(quill.Attribute.italic),
+                        ),
+                        _buildToolbarButton(
+                          icon: Icons.format_underline,
+                          onPressed: () => _formatText(quill.Attribute.underline),
+                          tooltip: 'Underline',
+                          isActive: _isFormatActive(quill.Attribute.underline),
+                        ),
+                        _buildToolbarButton(
+                          icon: Icons.format_strikethrough,
+                          onPressed: () => _formatText(quill.Attribute.strikeThrough),
+                          tooltip: 'Strikethrough',
+                          isActive: _isFormatActive(quill.Attribute.strikeThrough),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildToolbarButton(
+                          icon: Icons.format_list_bulleted,
+                          onPressed: () => _formatText(quill.Attribute.ul),
+                          tooltip: 'Bullet List',
+                          isActive: _isFormatActive(quill.Attribute.ul),
+                        ),
+                        _buildToolbarButton(
+                          icon: Icons.check_box_outlined,
+                          onPressed: () => _formatText(quill.Attribute.unchecked),
+                          tooltip: 'Checkbox',
+                          isActive: _isFormatActive(quill.Attribute.unchecked),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildToolbarButton(
+                          icon: Icons.undo,
+                          onPressed: () => widget.controller._quillController.undo(),
+                          tooltip: 'Undo',
+                        ),
+                        _buildToolbarButton(
+                          icon: Icons.redo,
+                          onPressed: () => widget.controller._quillController.redo(),
+                          tooltip: 'Redo',
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

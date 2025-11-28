@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/config/constants.dart';
+import 'package:zentry/controllers/wishlist_controller.dart';
+import 'package:zentry/views/home/add_journal_screen.dart';
+import 'package:zentry/views/home/add_project_page.dart';
+import 'package:zentry/views/home/add_wishlist_screen.dart';
+import 'package:zentry/views/home/wishlist_page.dart';
 
 class AddMenuWidget extends StatelessWidget {
-  const AddMenuWidget({super.key});
+  final WishlistController? wishlistController;
+
+  const AddMenuWidget({super.key, this.wishlistController});
 
   @override
   Widget build(BuildContext context) {
@@ -36,15 +43,20 @@ class AddMenuWidget extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           
-          // Add Task
+          // New Project
           _AddMenuItem(
             icon: Icons.check_circle_rounded,
-            title: 'New Task',
-            subtitle: 'Add a task to your list',
+            title: 'New Project',
+            subtitle: 'Create a new project',
             color: Theme.of(context).primaryColor,
             onTap: () {
               Navigator.pop(context);
-              // Navigate to add task
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AddProjectPage(),
+                ),
+              );
             },
           ),
           const SizedBox(height: 12),
@@ -57,7 +69,12 @@ class AddMenuWidget extends StatelessWidget {
             color: Theme.of(context).colorScheme.secondary,
             onTap: () {
               Navigator.pop(context);
-              // Navigate to journal editor
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AddJournalScreen(),
+                ),
+              );
             },
           ),
           const SizedBox(height: 12),
@@ -70,7 +87,12 @@ class AddMenuWidget extends StatelessWidget {
             color: Colors.orange,
             onTap: () {
               Navigator.pop(context);
-              // Navigate to add wish
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddWishlistScreen(controller: wishlistController!),
+                ),
+              );
             },
           ),
           const SizedBox(height: 24),
@@ -79,12 +101,12 @@ class AddMenuWidget extends StatelessWidget {
     );
   }
 
-  static void show(BuildContext context) {
+  static void show(BuildContext context, {WishlistController? wishlistController}) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => const AddMenuWidget(),
+      builder: (context) => AddMenuWidget(wishlistController: wishlistController),
     );
   }
 }
