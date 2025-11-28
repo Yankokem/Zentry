@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zentry/models/project_model.dart';
@@ -139,7 +140,28 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     return avatarWidgets;
   }
 
-  void _showMembersModal() {
+  void _showMembersModal() async {
+    // Get project creator details
+    Map<String, String>? creatorDetails;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final isCreator = currentUser?.uid == widget.project.userId;
+    
+    if (isCreator && currentUser?.email != null) {
+      // If current user is the creator, use their details
+      creatorDetails = await _userService.getUserDetailsByEmail(currentUser!.email!);
+    } else {
+      // Find creator from team members or fetch by userId
+      for (final email in widget.project.teamMembers) {
+        final userDetails = _userDetails[email];
+        if (userDetails != null) {
+          creatorDetails = userDetails;
+          break;
+        }
+      }
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -159,70 +181,168 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ),
             const SizedBox(height: 16),
             Flexible(
-              child: ListView.builder(
+              child: ListView(
                 shrinkWrap: true,
-                itemCount: widget.project.teamMembers.length,
-                itemBuilder: (context, index) {
-                  final email = widget.project.teamMembers[index];
-                  final details = _userDetails[email] ?? {};
-                  final displayName = _userService.getDisplayName(details, email);
-                  final profileUrl = details['profilePictureUrl'] ?? '';
+                children: [
+                  // Project Manager Section
+                  Text(
+                    'Project Manager',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (creatorDetails != null)
+                    _buildMemberTile(
+                      creatorDetails['fullName'] ?? creatorDetails['email'] ?? 'Unknown',
+                      currentUser?.email ?? '',
+                      creatorDetails['profilePictureUrl'] ?? '',
+                    ),
+                  const SizedBox(height: 16),
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
+                  // Roles and their members
+                  ...widget.project.roles.map((role) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundImage: profileUrl.isNotEmpty
-                              ? NetworkImage(profileUrl)
-                              : null,
-                          backgroundColor: Colors.grey.shade300,
-                          child: profileUrl.isEmpty
-                              ? Text(
-                                  displayName.isNotEmpty
-                                      ? displayName[0].toUpperCase()
-                                      : '?',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                displayName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Text(
-                                email,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                        Text(
+                          role.name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade600,
+                            letterSpacing: 0.5,
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        ...role.members.map((email) {
+                          final details = _userDetails[email] ?? {};
+                          final displayName = _userService.getDisplayName(details, email);
+                          final profileUrl = details['profilePictureUrl'] ?? '';
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _buildMemberTile(displayName, email, profileUrl),
+                          );
+                        }),
+                        const SizedBox(height: 16),
                       ],
+                    );
+                  }),
+
+                  // Members without roles (if any)
+                  if (widget.project.roles.isNotEmpty) ...[
+                    Builder(
+                      builder: (context) {
+                        final membersInRoles = widget.project.roles
+                            .expand((role) => role.members)
+                            .toSet();
+                        final creatorEmail = currentUser?.email;
+                        final membersWithoutRoles = widget.project.teamMembers
+                            .where((email) => 
+                                email != creatorEmail && 
+                                !membersInRoles.contains(email))
+                            .toList();
+
+                        if (membersWithoutRoles.isEmpty) return const SizedBox.shrink();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Other Members',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ...membersWithoutRoles.map((email) {
+                              final details = _userDetails[email] ?? {};
+                              final displayName = _userService.getDisplayName(details, email);
+                              final profileUrl = details['profilePictureUrl'] ?? '';
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: _buildMemberTile(displayName, email, profileUrl),
+                              );
+                            }),
+                          ],
+                        );
+                      },
                     ),
-                  );
-                },
+                  ] else ...[
+                    // No roles defined, show all other members
+                    ...widget.project.teamMembers
+                        .where((email) => email != currentUser?.email)
+                        .map((email) {
+                      final details = _userDetails[email] ?? {};
+                      final displayName = _userService.getDisplayName(details, email);
+                      final profileUrl = details['profilePictureUrl'] ?? '';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildMemberTile(displayName, email, profileUrl),
+                      );
+                    }),
+                  ],
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMemberTile(String displayName, String email, String profileUrl) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundImage: profileUrl.isNotEmpty
+              ? NetworkImage(profileUrl)
+              : null,
+          backgroundColor: Colors.grey.shade300,
+          child: profileUrl.isEmpty
+              ? Text(
+                  displayName.isNotEmpty
+                      ? displayName[0].toUpperCase()
+                      : '?',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : null,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                displayName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                email,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -624,11 +744,35 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
             const SizedBox(height: 24),
 
-            // Details Grid
+            // Details
             _buildDetailRow(Icons.flag_outlined, 'Priority', ticket.priority.toUpperCase()),
             const SizedBox(height: 12),
-            _buildDetailRow(Icons.person_outline, 'Assigned To', ticket.assignedTo.isNotEmpty ? ticket.assignedTo.map((email) => _userService.getDisplayName(_userDetails[email] ?? {}, email)).join(', ') : 'Unassigned'),
+            
+            // Assigned To with Avatar Stack
+            Row(
+              children: [
+                Icon(Icons.person_outline, size: 20, color: Colors.grey.shade600),
+                const SizedBox(width: 12),
+                Text(
+                  'Assigned To: ',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 32),
+              child: _buildAssigneeAvatarStack(
+                ticket.assignedTo,
+                onViewMore: () => _showAssigneesModal(ticket.assignedTo),
+              ),
+            ),
             const SizedBox(height: 12),
+            
             _buildDetailRow(Icons.assignment_outlined, 'Status', _formatStatus(ticket.status)),
 
             const SizedBox(height: 24),
@@ -737,6 +881,223 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   void _showEditTicketDialog(Ticket ticket) {
     TicketDialogs.showEditTicketDialog(context, ticket, widget.project.teamMembers, _refreshTickets);
+  }
+
+  Color _getColorForEmail(String email) {
+    final colors = [
+      Colors.blue.shade300,
+      Colors.green.shade300,
+      Colors.red.shade300,
+      Colors.purple.shade300,
+      Colors.orange.shade300,
+      Colors.pink.shade300,
+      Colors.cyan.shade300,
+      Colors.amber.shade300,
+    ];
+    final hash = email.hashCode.abs();
+    return colors[hash % colors.length];
+  }
+
+  Widget _buildAssigneeAvatarStack(List<String> assignees, {VoidCallback? onViewMore}) {
+    if (assignees.isEmpty) {
+      return Row(
+        children: [
+          Icon(Icons.person_outline, size: 18, color: Colors.grey.shade600),
+          const SizedBox(width: 8),
+          const Text('Unassigned'),
+        ],
+      );
+    }
+
+    // Show max 4 avatars stacked plus a "View" button
+    final visibleCount = assignees.length > 4 ? 4 : assignees.length;
+    final hasMore = assignees.length > 4;
+    final stackWidth = hasMore ? (visibleCount * 16.0) + 28 : (visibleCount * 16.0) + 16;
+
+    return Row(
+      children: [
+        SizedBox(
+          width: stackWidth,
+          height: 32,
+          child: Stack(
+            children: [
+            ...List.generate(visibleCount, (index) {
+              final email = assignees[index];
+              final details = _userDetails[email] ?? {};
+              final displayName = _userService.getDisplayName(details, email);
+              final profileUrl = details['profilePictureUrl'] ?? '';
+              final firstLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : email[0].toUpperCase();
+
+              return Positioned(
+                left: index * 16.0,
+                child: Tooltip(
+                  message: displayName,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: CircleAvatar(
+                      radius: 14,
+                      backgroundImage: profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                      backgroundColor: _getColorForEmail(email),
+                      child: profileUrl.isEmpty
+                          ? Text(
+                              firstLetter,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+              );
+            }),
+            if (hasMore)
+              Positioned(
+                left: visibleCount * 16.0,
+                child: Tooltip(
+                  message: '${assignees.length - 4} more',
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      color: Colors.grey.shade300,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '+${assignees.length - 4}',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E1E1E),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        if (onViewMore != null)
+          InkWell(
+            onTap: onViewMore,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: const Text(
+                'View Assignees',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1E1E1E),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showAssigneesModal(List<String> assignees) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Assignees (${assignees.length})',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListView.builder(
+              shrinkWrap: true,
+              itemCount: assignees.length,
+              itemBuilder: (context, index) {
+                final email = assignees[index];
+                final details = _userDetails[email] ?? {};
+                final displayName = _userService.getDisplayName(details, email);
+                final profileUrl = details['profilePictureUrl'] ?? '';
+                final firstLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : email[0].toUpperCase();
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey.shade300, width: 1),
+                        ),
+                        child: CircleAvatar(
+                          radius: 18,
+                          backgroundImage: profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                          backgroundColor: _getColorForEmail(email),
+                          child: profileUrl.isEmpty
+                              ? Text(
+                                  firstLetter,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              email,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showChangeStatusDialog(Ticket ticket) {

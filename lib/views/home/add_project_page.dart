@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/config/theme.dart';
 import 'package:zentry/models/project_model.dart';
+import 'package:zentry/models/project_role_model.dart';
 import 'package:zentry/services/firebase/firestore_service.dart';
 import 'package:zentry/services/firebase/user_service.dart';
 import 'package:zentry/services/project_manager.dart';
@@ -21,12 +22,15 @@ class _AddProjectPageState extends State<AddProjectPage> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _newMemberController = TextEditingController();
+  final _newRoleController = TextEditingController();
   String _selectedStatus = 'Planning';
   String _selectedColor = 'yellow';
   String _selectedType = 'workspace';
   List<String> _teamMembers = [];
   List<String> _suggestedEmails = [];
   bool _isSearching = false;
+  List<ProjectRole> _roles = [];
+  String? _selectedRoleForAssignment;
 
   final List<String> _statusOptions = ['Planning', 'In Progress', 'Completed', 'On Hold'];
   final List<String> _colorOptions = ['yellow', 'blue', 'green', 'purple', 'red'];
@@ -46,6 +50,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
       _selectedStatus = widget.projectToEdit!.status;
       _selectedColor = widget.projectToEdit!.color;
       _selectedType = widget.projectToEdit!.category;
+      _roles = List.from(widget.projectToEdit!.roles);
     } else {
       // For new projects, automatically add the current user as a team member
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -60,6 +65,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
     _titleController.dispose();
     _descriptionController.dispose();
     _newMemberController.dispose();
+    _newRoleController.dispose();
     super.dispose();
   }
 
@@ -192,6 +198,102 @@ class _AddProjectPageState extends State<AddProjectPage> {
     });
   }
 
+  void _createRole() {
+    final roleName = _newRoleController.text.trim();
+    if (roleName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a role name'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Check if role already exists
+    if (_roles.any((role) => role.name.toLowerCase() == roleName.toLowerCase())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This role already exists'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _roles.add(ProjectRole(name: roleName, members: []));
+      _newRoleController.clear();
+      _selectedRoleForAssignment = roleName;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Role created successfully'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _addMemberToRole(String roleName, String member) {
+    final roleIndex = _roles.indexWhere((role) => role.name == roleName);
+    if (roleIndex != -1) {
+      if (_roles[roleIndex].members.contains(member)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This member already has this role'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        final updatedMembers = [..._roles[roleIndex].members, member];
+        _roles[roleIndex] = _roles[roleIndex].copyWith(members: updatedMembers);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Member added to role'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _removeMemberFromRole(String roleName, String member) {
+    final roleIndex = _roles.indexWhere((role) => role.name == roleName);
+    if (roleIndex != -1) {
+      setState(() {
+        final updatedMembers = _roles[roleIndex].members.where((m) => m != member).toList();
+        _roles[roleIndex] = _roles[roleIndex].copyWith(members: updatedMembers);
+      });
+    }
+  }
+
+  void _deleteRole(String roleName) {
+    setState(() {
+      _roles.removeWhere((role) => role.name == roleName);
+      if (_selectedRoleForAssignment == roleName) {
+        _selectedRoleForAssignment = null;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Role deleted'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _saveProject() async {
     if (_formKey.currentState!.validate()) {
       if (widget.projectToEdit != null) {
@@ -202,6 +304,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
           teamMembers: _teamMembers,
           status: _selectedStatus,
           color: _selectedColor,
+          roles: _roles,
         );
         await _projectManager.updateProject(updatedProject);
       } else {
@@ -217,6 +320,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
           completedTickets: 0,
           color: _selectedColor,
           category: _selectedType,
+          roles: _roles,
         );
         await _projectManager.addProject(newProject);
       }
@@ -338,41 +442,80 @@ class _AddProjectPageState extends State<AddProjectPage> {
                 ],
               ),
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                ),
-                child: DropdownButtonFormField<String>(
-                  value: _selectedType,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
+              if (widget.projectToEdit != null)
+                // Disabled state - show as a read-only container
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
-                  items: _typeOptions.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Row(
-                        children: [
-                          Icon(_getCategoryIcon(type), color: Colors.grey.shade600),
-                          const SizedBox(width: 8),
-                          Text(type.capitalize()),
-                        ],
+                  child: Row(
+                    children: [
+                      Icon(
+                        _selectedType == 'workspace' ? Icons.business : Icons.person,
+                        color: _selectedType == 'workspace' ? Colors.blue : Colors.orange,
+                        size: 20,
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedType = value!;
-                      // Clear team members if switching to personal
-                      if (_selectedType == 'personal') {
-                        final currentUserEmail = FirebaseAuth.instance.currentUser?.email;
-                        _teamMembers = currentUserEmail != null ? [currentUserEmail] : [];
-                      }
-                    });
-                  },
+                      const SizedBox(width: 12),
+                      Text(
+                        _selectedType.capitalize(),
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        Icons.lock,
+                        size: 16,
+                        color: Colors.grey.shade400,
+                      ),
+                    ],
+                  ),
+                )
+              else
+                // Editable dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                  ),
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedType,
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                    ),
+                    items: _typeOptions.map((type) {
+                      final isWorkspace = type == 'workspace';
+                      final color = isWorkspace ? Colors.blue : Colors.orange;
+                      return DropdownMenuItem(
+                        value: type,
+                        child: Row(
+                          children: [
+                            Icon(
+                              isWorkspace ? Icons.business : Icons.person,
+                              color: color,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(type.capitalize()),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedType = value!;
+                        // Clear team members if switching to personal
+                        if (_selectedType == 'personal') {
+                          final currentUserEmail = FirebaseAuth.instance.currentUser?.email;
+                          _teamMembers = currentUserEmail != null ? [currentUserEmail] : [];
+                        }
+                      });
+                    },
+                  ),
                 ),
-              ),
               const SizedBox(height: 32),
 
               // Team Members Field (only show for workspace)
@@ -480,6 +623,197 @@ class _AddProjectPageState extends State<AddProjectPage> {
             ],
               const SizedBox(height: 16),
 
+              // Role Management Section (only for workspace projects)
+              if (_selectedType == 'workspace') ...[
+                Row(
+                  children: [
+                    Icon(Icons.badge, color: Colors.grey.shade600),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Team Roles (Optional)',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 12),
+              Text(
+                'Assign roles to organize your team by responsibilities',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Create New Role
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Create New Role',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _newRoleController,
+                            decoration: InputDecoration(
+                              hintText: 'e.g., Backend Developer, Designer',
+                              filled: true,
+                              fillColor: AppTheme.surface,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _createRole,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: AppTheme.textDark,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          ),
+                          child: const Text('Add Role'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Display Roles with Members
+              if (_roles.isNotEmpty) ...[
+                Text(
+                  'Roles & Members',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _roles.length,
+                  itemBuilder: (context, index) {
+                    final role = _roles[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade200),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          dividerColor: Colors.transparent,
+                        ),
+                        child: ExpansionTile(
+                          title: Text(
+                            role.name,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            '${role.members.length} member${role.members.length != 1 ? 's' : ''}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                            onPressed: () => _deleteRole(role.name),
+                          ),
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Add member to role dropdown
+                                  DropdownButton<String>(
+                                    hint: const Text('Select member to add'),
+                                    isExpanded: true,
+                                    items: _teamMembers
+                                        .where((member) => !role.members.contains(member))
+                                        .map((member) {
+                                      return DropdownMenuItem(
+                                        value: member,
+                                        child: Text(member),
+                                      );
+                                    }).toList(),
+                                    onChanged: (member) {
+                                      if (member != null) {
+                                        _addMemberToRole(role.name, member);
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // List of members in this role
+                                  if (role.members.isNotEmpty) ...[
+                                    Text(
+                                      'Members in this role:',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: role.members.map((member) {
+                                        return Chip(
+                                          label: Text(member, style: const TextStyle(fontSize: 12)),
+                                          deleteIcon: const Icon(Icons.close, size: 14),
+                                          onDeleted: () => _removeMemberFromRole(role.name, member),
+                                          backgroundColor: Colors.blue.shade50,
+                                          deleteIconColor: Colors.red.shade600,
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ] else
+                                    Text(
+                                      'No members assigned yet',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade500,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
+              const SizedBox(height: 16),
+              ], // End workspace-only roles section
+
               // Status Dropdown
               Row(
                 children: [
@@ -515,10 +849,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                         children: [
                           Icon(_getStatusIcon(status), color: statusColor, size: 20),
                           const SizedBox(width: 8),
-                          Text(
-                            status,
-                            style: TextStyle(color: statusColor),
-                          ),
+                          Text(status),
                         ],
                       ),
                     );
@@ -663,18 +994,6 @@ class _AddProjectPageState extends State<AddProjectPage> {
     }
   }
 
-  static IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'workspace':
-        return Icons.work;
-      case 'shared':
-        return Icons.share;
-      case 'personal':
-        return Icons.person;
-      default:
-        return Icons.category;
-    }
-  }
 }
 
 extension StringExtension on String {

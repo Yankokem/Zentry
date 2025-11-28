@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'project_role_model.dart';
 
 class Project {
   final String id;
@@ -15,6 +16,7 @@ class Project {
   final DateTime updatedAt;
   final bool isPinned;
   final String category;
+  final List<ProjectRole> roles;
 
   Project({
     required this.id,
@@ -31,6 +33,7 @@ class Project {
     DateTime? updatedAt,
     this.isPinned = false,
     this.category = 'workspace',
+    this.roles = const [],
   }) : createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
 
@@ -49,6 +52,7 @@ class Project {
     DateTime? updatedAt,
     bool? isPinned,
     String? category,
+    List<ProjectRole>? roles,
   }) {
     return Project(
       id: id ?? this.id,
@@ -65,6 +69,7 @@ class Project {
       updatedAt: updatedAt ?? this.updatedAt,
       isPinned: isPinned ?? this.isPinned,
       category: category ?? this.category,
+      roles: roles ?? this.roles,
     );
   }
 
@@ -89,6 +94,7 @@ class Project {
       'updatedAt': updatedAt.toIso8601String(),
       'isPinned': isPinned,
       'category': category,
+      'roles': roles.map((role) => role.toMap()).toList(),
     };
   }
 
@@ -116,6 +122,7 @@ class Project {
           : null,
       isPinned: map['isPinned'] ?? false,
       category: map['category'] ?? 'workspace',
+      roles: (map['roles'] as List?)?.map((role) => ProjectRole.fromMap(role as Map<String, dynamic>)).toList() ?? [],
     );
   }
 }

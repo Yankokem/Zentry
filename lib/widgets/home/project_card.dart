@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:zentry/models/project_model.dart';
 import 'package:zentry/services/firebase/user_service.dart';
@@ -147,7 +148,31 @@ class _ProjectCardState extends State<ProjectCard> {
     return avatarWidgets;
   }
 
-  void _showMembersModal() {
+  void _showMembersModal() async {
+    // Get project creator details
+    Map<String, String>? creatorDetails;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final isCreator = currentUser?.uid == widget.project.userId;
+    
+    if (isCreator && currentUser?.email != null) {
+      // If current user is the creator, use their details
+      creatorDetails = await _userService.getUserDetailsByEmail(currentUser!.email!);
+    } else {
+      // Find creator from team members or fetch by userId
+      for (final email in widget.project.teamMembers) {
+        final userDetails = _userDetails[email];
+        if (userDetails != null) {
+          // Check if this user is the creator by getting their UID
+          // For now, we'll show the first member as placeholder
+          // In production, you'd need to store creator email in the project model
+          creatorDetails = userDetails;
+          break;
+        }
+      }
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -167,70 +192,169 @@ class _ProjectCardState extends State<ProjectCard> {
             ),
             const SizedBox(height: 16),
             Flexible(
-              child: ListView.builder(
+              child: ListView(
                 shrinkWrap: true,
-                itemCount: widget.project.teamMembers.length,
-                itemBuilder: (context, index) {
-                  final email = widget.project.teamMembers[index];
-                  final details = _userDetails[email] ?? {};
-                  final displayName = _userService.getDisplayName(details, email);
-                  final profileUrl = details['profilePictureUrl'] ?? '';
+                children: [
+                  // Project Manager Section
+                  Text(
+                    'Project Manager',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (creatorDetails != null)
+                    _buildMemberTile(
+                      creatorDetails['fullName'] ?? creatorDetails['email'] ?? 'Unknown',
+                      currentUser?.email ?? '',
+                      creatorDetails['profilePictureUrl'] ?? '',
+                    ),
+                  const SizedBox(height: 16),
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
+                  // Roles and their members
+                  ...widget.project.roles.map((role) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundImage: profileUrl.isNotEmpty
-                              ? NetworkImage(profileUrl)
-                              : null,
-                          backgroundColor: Colors.grey.shade300,
-                          child: profileUrl.isEmpty
-                              ? Text(
-                                  displayName.isNotEmpty
-                                      ? displayName[0].toUpperCase()
-                                      : '?',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                displayName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Text(
-                                email,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                        Text(
+                          role.name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade600,
+                            letterSpacing: 0.5,
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        ...role.members.map((email) {
+                          final details = _userDetails[email] ?? {};
+                          final displayName = _userService.getDisplayName(details, email);
+                          final profileUrl = details['profilePictureUrl'] ?? '';
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _buildMemberTile(displayName, email, profileUrl),
+                          );
+                        }),
+                        const SizedBox(height: 16),
                       ],
+                    );
+                  }),
+
+                  // Members without roles (if any)
+                  if (widget.project.roles.isNotEmpty) ...[
+                    // Find members not in any role
+                    Builder(
+                      builder: (context) {
+                        final membersInRoles = widget.project.roles
+                            .expand((role) => role.members)
+                            .toSet();
+                        final creatorEmail = currentUser?.email;
+                        final membersWithoutRoles = widget.project.teamMembers
+                            .where((email) => 
+                                email != creatorEmail && 
+                                !membersInRoles.contains(email))
+                            .toList();
+
+                        if (membersWithoutRoles.isEmpty) return const SizedBox.shrink();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Other Members',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ...membersWithoutRoles.map((email) {
+                              final details = _userDetails[email] ?? {};
+                              final displayName = _userService.getDisplayName(details, email);
+                              final profileUrl = details['profilePictureUrl'] ?? '';
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: _buildMemberTile(displayName, email, profileUrl),
+                              );
+                            }),
+                          ],
+                        );
+                      },
                     ),
-                  );
-                },
+                  ] else ...[
+                    // No roles defined, show all other members
+                    ...widget.project.teamMembers
+                        .where((email) => email != currentUser?.email)
+                        .map((email) {
+                      final details = _userDetails[email] ?? {};
+                      final displayName = _userService.getDisplayName(details, email);
+                      final profileUrl = details['profilePictureUrl'] ?? '';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildMemberTile(displayName, email, profileUrl),
+                      );
+                    }),
+                  ],
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMemberTile(String displayName, String email, String profileUrl) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundImage: profileUrl.isNotEmpty
+              ? NetworkImage(profileUrl)
+              : null,
+          backgroundColor: Colors.grey.shade300,
+          child: profileUrl.isEmpty
+              ? Text(
+                  displayName.isNotEmpty
+                      ? displayName[0].toUpperCase()
+                      : '?',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : null,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                displayName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                email,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -328,38 +452,47 @@ class _ProjectCardState extends State<ProjectCard> {
                             widget.onPinToggle?.call();
                           }
                         },
-                        itemBuilder: (BuildContext context) => [
-                          PopupMenuItem<String>(
-                            value: 'pin',
-                            child: Row(
-                              children: [
-                                Icon(widget.project.isPinned ? Icons.push_pin : Icons.push_pin_outlined, size: 18),
-                                const SizedBox(width: 8),
-                                Text(widget.project.isPinned ? 'Unpin' : 'Pin'),
-                              ],
+                        itemBuilder: (BuildContext context) {
+                          final currentUser = FirebaseAuth.instance.currentUser;
+                          final isProjectCreator = currentUser?.uid == widget.project.userId;
+                          
+                          return [
+                            PopupMenuItem<String>(
+                              value: 'pin',
+                              child: Row(
+                                children: [
+                                  Icon(widget.project.isPinned ? Icons.push_pin : Icons.push_pin_outlined, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(widget.project.isPinned ? 'Unpin' : 'Pin'),
+                                ],
+                              ),
                             ),
-                          ),
-                          const PopupMenuItem<String>(
-                            value: 'edit',
-                            child: Row(
-                              children: [
-                                Icon(Icons.settings, size: 18),
-                                SizedBox(width: 8),
-                                Text('Manage'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem<String>(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, size: 18),
-                                SizedBox(width: 8),
-                                Text('Delete'),
-                              ],
-                            ),
-                          ),
-                        ],
+                            // Only show Manage button to project creator
+                            if (isProjectCreator)
+                              const PopupMenuItem<String>(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.settings, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Manage'),
+                                  ],
+                                ),
+                              ),
+                            // Only show Delete button to project creator
+                            if (isProjectCreator)
+                              const PopupMenuItem<String>(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Delete'),
+                                  ],
+                                ),
+                              ),
+                          ];
+                        },
                         icon: const Icon(Icons.more_vert, size: 20),
                         tooltip: 'More options',
                       ),

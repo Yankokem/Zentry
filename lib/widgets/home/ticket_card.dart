@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/models/ticket_model.dart';
+import 'package:zentry/services/firebase/user_service.dart';
 
-class TicketCard extends StatelessWidget {
+class TicketCard extends StatefulWidget {
   final Ticket ticket;
   final VoidCallback? onTap;
 
@@ -11,8 +12,36 @@ class TicketCard extends StatelessWidget {
     this.onTap,
   });
 
+  @override
+  State<TicketCard> createState() => _TicketCardState();
+}
+
+class _TicketCardState extends State<TicketCard> {
+  final UserService _userService = UserService();
+  late Map<String, Map<String, String>> _userDetails;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserDetails();
+  }
+
+  Future<void> _loadUserDetails() async {
+    try {
+      _userDetails = await _userService.getUsersDetailsByEmails(widget.ticket.assignedTo);
+    } catch (e) {
+      _userDetails = {};
+    }
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Color _getPriorityColor() {
-    switch (ticket.priority) {
+    switch (widget.ticket.priority) {
       case 'high':
         return Colors.red.shade400;
       case 'medium':
@@ -24,10 +53,123 @@ class TicketCard extends StatelessWidget {
     }
   }
 
+  Color _getColorForEmail(String email) {
+    final colors = [
+      Colors.blue.shade300,
+      Colors.green.shade300,
+      Colors.red.shade300,
+      Colors.purple.shade300,
+      Colors.orange.shade300,
+      Colors.pink.shade300,
+      Colors.cyan.shade300,
+      Colors.amber.shade300,
+    ];
+    final hash = email.hashCode.abs();
+    return colors[hash % colors.length];
+  }
+
+  Widget _buildAvatarStack() {
+    final assignees = widget.ticket.assignedTo;
+    if (assignees.isEmpty) {
+      return Tooltip(
+        message: 'Unassigned',
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.grey.shade300, width: 1),
+            color: Colors.grey.shade100,
+          ),
+          child: Icon(
+            Icons.person_outline,
+            size: 14,
+            color: Colors.grey.shade600,
+          ),
+        ),
+      );
+    }
+
+    // Show max 3 avatars stacked
+    final visibleCount = assignees.length > 3 ? 3 : assignees.length;
+    final hasMore = assignees.length > 3;
+    final stackWidth = (visibleCount * 12.0) + 24; // Calculate total width needed
+
+    return SizedBox(
+      width: stackWidth,
+      height: 28,
+      child: Stack(
+        children: [
+          ...List.generate(visibleCount, (index) {
+            final email = assignees[index];
+            final details = _userDetails[email] ?? {};
+            final displayName = _userService.getDisplayName(details, email);
+            final profileUrl = details['profilePictureUrl'] ?? '';
+            final firstLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : email[0].toUpperCase();
+
+            return Positioned(
+              left: index * 12.0,
+              child: Tooltip(
+                message: displayName,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: CircleAvatar(
+                    radius: 12,
+                    backgroundImage: profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                    backgroundColor: _getColorForEmail(email),
+                    child: profileUrl.isEmpty
+                        ? Text(
+                            firstLetter,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          )
+                      : null,
+                ),
+              ),
+            ),
+          );
+        }),
+        if (hasMore)
+          Positioned(
+            left: visibleCount * 12.0,
+            child: Tooltip(
+              message: '${assignees.length - 3} more',
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                  color: Colors.grey.shade300,
+                ),
+                child: Center(
+                  child: Text(
+                    '+${assignees.length - 3}',
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E1E1E),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -57,7 +199,7 @@ class TicketCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                ticket.ticketNumber,
+                widget.ticket.ticketNumber,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -71,7 +213,7 @@ class TicketCard extends StatelessWidget {
 
             // Title
             Text(
-              ticket.title,
+              widget.ticket.title,
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -85,7 +227,7 @@ class TicketCard extends StatelessWidget {
 
             // Description
             Text(
-              ticket.description,
+              widget.ticket.description,
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.grey.shade600,
@@ -123,7 +265,7 @@ class TicketCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        ticket.priority.toUpperCase(),
+                        widget.ticket.priority.toUpperCase(),
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -136,28 +278,20 @@ class TicketCard extends StatelessWidget {
 
                 const SizedBox(width: 8),
 
-                // Assigned To
+                // Avatar Stack
                 Expanded(
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.person_outline,
-                        size: 16,
-                        color: Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          ticket.assignedTo.isNotEmpty ? ticket.assignedTo.join(', ') : 'Unassigned',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _isLoading
+                        ? SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey.shade400),
+                            ),
+                          )
+                        : _buildAvatarStack(),
                   ),
                 ),
               ],
