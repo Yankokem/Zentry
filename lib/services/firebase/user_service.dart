@@ -30,6 +30,7 @@ class UserService {
         return {
           'fullName': data['fullName'] ?? '',
           'email': data['email'] ?? email,
+          'profilePictureUrl': data['profilePictureUrl'] ?? '',
         };
       }
     } catch (e) {
@@ -40,6 +41,7 @@ class UserService {
     return {
       'fullName': '',
       'email': email,
+      'profilePictureUrl': '',
     };
   }
 

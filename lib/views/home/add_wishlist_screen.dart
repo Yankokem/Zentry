@@ -636,18 +636,33 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
             const SizedBox(height: 16),
             // Display current shared with emails
             if (_teamMembers.isNotEmpty) ...[
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _teamMembers.map((email) {
-                  return Chip(
-                    label: Text(email),
-                    deleteIcon: const Icon(Icons.close, size: 16),
-                    onDeleted: () => _removeSharedWith(email),
-                    backgroundColor: Colors.grey.shade100,
-                    deleteIconColor: Colors.red.shade600,
+              FutureBuilder<Map<String, Map<String, String>>>(
+                future: _userService.getUsersDetailsByEmails(_teamMembers),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    );
+                  }
+
+                  final usersDetails = snapshot.data ?? {};
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _teamMembers.map((email) {
+                      final userDetails = usersDetails[email] ?? {};
+                      final displayName = _userService.getDisplayName(userDetails, email);
+                      return Chip(
+                        label: Text(displayName),
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                        onDeleted: () => _removeSharedWith(email),
+                        backgroundColor: Colors.grey.shade100,
+                        deleteIconColor: Colors.red.shade600,
+                      );
+                    }).toList(),
                   );
-                }).toList(),
+                },
               ),
               const SizedBox(height: 16),
             ],

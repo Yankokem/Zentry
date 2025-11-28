@@ -80,6 +80,152 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     setState(() {});
   }
 
+  double _calculateAvatarStackWidth() {
+    final count = widget.project.teamMembers.length;
+    // Each avatar overlaps by 10px (20px spacing on 30px diameter)
+    return count > 0 ? (count - 1) * 20.0 + 30.0 : 30.0;
+  }
+
+  double _calculateAvatarStackWidthWithButton() {
+    final count = widget.project.teamMembers.length;
+    // Include space for all avatars plus the view all button
+    return count > 0 ? count * 20.0 + 30.0 : 30.0;
+  }
+
+  List<Widget> _buildDetailAvatarStack() {
+    final avatarWidgets = <Widget>[];
+    
+    for (int i = 0; i < widget.project.teamMembers.length; i++) {
+      final member = widget.project.teamMembers[i];
+      final details = _userDetails[member] ?? {};
+      final displayName = _userService.getDisplayName(details, member);
+      final profileUrl = details['profilePictureUrl'] ?? '';
+      
+      avatarWidgets.add(
+        Positioned(
+          left: i * 20.0,
+          child: Tooltip(
+            message: displayName,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: CircleAvatar(
+                radius: 13,
+                backgroundImage: profileUrl.isNotEmpty
+                    ? NetworkImage(profileUrl)
+                    : null,
+                backgroundColor: Colors.grey.shade300,
+                child: profileUrl.isEmpty
+                    ? Text(
+                        displayName.isNotEmpty
+                            ? displayName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E1E1E),
+                        ),
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    
+    return avatarWidgets;
+  }
+
+  void _showMembersModal() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Team Members',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: widget.project.teamMembers.length,
+                itemBuilder: (context, index) {
+                  final email = widget.project.teamMembers[index];
+                  final details = _userDetails[email] ?? {};
+                  final displayName = _userService.getDisplayName(details, email);
+                  final profileUrl = details['profilePictureUrl'] ?? '';
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundImage: profileUrl.isNotEmpty
+                              ? NetworkImage(profileUrl)
+                              : null,
+                          backgroundColor: Colors.grey.shade300,
+                          child: profileUrl.isEmpty
+                              ? Text(
+                                  displayName.isNotEmpty
+                                      ? displayName[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                displayName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Text(
+                                email,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -161,47 +307,58 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     ),
                   ),
 
-                  // Team members
+                  // Team members - Avatar Group
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: widget.project.teamMembers.map((member) {
-                        final displayName = _userService.getDisplayName(_userDetails[member] ?? {}, member);
-                        return Tooltip(
-                          message: member,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E1E1E).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                    child: Row(
+                      children: [
+                        Text(
+                          'Project Members',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: const Color(0xFF1E1E1E).withOpacity(0.7),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SizedBox(
+                            height: 30,
+                            width: _calculateAvatarStackWidthWithButton(),
+                            child: Stack(
+                              clipBehavior: Clip.none,
                               children: [
-                                const Icon(
-                                  Icons.person,
-                                  size: 14,
-                                  color: Color(0xFF1E1E1E),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  displayName,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1E1E1E),
+                                ..._buildDetailAvatarStack(),
+                                if (widget.project.teamMembers.isNotEmpty)
+                                  Positioned(
+                                    left: widget.project.teamMembers.length * 20.0,
+                                    child: GestureDetector(
+                                      onTap: () => _showMembersModal(),
+                                      child: Tooltip(
+                                        message: 'View all members',
+                                        child: Container(
+                                          width: 30,
+                                          height: 30,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade200,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white, width: 2),
+                                          ),
+                                          child: const Icon(
+                                            Icons.people,
+                                            size: 16,
+                                            color: Color(0xFF1E1E1E),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                           ),
-                        );
-                      }).toList(),
+                        ),
+                      ],
                     ),
                   ),
 

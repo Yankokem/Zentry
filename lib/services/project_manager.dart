@@ -14,6 +14,10 @@ class ProjectManager {
   String? get _currentUserId => _auth.currentUser?.uid;
   String? get _currentUserEmail => _auth.currentUser?.email;
 
+  // Public getters for current user info
+  String? getCurrentUserId() => _currentUserId;
+  String? getCurrentUserEmail() => _currentUserEmail;
+
   // Get all projects for current user
   Future<List<Project>> getProjects() async {
     if (_currentUserId == null || _currentUserEmail == null) {

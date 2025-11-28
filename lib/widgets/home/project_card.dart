@@ -87,16 +87,158 @@ class _ProjectCardState extends State<ProjectCard> {
       return _userService.getDisplayName(details ?? {}, email);
     }).toList();
 
-    final firstThree = displayNames.take(3).join(', ');
-    final remaining = displayNames.length - 3;
+    // Show only first 2 members with "+X others" format
+    final firstTwo = displayNames.take(2).join(', ');
+    final remaining = displayNames.length - 2;
 
-    return remaining > 0 ? '$firstThree +$remaining more' : firstThree;
+    return remaining > 0 ? '$firstTwo, and $remaining others' : firstTwo;
+  }
+
+  double _calculateStackWidth() {
+    final count = widget.project.teamMembers.length > 10 ? 10 : widget.project.teamMembers.length;
+    // Each avatar overlaps by 8px (18px spacing on 26px diameter)
+    return count > 0 ? (count - 1) * 18.0 + 28.0 : 28.0;
+  }
+
+  List<Widget> _buildAvatarStack() {
+    final avatarWidgets = <Widget>[];
+    final count = widget.project.teamMembers.length > 10 ? 10 : widget.project.teamMembers.length;
+    
+    for (int i = 0; i < count; i++) {
+      final email = widget.project.teamMembers[i];
+      final details = _userDetails[email] ?? {};
+      final displayName = _userService.getDisplayName(details, email);
+      final profileUrl = details['profilePictureUrl'] ?? '';
+      
+      avatarWidgets.add(
+        Positioned(
+          left: i * 18.0,
+          child: Tooltip(
+            message: displayName,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: CircleAvatar(
+                radius: 12,
+                backgroundImage: profileUrl.isNotEmpty
+                    ? NetworkImage(profileUrl)
+                    : null,
+                backgroundColor: Colors.grey.shade300,
+                child: profileUrl.isEmpty
+                    ? Text(
+                        displayName.isNotEmpty
+                            ? displayName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    
+    return avatarWidgets;
+  }
+
+  void _showMembersModal() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Team Members',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: widget.project.teamMembers.length,
+                itemBuilder: (context, index) {
+                  final email = widget.project.teamMembers[index];
+                  final details = _userDetails[email] ?? {};
+                  final displayName = _userService.getDisplayName(details, email);
+                  final profileUrl = details['profilePictureUrl'] ?? '';
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundImage: profileUrl.isNotEmpty
+                              ? NetworkImage(profileUrl)
+                              : null,
+                          backgroundColor: Colors.grey.shade300,
+                          child: profileUrl.isEmpty
+                              ? Text(
+                                  displayName.isNotEmpty
+                                      ? displayName[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                displayName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Text(
+                                email,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -240,28 +382,60 @@ class _ProjectCardState extends State<ProjectCard> {
 
                   const SizedBox(height: 16),
 
-                  // Team Members
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.people_outline,
-                        size: 18,
-                        color: Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _getTeamMembersDisplay(),
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                  // Team Members - Avatar Group
+                  if (widget.project.teamMembers.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: 18,
+                          color: Colors.grey.shade600,
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: [
+                                // Overlapping avatars using Stack
+                                SizedBox(
+                                  height: 28,
+                                  width: _calculateStackWidth(),
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: _buildAvatarStack(),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // Show badge for additional members when > 10
+                                if (widget.project.teamMembers.length > 10)
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade200,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '+${widget.project.teamMembers.length - 10}',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   const SizedBox(height: 16),
 

@@ -23,12 +23,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
   final _newMemberController = TextEditingController();
   String _selectedStatus = 'Planning';
   String _selectedColor = 'yellow';
+  String _selectedType = 'workspace';
   List<String> _teamMembers = [];
   List<String> _suggestedEmails = [];
   bool _isSearching = false;
 
   final List<String> _statusOptions = ['Planning', 'In Progress', 'Completed', 'On Hold'];
   final List<String> _colorOptions = ['yellow', 'blue', 'green', 'purple', 'red'];
+  final List<String> _typeOptions = ['workspace', 'personal'];
 
   final ProjectManager _projectManager = ProjectManager();
   final FirestoreService _firestoreService = FirestoreService();
@@ -43,6 +45,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
       _teamMembers = List.from(widget.projectToEdit!.teamMembers);
       _selectedStatus = widget.projectToEdit!.status;
       _selectedColor = widget.projectToEdit!.color;
+      _selectedType = widget.projectToEdit!.category;
     } else {
       // For new projects, automatically add the current user as a team member
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -147,11 +150,40 @@ class _AddProjectPageState extends State<AddProjectPage> {
     }
   }
 
-  void _selectSuggestedEmail(String email) {
+  void _selectSuggestedEmail(String email) async {
+    // Add immediately when email is selected from suggestions
+    if (_teamMembers.contains(email)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This email is already added to the team'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      setState(() {
+        _newMemberController.clear();
+        _suggestedEmails.clear();
+      });
+      return;
+    }
+
     setState(() {
-      _newMemberController.text = email;
+      _teamMembers.add(email);
+      _newMemberController.clear();
       _suggestedEmails.clear();
     });
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email added successfully'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _removeTeamMember(String member) {
@@ -184,6 +216,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
           totalTickets: 0,
           completedTickets: 0,
           color: _selectedColor,
+          category: _selectedType,
         );
         await _projectManager.addProject(newProject);
       }
@@ -289,7 +322,61 @@ class _AddProjectPageState extends State<AddProjectPage> {
               ),
               const SizedBox(height: 32),
 
-              // Team Members Field
+              // Project Type Dropdown
+              Row(
+                children: [
+                  Icon(Icons.category, color: Colors.grey.shade600),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Project Type',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedType,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                  ),
+                  items: _typeOptions.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Row(
+                        children: [
+                          Icon(_getCategoryIcon(type), color: Colors.grey.shade600),
+                          const SizedBox(width: 8),
+                          Text(type.capitalize()),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedType = value!;
+                      // Clear team members if switching to personal
+                      if (_selectedType == 'personal') {
+                        final currentUserEmail = FirebaseAuth.instance.currentUser?.email;
+                        _teamMembers = currentUserEmail != null ? [currentUserEmail] : [];
+                      }
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Team Members Field (only show for workspace)
+              if (_selectedType == 'workspace') ...[
               Row(
                 children: [
                   Icon(Icons.group, color: Colors.grey.shade600),
@@ -308,53 +395,37 @@ class _AddProjectPageState extends State<AddProjectPage> {
               // Add new member input
               Column(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _newMemberController,
-                          onChanged: _searchUsers,
-                          decoration: InputDecoration(
-                            hintText: 'Enter team member email',
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            suffixIcon: _isSearching
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: Padding(
-                                      padding: EdgeInsets.all(12),
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          validator: (value) {
-                            if (value != null && value.isNotEmpty) {
-                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
-                                return 'Please enter a valid email address';
-                              }
-                            }
-                            return null;
-                          },
-                        ),
+                  TextFormField(
+                    controller: _newMemberController,
+                    onChanged: _searchUsers,
+                    decoration: InputDecoration(
+                      hintText: 'Enter team member email',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                        borderSide: BorderSide.none,
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: _addTeamMember,
-                        icon: const Icon(Icons.add, size: 20),
-                        style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFFF9ED69),
-                          foregroundColor: const Color(0xFF1E1E1E),
-                          padding: const EdgeInsets.all(12),
-                        ),
-                      ),
-                    ],
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      suffixIcon: _isSearching
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: Padding(
+                                padding: EdgeInsets.all(12),
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : null,
+                    ),
+                    validator: (value) {
+                      if (value != null && value.isNotEmpty) {
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                          return 'Please enter a valid email address';
+                        }
+                      }
+                      return null;
+                    },
                   ),
                   // Suggestions dropdown
                   if (_suggestedEmails.isNotEmpty)
@@ -406,6 +477,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                 ),
                 const SizedBox(height: 16),
               ],
+            ],
               const SizedBox(height: 16),
 
               // Status Dropdown
@@ -436,13 +508,17 @@ class _AddProjectPageState extends State<AddProjectPage> {
                     border: InputBorder.none,
                   ),
                   items: _statusOptions.map((status) {
+                    final statusColor = _getStatusColor(status);
                     return DropdownMenuItem(
                       value: status,
                       child: Row(
                         children: [
-                          Icon(_getStatusIcon(status), color: Colors.grey.shade600),
+                          Icon(_getStatusIcon(status), color: statusColor, size: 20),
                           const SizedBox(width: 8),
-                          Text(status),
+                          Text(
+                            status,
+                            style: TextStyle(color: statusColor),
+                          ),
                         ],
                       ),
                     );
@@ -569,6 +645,21 @@ class _AddProjectPageState extends State<AddProjectPage> {
         return Icons.pause;
       default:
         return Icons.flag;
+    }
+  }
+
+  static Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Planning':
+        return Colors.blue;
+      case 'In Progress':
+        return Colors.orange;
+      case 'Completed':
+        return Colors.green;
+      case 'On Hold':
+        return Colors.grey;
+      default:
+        return Colors.grey;
     }
   }
 

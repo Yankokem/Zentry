@@ -67,11 +67,29 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   List<Project> _getFilteredProjects() {
     List<Project> filtered = _projects;
+    final currentUserId = _projectManager.getCurrentUserId();
+    final currentUserEmail = _projectManager.getCurrentUserEmail();
 
     // Filter by category
-    if (_selectedCategory != 'all') {
-      filtered = filtered.where((project) => project.category == _selectedCategory).toList();
+    if (_selectedCategory == 'workspace') {
+      // Show all projects the user created (workspace projects)
+      filtered = filtered.where((project) => 
+        project.category == 'workspace' && project.userId == currentUserId
+      ).toList();
+    } else if (_selectedCategory == 'shared') {
+      // Show all projects the user is a member of (but didn't create)
+      filtered = filtered.where((project) => 
+        project.userId != currentUserId && 
+        currentUserEmail != null &&
+        project.teamMembers.contains(currentUserEmail)
+      ).toList();
+    } else if (_selectedCategory == 'personal') {
+      // Show all personal projects of the user
+      filtered = filtered.where((project) => 
+        project.category == 'personal' && project.userId == currentUserId
+      ).toList();
     }
+    // If 'all', show everything (no filter)
 
     // Filter by search query
     if (_searchQuery.isNotEmpty) {
