@@ -8,6 +8,8 @@ import 'package:zentry/views/home/journal_page.dart';
 import 'package:zentry/views/home/wishlist_page.dart';
 import 'package:zentry/views/launch_screen.dart';
 import 'package:zentry/views/profile/profile_screen.dart';
+import 'package:zentry/views/profile/about_screen.dart';
+import 'package:zentry/views/profile/help_support_screen.dart';
 import 'package:zentry/views/admin/admin_bug_report_details.dart';
 import 'package:zentry/views/admin/admin_account_action.dart';
 
@@ -19,6 +21,8 @@ class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   static const String home = '/home';
   static const String profile = '/profile';
+  static const String about = '/about';
+  static const String helpSupport = '/help-support';
   static const String adminDashboard = '/admin';
 
   // Tasks
@@ -62,6 +66,16 @@ class AppRoutes {
       case profile:
         return MaterialPageRoute(
           builder: (_) => const ProfileScreen(),
+        );
+
+      case about:
+        return MaterialPageRoute(
+          builder: (_) => const AboutScreen(),
+        );
+
+      case helpSupport:
+        return MaterialPageRoute(
+          builder: (_) => const HelpSupportScreen(),
         );
 
       case adminDashboard:

@@ -336,11 +336,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: 'Help & Support',
                     subtitle: 'Get help with the app',
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Help page coming soon!'),
-                        ),
-                      );
+                      Navigator.pushNamed(context, AppRoutes.helpSupport);
                     },
                   ),
 
@@ -352,27 +348,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: 'About',
                     subtitle: 'App version and information',
                     onTap: () {
-                      showAboutDialog(
-                        context: context,
-                        applicationName: 'Zentry',
-                        applicationVersion: '1.0.0',
-                        applicationIcon: Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.book_outlined,
-                            size: 32,
-                            color: Color(0xFF1E1E1E),
-                          ),
-                        ),
-                        children: [
-                          const Text('Your life, organized.'),
-                        ],
-                      );
+                      Navigator.pushNamed(context, AppRoutes.about);
                     },
                   ),
 
