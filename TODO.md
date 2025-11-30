@@ -1,5 +1,6 @@
-# TODO: Implement FAQ and Contact Support with OOP
-
-- [x] Create lib/views/profile/faq_screen.dart with a list of common questions and answers
-- [x] Create lib/views/profile/contact_support_screen.dart with a form to send a message
-- [x] Update lib/views/profile/help_support_screen.dart to navigate to the new screens instead of showing snackbars
+- [x] Modify calendar_dialog.dart to make dates selectable
+- [x] Add selectedDay state variable
+- [x] Update TableCalendar with selectedDay and onDaySelected
+- [x] Add method to get tickets for a specific date
+- [x] Add UI below calendar to display ticket details for selected date
+- [x] Make ticket deadline mandatory in ticket_model.dart

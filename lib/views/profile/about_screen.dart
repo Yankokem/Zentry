@@ -140,9 +140,9 @@ class AboutScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text(
+                const Text(
                   'Zentry is your personal productivity companion designed to help you organize your life, track your tasks, journal your thoughts, and manage your wishes. With a clean and intuitive interface, Zentry makes it easy to stay on top of your goals and maintain a balanced lifestyle.',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     color: Color(0xFF1E1E1E),
                     height: 1.5,
@@ -217,9 +217,9 @@ class AboutScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text(
+                const Text(
                   'Built with ❤️ by the Zentry Team',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     color: Color(0xFF1E1E1E),
                   ),

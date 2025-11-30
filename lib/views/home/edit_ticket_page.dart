@@ -731,7 +731,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
                   child: Text(
                     selectedDeadline != null
                         ? '${selectedDeadline!.day}/${selectedDeadline!.month}/${selectedDeadline!.year}'
-                        : 'Select deadline (optional)',
+                        : 'Select deadline',
                     style: TextStyle(
                       color: selectedDeadline != null ? Colors.black : Colors.grey.shade600,
                       fontSize: 16,
@@ -774,6 +774,20 @@ class _EditTicketPageState extends State<EditTicketPage> {
 
   void _saveChanges() {
     if (_formKey.currentState!.validate()) {
+      if (selectedDeadline == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please select a deadline for the ticket'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+        return;
+      }
+
       final updatedTicket = widget.ticket.copyWith(
         title: titleController.text,
         description: descController.text,
@@ -1112,7 +1126,7 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         ),

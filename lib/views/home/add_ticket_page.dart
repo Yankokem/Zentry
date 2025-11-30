@@ -404,7 +404,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
                   child: Text(
                     selectedDeadline != null
                         ? '${selectedDeadline!.day}/${selectedDeadline!.month}/${selectedDeadline!.year}'
-                        : 'Select deadline (optional)',
+                        : 'Select deadline',
                     style: TextStyle(
                       color: selectedDeadline != null ? Colors.black : Colors.grey.shade600,
                       fontSize: 16,
@@ -421,6 +421,20 @@ class _AddTicketPageState extends State<AddTicketPage> {
 
   void _saveTicket() {
     if (_formKey.currentState!.validate()) {
+      if (selectedDeadline == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please select a deadline for the ticket'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+        return;
+      }
+
       // Generate ticket number
       final ticketNumber = 'TICK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
@@ -433,7 +447,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
         status: selectedStatus,
         assignedTo: selectedAssignees,
         projectId: widget.project.id,
-        deadline: selectedDeadline,
+        deadline: selectedDeadline!,
       );
 
       ProjectManager().addTicket(newTicket);
@@ -791,7 +805,7 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         ),

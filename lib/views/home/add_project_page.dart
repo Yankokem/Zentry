@@ -483,7 +483,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                     borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
                   ),
                   child: DropdownButtonFormField<String>(
-                    value: _selectedType,
+                    initialValue: _selectedType,
                     decoration: const InputDecoration(
                       border: InputBorder.none,
                     ),

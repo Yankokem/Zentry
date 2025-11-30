@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+ import 'package:flutter/material.dart';
 import 'package:zentry/models/project_model.dart';
 import 'package:zentry/models/ticket_model.dart';
 import 'package:zentry/services/project_manager.dart';
@@ -399,18 +399,18 @@ class TicketDialogs {
                                     children: [
                                       Icon(Icons.calendar_today, color: Colors.grey.shade600, size: 16),
                                       const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          selectedDeadline != null
-                                              ? '${selectedDeadline!.day}/${selectedDeadline!.month}/${selectedDeadline!.year}'
-                                              : 'Select deadline (optional)',
-                                          style: TextStyle(
-                                            color: selectedDeadline != null ? Colors.black : Colors.grey.shade600,
-                                            fontSize: 14,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                  Flexible(
+                                    child: Text(
+                                      selectedDeadline != null
+                                          ? '${selectedDeadline!.day}/${selectedDeadline!.month}/${selectedDeadline!.year}'
+                                          : 'Select deadline',
+                                      style: TextStyle(
+                                        color: selectedDeadline != null ? Colors.black : Colors.grey.shade600,
+                                        fontSize: 14,
                                       ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                     ],
                                   ),
                                 ),
@@ -909,7 +909,7 @@ class TicketDialogs {
                                   Text(
                                     selectedDeadline != null
                                         ? '${selectedDeadline!.day}/${selectedDeadline!.month}/${selectedDeadline!.year}'
-                                        : 'Select deadline (optional)',
+                                        : 'Select deadline',
                                     style: TextStyle(
                                       color: selectedDeadline != null ? Colors.black : Colors.grey.shade600,
                                       fontSize: 14,

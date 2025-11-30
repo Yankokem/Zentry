@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:zentry/models/project_model.dart';
+import 'package:zentry/models/ticket_model.dart';
 import 'package:zentry/services/project_manager.dart';
 
 class CalendarDialog extends StatefulWidget {
@@ -12,21 +12,22 @@ class CalendarDialog extends StatefulWidget {
 
 class _CalendarDialogState extends State<CalendarDialog> {
   final ProjectManager _projectManager = ProjectManager();
-  List<Project> _projects = [];
+  List<Ticket> _tickets = [];
   bool _isLoading = true;
+  DateTime? _selectedDay;
 
   @override
   void initState() {
     super.initState();
-    _loadProjects();
+    _loadTickets();
   }
 
-  Future<void> _loadProjects() async {
+  Future<void> _loadTickets() async {
     try {
-      // Load projects asynchronously from ProjectManager
-      final projects = await _projectManager.getProjects();
+      // Load tickets asynchronously from ProjectManager
+      final tickets = await _projectManager.getTickets();
       setState(() {
-        _projects = projects;
+        _tickets = tickets;
         _isLoading = false;
       });
     } catch (e) {
@@ -35,20 +36,30 @@ class _CalendarDialogState extends State<CalendarDialog> {
     }
   }
 
-  // Get dates that have project deadlines
+  // Get dates that have ticket deadlines
   Set<DateTime> _getDeadlineDates() {
     final Set<DateTime> dates = {};
-    for (final project in _projects) {
-      if (project.deadline != null) {
+    for (final ticket in _tickets) {
+      if (ticket.deadline != null) {
         final date = DateTime(
-          project.deadline!.year,
-          project.deadline!.month,
-          project.deadline!.day,
+          ticket.deadline!.year,
+          ticket.deadline!.month,
+          ticket.deadline!.day,
         );
         dates.add(date);
       }
     }
     return dates;
+  }
+
+  // Get tickets that have deadlines on a specific date
+  List<Ticket> _getTicketsForDate(DateTime date) {
+    return _tickets.where((ticket) {
+      return ticket.deadline != null &&
+             ticket.deadline!.year == date.year &&
+             ticket.deadline!.month == date.month &&
+             ticket.deadline!.day == date.day;
+    }).toList();
   }
 
   @override
@@ -69,7 +80,7 @@ class _CalendarDialogState extends State<CalendarDialog> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Project Deadlines',
+                  'Ticket Deadlines',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -88,6 +99,7 @@ class _CalendarDialogState extends State<CalendarDialog> {
                 firstDay: DateTime.utc(2020, 1, 1),
                 lastDay: DateTime.utc(2030, 12, 31),
                 focusedDay: DateTime.now(),
+                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
                 calendarFormat: CalendarFormat.month,
                 availableCalendarFormats: const {
                   CalendarFormat.month: 'Month',
@@ -106,6 +118,11 @@ class _CalendarDialogState extends State<CalendarDialog> {
                     shape: BoxShape.circle,
                   ),
                 ),
+                onDaySelected: (selectedDay, focusedDay) {
+                  setState(() {
+                    _selectedDay = selectedDay;
+                  });
+                },
                 eventLoader: (day) {
                   final date = DateTime(day.year, day.month, day.day);
                   return deadlineDates.contains(date) ? ['deadline'] : [];
@@ -132,11 +149,41 @@ class _CalendarDialogState extends State<CalendarDialog> {
               ),
             const SizedBox(height: 16),
             Text(
-              'Red dots indicate project deadlines',
+              'Red dots indicate ticket deadlines',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Colors.grey,
                   ),
             ),
+            if (_selectedDay != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Tickets due on ${_selectedDay!.day}/${_selectedDay!.month}/${_selectedDay!.year}:',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              ..._getTicketsForDate(_selectedDay!).map((ticket) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      title: Text(ticket.title),
+                      subtitle: Text(ticket.description),
+                      trailing: Text(
+                        'Status: ${ticket.status}',
+                        style: TextStyle(
+                          color: ticket.status == 'done' ? Colors.green : Colors.orange,
+                        ),
+                      ),
+                    ),
+                  )),
+              if (_getTicketsForDate(_selectedDay!).isEmpty)
+                Text(
+                  'No tickets due on this date.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey,
+                      ),
+                ),
+            ],
           ],
         ),
       ),

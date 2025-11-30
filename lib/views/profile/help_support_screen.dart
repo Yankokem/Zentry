@@ -119,10 +119,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(Icons.bug_report, size: 20, color: AppTheme.textDark),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text(
                       'Report a Bug',
                       style: TextStyle(
@@ -171,7 +171,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
                       // Category Dropdown
                       DropdownButtonFormField<String>(
-                        value: _selectedCategory,
+                        initialValue: _selectedCategory,
                         decoration: InputDecoration(
                           labelText: 'Category',
                           border: OutlineInputBorder(
@@ -193,7 +193,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
                       // Priority Dropdown
                       DropdownButtonFormField<String>(
-                        value: _selectedPriority,
+                        initialValue: _selectedPriority,
                         decoration: InputDecoration(
                           labelText: 'Priority',
                           border: OutlineInputBorder(
@@ -285,10 +285,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(Icons.support_agent, size: 20, color: AppTheme.textDark),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text(
                       'Other Support Options',
                       style: TextStyle(

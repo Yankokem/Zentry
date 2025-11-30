@@ -4,7 +4,6 @@ import 'package:zentry/controllers/wishlist_controller.dart';
 import 'package:zentry/views/home/add_journal_screen.dart';
 import 'package:zentry/views/home/add_project_page.dart';
 import 'package:zentry/views/home/add_wishlist_screen.dart';
-import 'package:zentry/views/home/wishlist_page.dart';
 
 class AddMenuWidget extends StatelessWidget {
   final WishlistController? wishlistController;

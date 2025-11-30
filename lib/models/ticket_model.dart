@@ -22,7 +22,7 @@ class Ticket {
     required this.status,
     required this.assignedTo,
     required this.projectId,
-    this.deadline,
+    required this.deadline,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : createdAt = createdAt ?? DateTime.now(),
@@ -63,7 +63,7 @@ class Ticket {
       status: map['status'],
       assignedTo: assignedTo,
       projectId: map['projectId'],
-      deadline: map['deadline'] != null ? DateTime.parse(map['deadline']) : null,
+      deadline: map['deadline'] != null ? DateTime.parse(map['deadline']) : DateTime.now(),
       createdAt: map['createdAt'] != null
           ? (map['createdAt'] is Timestamp
               ? (map['createdAt'] as Timestamp).toDate()
