@@ -279,11 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: 'Settings',
                     subtitle: 'App preferences and configurations',
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Settings page coming soon!'),
-                        ),
-                      );
+                      Navigator.pushNamed(context, AppRoutes.settings);
                     },
                   ),
 

@@ -4,6 +4,7 @@ import 'config/theme.dart';
 import 'config/routes.dart';
 import 'providers/theme_provider.dart';
 import 'providers/wishlist_provider.dart';
+import 'providers/settings_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -27,14 +28,19 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => WishlistProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
+      child: Consumer2<ThemeProvider, SettingsProvider>(
+        builder: (context, themeProvider, settingsProvider, _) {
           return MaterialApp(
             title: 'Zentry',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
+            theme: AppTheme.lightTheme.copyWith(
+              textTheme: settingsProvider.getTextTheme(false),
+            ),
+            darkTheme: AppTheme.darkTheme.copyWith(
+              textTheme: settingsProvider.getTextTheme(true),
+            ),
             themeMode: themeProvider.themeMode,
             initialRoute: AppRoutes.splash,
             onGenerateRoute: AppRoutes.generateRoute,
