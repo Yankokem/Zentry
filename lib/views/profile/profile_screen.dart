@@ -291,11 +291,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: 'Notifications',
                     subtitle: 'Manage notification preferences',
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Notifications settings coming soon!'),
-                        ),
-                      );
+                      Navigator.pushNamed(context, AppRoutes.notifications);
                     },
                   ),
 

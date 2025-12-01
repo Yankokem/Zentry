@@ -11,6 +11,7 @@ import 'package:zentry/views/profile/profile_screen.dart';
 import 'package:zentry/views/profile/settings_screen.dart';
 import 'package:zentry/views/profile/about_screen.dart';
 import 'package:zentry/views/profile/help_support_screen.dart';
+import 'package:zentry/views/profile/notifications_screen.dart';
 import 'package:zentry/views/admin/admin_bug_report_details.dart';
 import 'package:zentry/views/admin/admin_account_action.dart';
 
@@ -37,6 +38,9 @@ class AppRoutes {
 
   // Wishlist
   static const String wishlist = '/wishlist';
+
+  // Notifications
+  static const String notifications = '/notifications';
 
   // Admin
   static const String adminBugReportDetails = '/admin/bug-report-details';
@@ -117,6 +121,11 @@ class AppRoutes {
             user: args['user'] as Map<String, dynamic>,
             action: args['action'] as String,
           ),
+        );
+
+      case notifications:
+        return MaterialPageRoute(
+          builder: (_) => const NotificationsScreen(),
         );
 
       default:

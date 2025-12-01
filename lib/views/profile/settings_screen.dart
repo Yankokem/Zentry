@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/providers/settings_provider.dart';
+import 'package:zentry/providers/notification_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -14,6 +15,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
+    final notificationProvider = Provider.of<NotificationProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -109,7 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (value) {
                     settingsProvider.setPushNotifications(value);
                   },
-                  activeColor: Theme.of(context).primaryColor,
+                  activeThumbColor: Theme.of(context).primaryColor,
                 ),
               ),
 
@@ -124,100 +126,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (value) {
                     settingsProvider.setEmailNotifications(value);
                   },
-                  activeColor: Theme.of(context).primaryColor,
+                  activeThumbColor: Theme.of(context).primaryColor,
                 ),
               ),
 
-              const SizedBox(height: 12),
 
-              // Reminder Notifications
-              _SettingsCard(
-                title: 'Reminder Notifications',
-                subtitle: 'Get reminded about tasks and deadlines',
-                child: Switch(
-                  value: settingsProvider.reminderNotifications,
-                  onChanged: (value) {
-                    settingsProvider.setReminderNotifications(value);
-                  },
-                  activeColor: Theme.of(context).primaryColor,
-                ),
-              ),
 
-              const SizedBox(height: 32),
 
-              // Privacy Section
-              Text(
-                'Privacy',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
-                    ),
-              ),
-              const SizedBox(height: 16),
 
-              // Analytics
-              _SettingsCard(
-                title: 'Analytics',
-                subtitle: 'Help improve the app by sharing usage data',
-                child: Switch(
-                  value: settingsProvider.analyticsEnabled,
-                  onChanged: (value) {
-                    settingsProvider.setAnalyticsEnabled(value);
-                  },
-                  activeColor: Theme.of(context).primaryColor,
-                ),
-              ),
 
-              const SizedBox(height: 12),
-
-              // Crash Reporting
-              _SettingsCard(
-                title: 'Crash Reporting',
-                subtitle: 'Send crash reports to help fix issues',
-                child: Switch(
-                  value: settingsProvider.crashReporting,
-                  onChanged: (value) {
-                    settingsProvider.setCrashReporting(value);
-                  },
-                  activeColor: Theme.of(context).primaryColor,
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // Language Section
-              Text(
-                'Language',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
-                    ),
-              ),
-              const SizedBox(height: 16),
-
-              // Language Setting
-              _SettingsCard(
-                title: 'App Language',
-                subtitle: 'Choose your preferred language',
-                child: DropdownButton<String>(
-                  value: settingsProvider.language,
-                  isExpanded: true,
-                  underline: const SizedBox(),
-                  items: SettingsProvider.availableLanguages.map((language) {
-                    return DropdownMenuItem<String>(
-                      value: language,
-                      child: Text(language),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      settingsProvider.setLanguage(value);
-                    }
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 32),
 
               // Preview Section
               Text(

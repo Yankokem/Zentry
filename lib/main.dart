@@ -5,6 +5,7 @@ import 'config/routes.dart';
 import 'providers/theme_provider.dart';
 import 'providers/wishlist_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/notification_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -29,6 +30,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => WishlistProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: Consumer2<ThemeProvider, SettingsProvider>(
         builder: (context, themeProvider, settingsProvider, _) {

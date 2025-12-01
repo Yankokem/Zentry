@@ -36,6 +36,11 @@ dependencies:
   # Rich Text Editor
   flutter_quill: ^11.5.0
 
+  # Notifications
+  firebase_messaging: 16.0.4
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
+
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
