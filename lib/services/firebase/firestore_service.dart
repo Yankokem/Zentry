@@ -162,7 +162,40 @@ class FirestoreService {
         }
       }
 
-      return allProjects;
+      // Calculate actual ticket counts for each project
+      final projectsWithUpdatedCounts = <Project>[];
+      for (final project in allProjects) {
+        try {
+          // Get tickets for this project
+          final ticketsSnapshot = await _db
+              .collection(projectsCollection)
+              .doc(project.id)
+              .collection(ticketsSubcollection)
+              .get();
+
+          final tickets = ticketsSnapshot.docs
+              .map((doc) => Ticket.fromMap(doc.data()))
+              .toList();
+
+          // Count total tickets and completed tickets
+          final totalTickets = tickets.length;
+          final completedTickets = tickets.where((ticket) => ticket.status == 'done').length;
+
+          // Update project with calculated counts
+          final updatedProject = project.copyWith(
+            totalTickets: totalTickets,
+            completedTickets: completedTickets,
+          );
+
+          projectsWithUpdatedCounts.add(updatedProject);
+        } catch (e) {
+          // If there's an error fetching tickets for this project, use the stored counts
+          print('Error fetching tickets for project ${project.id}: $e');
+          projectsWithUpdatedCounts.add(project);
+        }
+      }
+
+      return projectsWithUpdatedCounts;
     } catch (e) {
       throw Exception('Failed to get user projects: $e');
     }
