@@ -39,22 +39,28 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Future<void> _loadProjects() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final projects = await _projectManager.getProjects();
-      setState(() {
-        _projects = projects;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _projects = projects;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
       print('Error loading projects: $e');
     }
   }
@@ -433,6 +439,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                     );
                                   }
                                 },
+                                onStatusChanged: _loadProjects,
                               );
                             },
                           ),

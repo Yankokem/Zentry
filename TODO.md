@@ -1,5 +1,10 @@
-# TODO: Make Segmented Control Functional in Projects Page
+# TODO: Make Project Status Functional
 
 ## Tasks
-- [x] Update filtering logic in `_getFilteredProjects()` method for 'workspace', 'shared', and 'personal' categories
-- [x] Test the changes to ensure correct filtering behavior
+- [ ] Import ProjectManager in ProjectCard widget
+- [ ] Add method to show status change bottom sheet with options (Planning, In Progress, Completed)
+- [ ] Make status badge clickable with GestureDetector
+- [ ] Add permission check (only project creators can change status)
+- [ ] Implement status update using ProjectManager.updateProject
+- [ ] Add callback to refresh projects list after status change
+- [ ] Test the functionality

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:zentry/models/project_model.dart';
 import 'package:zentry/services/firebase/user_service.dart';
+import 'package:zentry/services/project_manager.dart';
 
 class ProjectCard extends StatefulWidget {
   final Project project;
@@ -10,6 +11,7 @@ class ProjectCard extends StatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onPinToggle;
+  final VoidCallback? onStatusChanged;
 
   const ProjectCard({
     super.key,
@@ -18,6 +20,7 @@ class ProjectCard extends StatefulWidget {
     this.onEdit,
     this.onDelete,
     this.onPinToggle,
+    this.onStatusChanged,
   });
 
   @override
@@ -368,6 +371,90 @@ class _ProjectCardState extends State<ProjectCard> {
     );
   }
 
+  void _showStatusChangeSheet() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final isProjectCreator = currentUser?.uid == widget.project.userId;
+
+    if (!isProjectCreator) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only project creators can change status')),
+      );
+      return;
+    }
+
+    final statuses = ['Planning', 'In Progress', 'Completed'];
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Change Project Status',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            ...statuses.map((status) => ListTile(
+                  leading: Icon(
+                    status == 'Completed' ? Icons.check_circle :
+                    status == 'In Progress' ? Icons.play_circle :
+                    Icons.schedule,
+                    color: _getStatusColorForStatus(status),
+                  ),
+                  title: Text(status),
+                  trailing: widget.project.status == status
+                      ? Icon(Icons.check, color: _getStatusColorForStatus(status))
+                      : null,
+                  onTap: () async {
+                    if (widget.project.status == status) {
+                      Navigator.of(context).pop();
+                      return;
+                    }
+
+                    try {
+                      final projectManager = ProjectManager();
+                      final updatedProject = widget.project.copyWith(status: status);
+                      await projectManager.updateProject(updatedProject);
+                      Navigator.of(context).pop();
+                      widget.onStatusChanged?.call();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Project status changed to $status')),
+                      );
+                    } catch (e) {
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error updating status: $e')),
+                      );
+                    }
+                  },
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColorForStatus(String status) {
+    switch (status) {
+      case 'In Progress':
+        return Colors.orange;
+      case 'Planning':
+        return Colors.blue;
+      case 'Completed':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -432,21 +519,24 @@ class _ProjectCardState extends State<ProjectCard> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor().withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          widget.project.status,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: _getStatusColor(),
+                      GestureDetector(
+                        onTap: _showStatusChangeSheet,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor().withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            widget.project.status,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _getStatusColor(),
+                            ),
                           ),
                         ),
                       ),
