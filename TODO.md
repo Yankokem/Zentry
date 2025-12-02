@@ -1,17 +1,6 @@
-# Notifications Implementation Plan
+# Task: Move Notification Toggles
 
-## Completed Tasks
-- [x] Analyze current notification setup
-- [x] Create implementation plan
-- [x] Add notification packages to pubspec.yaml
-- [x] Create notification model (lib/models/notification_model.dart)
-- [x] Create notification service (lib/services/notification_service.dart)
-- [x] Create notification provider (lib/providers/notification_provider.dart)
-- [x] Create notifications screen (lib/views/profile/notifications_screen.dart)
-- [x] Update routes.dart to include notifications route
-- [x] Update profile_screen.dart to navigate to notifications screen
-- [x] Update settings_screen.dart to integrate with notification provider
-- [x] Add NotificationProvider to main.dart's MultiProvider
-
-## Pending Tasks
-- [x] Test the implementation
+## Steps to Complete:
+- [x] Add notification toggles section to notifications_screen.dart
+- [x] Remove notifications section from settings_screen.dart
+- [x] Test the changes to ensure toggles work correctly

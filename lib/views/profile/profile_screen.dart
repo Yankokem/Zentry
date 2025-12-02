@@ -295,21 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 8),
 
-                  // Privacy
-                  _ProfileOption(
-                    icon: Icons.privacy_tip_rounded,
-                    title: 'Privacy',
-                    subtitle: 'Control your privacy settings',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Privacy settings coming soon!'),
-                        ),
-                      );
-                    },
-                  ),
 
                   const SizedBox(height: 16),
 

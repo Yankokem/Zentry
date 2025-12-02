@@ -92,50 +92,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               const SizedBox(height: 32),
 
-              // Notifications Section
-              Text(
-                'Notifications',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
-                    ),
-              ),
-              const SizedBox(height: 16),
-
-              // Push Notifications
-              _SettingsCard(
-                title: 'Push Notifications',
-                subtitle: 'Receive push notifications for important updates',
-                child: Switch(
-                  value: settingsProvider.pushNotifications,
-                  onChanged: (value) {
-                    settingsProvider.setPushNotifications(value);
-                  },
-                  activeThumbColor: Theme.of(context).primaryColor,
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Email Notifications
-              _SettingsCard(
-                title: 'Email Notifications',
-                subtitle: 'Receive email notifications for account activity',
-                child: Switch(
-                  value: settingsProvider.emailNotifications,
-                  onChanged: (value) {
-                    settingsProvider.setEmailNotifications(value);
-                  },
-                  activeThumbColor: Theme.of(context).primaryColor,
-                ),
-              ),
-
-
-
-
-
-
-
               // Preview Section
               Text(
                 'Preview',
