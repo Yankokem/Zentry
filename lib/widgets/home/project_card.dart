@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:zentry/models/project_model.dart';
 import 'package:zentry/services/firebase/user_service.dart';
@@ -27,6 +28,15 @@ class _ProjectCardState extends State<ProjectCard> {
   final UserService _userService = UserService();
   Map<String, Map<String, String>> _userDetails = {};
   bool _isLoadingUsers = true;
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    // Avoid adding properties that might cause LegacyJavaScriptObject issues
+    properties.add(StringProperty('title', widget.project.title));
+    properties.add(StringProperty('description', widget.project.description));
+    properties.add(StringProperty('status', widget.project.status));
+  }
 
   @override
   void initState() {

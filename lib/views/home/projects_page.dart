@@ -68,28 +68,25 @@ class _ProjectsPageState extends State<ProjectsPage> {
   List<Project> _getFilteredProjects() {
     List<Project> filtered = _projects;
     final currentUserId = _projectManager.getCurrentUserId();
-    final currentUserEmail = _projectManager.getCurrentUserEmail();
 
-    // Filter by category
+    // Filter by ownership and sharing status
     if (_selectedCategory == 'workspace') {
-      // Show all projects the user created (workspace projects)
-      filtered = filtered.where((project) => 
+      // Show workspace projects created by the user (owned workspace projects)
+      filtered = filtered.where((project) =>
         project.category == 'workspace' && project.userId == currentUserId
       ).toList();
     } else if (_selectedCategory == 'shared') {
-      // Show all projects the user is a member of (but didn't create)
-      filtered = filtered.where((project) => 
-        project.userId != currentUserId && 
-        currentUserEmail != null &&
-        project.teamMembers.contains(currentUserEmail)
+      // Show projects shared with the user (not created by them, but they're a team member)
+      filtered = filtered.where((project) =>
+        project.userId != currentUserId && project.teamMembers.contains(_projectManager.getCurrentUserEmail())
       ).toList();
     } else if (_selectedCategory == 'personal') {
-      // Show all personal projects of the user
-      filtered = filtered.where((project) => 
+      // Show personal projects the user created
+      filtered = filtered.where((project) =>
         project.category == 'personal' && project.userId == currentUserId
       ).toList();
     }
-    // If 'all', show everything (no filter)
+    // If 'all', show everything (all accessible projects)
 
     // Filter by search query
     if (_searchQuery.isNotEmpty) {
@@ -99,11 +96,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
       }).toList();
     }
 
-    // Sort pinned projects first
+    // Sort: pinned projects first, then by creation date (newest first)
     filtered.sort((a, b) {
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
-      return 0; // Keep original order for same pin status
+      // Both pinned or both unpinned: sort by creation date (newest first)
+      return b.createdAt.compareTo(a.createdAt);
     });
 
     return filtered;

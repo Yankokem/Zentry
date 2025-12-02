@@ -1,6 +1,5 @@
-# Task: Move Notification Toggles
+# TODO: Make Segmented Control Functional in Projects Page
 
-## Steps to Complete:
-- [x] Add notification toggles section to notifications_screen.dart
-- [x] Remove notifications section from settings_screen.dart
-- [x] Test the changes to ensure toggles work correctly
+## Tasks
+- [x] Update filtering logic in `_getFilteredProjects()` method for 'workspace', 'shared', and 'personal' categories
+- [x] Test the changes to ensure correct filtering behavior
