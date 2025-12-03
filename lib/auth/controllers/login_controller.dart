@@ -31,21 +31,25 @@ class LoginController {
 
     try {
       final email = emailController.text.trim().toLowerCase();
-      
-  // First, check if user exists in Firestore
-  final userExists = await _firestoreService.userExistsByEmail(email);
 
-      if (!userExists) {
-        _isLoading = false;
-        _errorMessage = 'Email not found. Please sign up first.';
-        return false;
-      }
-
-      // Attempt to sign in with Firebase Auth
-      await _authService.signInWithEmailAndPassword(
+      // First, attempt to sign in with Firebase Auth
+      final userCredential = await _authService.signInWithEmailAndPassword(
         email,
         passwordController.text,
       );
+
+      // If Auth succeeds, ensure Firestore document exists
+      final userExists = await _firestoreService.userExistsByEmail(email);
+      if (!userExists) {
+        // Create Firestore document for existing Auth user
+        await _firestoreService.createUserDocument(
+          uid: userCredential.user!.uid,
+          firstName: 'User', // Default values since we don't have signup data
+          lastName: '',
+          fullName: 'User',
+          email: email,
+        );
+      }
 
       _isLoading = false;
       return true;

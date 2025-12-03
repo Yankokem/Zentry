@@ -8,7 +8,10 @@ import 'package:zentry/views/home/project_detail_page.dart';
 import 'package:zentry/views/home/add_project_page.dart';
 
 class ProjectsPage extends StatefulWidget {
-  const ProjectsPage({super.key});
+  final String? initialFilter;
+  final ValueNotifier<String>? filterNotifier;
+
+  const ProjectsPage({super.key, this.initialFilter, this.filterNotifier});
 
   @override
   State<ProjectsPage> createState() => _ProjectsPageState();
@@ -35,7 +38,23 @@ class _ProjectsPageState extends State<ProjectsPage> {
       ),
     );
 
+    // Set initial filter if provided
+    if (widget.initialFilter != null) {
+      _selectedCategory = widget.initialFilter!;
+    }
+
+    // Listen to filter changes
+    widget.filterNotifier?.addListener(_onFilterChanged);
+
     _loadProjects();
+  }
+
+  void _onFilterChanged() {
+    if (widget.filterNotifier != null) {
+      setState(() {
+        _selectedCategory = widget.filterNotifier!.value;
+      });
+    }
   }
 
   Future<void> _loadProjects() async {
@@ -68,8 +87,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    widget.filterNotifier?.removeListener(_onFilterChanged);
     super.dispose();
   }
+
+
 
   List<Project> _getFilteredProjects() {
     List<Project> filtered = _projects;

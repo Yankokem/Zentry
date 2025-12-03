@@ -1,1 +1,29 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"zentry-f40a0","appId":"1:1038744556460:android:e41f568e504739dc4aa009","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"zentry-f40a0","configurations":{"android":"1:1038744556460:android:e41f568e504739dc4aa009","ios":"1:1038744556460:ios:dfc1220ed4c6e0284aa009","macos":"1:1038744556460:ios:dfc1220ed4c6e0284aa009","web":"1:1038744556460:web:bbb9f44aee4c6e564aa009","windows":"1:1038744556460:web:2afe602b983cdb6a4aa009"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "zentry-f40a0",
+          "appId": "1:1038744556460:android:e41f568e504739dc4aa009",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "zentry-f40a0",
+          "configurations": {
+            "android": "1:1038744556460:android:e41f568e504739dc4aa009",
+            "ios": "1:1038744556460:ios:dfc1220ed4c6e0284aa009",
+            "macos": "1:1038744556460:ios:dfc1220ed4c6e0284aa009",
+            "web": "1:1038744556460:web:bbb9f44aee4c6e564aa009",
+            "windows": "1:1038744556460:web:2afe602b983cdb6a4aa009"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

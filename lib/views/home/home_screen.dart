@@ -16,10 +16,20 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  final ValueNotifier<String> _projectsFilterNotifier = ValueNotifier<String>('all');
 
-  final List<Widget> _pages = [
-    const HomePage(),
-    const ProjectsPage(), // CHANGED from TasksPage to ProjectsPage
+  void _onNavigateToProjects(String? filter) {
+    if (filter != null) {
+      _projectsFilterNotifier.value = filter;
+    }
+    setState(() {
+      _selectedIndex = 1; // Projects tab index
+    });
+  }
+
+  late final List<Widget> _pages = [
+    HomePage(onNavigateToProjects: _onNavigateToProjects),
+    ProjectsPage(filterNotifier: _projectsFilterNotifier, initialFilter: 'all'),
     const JournalPage(),
     const WishlistPage(),
   ];

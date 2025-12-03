@@ -1,10 +1,15 @@
-# TODO: Make Project Status Functional
+# Fix Login Issue for pau@gmail.com
 
 ## Tasks
-- [ ] Import ProjectManager in ProjectCard widget
-- [ ] Add method to show status change bottom sheet with options (Planning, In Progress, Completed)
-- [ ] Make status badge clickable with GestureDetector
-- [ ] Add permission check (only project creators can change status)
-- [ ] Implement status update using ProjectManager.updateProject
-- [ ] Add callback to refresh projects list after status change
-- [ ] Test the functionality
+- [ ] Modify LoginController to try Firebase Auth first instead of Firestore check
+- [ ] If Auth succeeds, ensure Firestore document exists (create if not)
+- [ ] If Auth fails, provide appropriate error message
+- [ ] Test the login functionality
+
+## Information Gathered
+- Current login flow: Check Firestore -> Auth sign-in
+- Issue: User exists in Firebase Auth but not Firestore, causing "Email not found" error
+- Solution: Auth first, then sync Firestore document
+
+## Dependent Files
+- lib/auth/controllers/login_controller.dart

@@ -4,14 +4,27 @@ import 'package:zentry/config/routes.dart';
 import 'package:zentry/utils/admin_mode.dart';
 import 'package:zentry/services/firebase/auth_service.dart';
 import 'package:zentry/services/firebase/firestore_service.dart';
-import 'package:zentry/widgets/home/stat_card.dart';
+
 import 'package:zentry/widgets/home/task_card.dart';
 import 'package:zentry/widgets/home/wish_card.dart';
 import 'package:zentry/widgets/home/recent_journal_card.dart';
 import 'package:zentry/widgets/home/calendar_dialog.dart';
+import 'package:zentry/services/firebase/journal_service.dart';
+import 'package:zentry/models/journal_entry_model.dart';
+import 'package:zentry/models/project_model.dart';
+import 'package:zentry/models/wish_model.dart';
+import 'package:zentry/providers/wishlist_provider.dart';
+import 'package:zentry/widgets/home/project_card.dart';
+import 'package:zentry/views/home/project_detail_page.dart';
+import 'package:zentry/views/home/add_project_page.dart';
+import 'package:zentry/views/home/projects_page.dart';
+import 'package:zentry/services/project_manager.dart';
+import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final Function(String? filter)? onNavigateToProjects;
+
+  const HomePage({super.key, this.onNavigateToProjects});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -20,13 +33,28 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final AuthService _authService = AuthService();
   final FirestoreService _firestoreService = FirestoreService();
+  final JournalService _journalService = JournalService();
 
   String _firstName = '';
+  List<Project> _sharedProjects = [];
+  List<JournalEntry> _recentJournalEntries = [];
+  List<Wish> _wishlistItems = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadUserName();
+    _loadData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Load data when dependencies change (e.g., provider initialization)
+    if (_isLoading) {
+      _loadData();
+    }
   }
 
   Future<void> _loadUserName() async {
@@ -60,11 +88,248 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _loadData() async {
+    try {
+      final user = _authService.currentUser;
+      if (user == null) return;
+
+      // Load shared projects (projects shared with the user, not owned by them)
+      final projects = await _firestoreService.getUserProjects(user.uid, user.email ?? '');
+      final sharedProjects = projects.where((project) =>
+        project.userId != user.uid && project.teamMembers.contains(user.email ?? '')
+      ).toList()
+      // Sort by most recently updated first
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+      // Load recent journal entries
+      final journalEntries = await _journalService.getEntries();
+      final recentEntries = journalEntries.take(1).toList(); // Get the most recent entry
+
+      // Load wishlist items
+      final wishlistProvider = Provider.of<WishlistProvider>(context, listen: false);
+      if (wishlistProvider.isInitialized) {
+        final wishlistItems = wishlistProvider.controller.wishes.take(3).toList(); // Get first 3 items
+        if (mounted) {
+          setState(() {
+            _sharedProjects = sharedProjects;
+            _recentJournalEntries = recentEntries;
+            _wishlistItems = wishlistItems;
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Wait for wishlist to initialize
+        await Future.delayed(const Duration(milliseconds: 100));
+        _loadData();
+      }
+    } catch (e) {
+      debugPrint('Error loading data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   String _timeBasedGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good Morning';
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
+  }
+
+  String _getMoodEmoji(String mood) {
+    switch (mood.toLowerCase()) {
+      case 'happy':
+        return '😊';
+      case 'sad':
+        return '😢';
+      case 'angry':
+        return '😠';
+      case 'excited':
+        return '🤩';
+      case 'calm':
+      default:
+        return '😌';
+    }
+  }
+
+  IconData _getWishIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'electronics':
+        return Icons.devices;
+      case 'clothing':
+        return Icons.checkroom;
+      case 'travel':
+        return Icons.flight;
+      case 'food':
+        return Icons.restaurant;
+      case 'books':
+        return Icons.book;
+      case 'sports':
+        return Icons.sports_soccer;
+      default:
+        return Icons.star;
+    }
+  }
+
+  Widget _buildSharedProjectCard(Project project) {
+    Color _getProjectColor() {
+      switch (project.color) {
+        case 'yellow':
+          return const Color(0xFFF9ED69);
+        case 'blue':
+          return Colors.blue.shade300;
+        case 'green':
+          return Colors.green.shade300;
+        case 'purple':
+          return Colors.purple.shade300;
+        case 'red':
+          return Colors.red.shade300;
+        default:
+          return const Color(0xFFF9ED69);
+      }
+    }
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProjectDetailPage(project: project),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: 6),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Color indicator
+            Container(
+              width: 4,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _getProjectColor(),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Project info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          project.title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1E1E),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (project.isPinned) ...[
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.push_pin,
+                          size: 14,
+                          color: Color(0xFFF9ED69),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    project.description,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.people_outline,
+                        size: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${project.teamMembers.length} members',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _getProjectColor().withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          project.status,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _getProjectColor().withOpacity(0.8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Progress indicator
+            SizedBox(
+              width: 60,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '${project.completedTickets}/${project.totalTickets}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  LinearProgressIndicator(
+                    value: project.totalTickets > 0 ? project.completedTickets / project.totalTickets : 0,
+                    backgroundColor: Colors.grey.shade200,
+                    valueColor: AlwaysStoppedAnimation<Color>(_getProjectColor()),
+                    minHeight: 4,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -197,45 +462,7 @@ class _HomePageState extends State<HomePage> {
 
             const SizedBox(height: 24),
 
-            // Task Overview Cards
-            const Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: AppConstants.paddingMedium),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: StatCard(
-                      icon: Icons.check_circle_rounded,
-                      count: '10',
-                      label: 'Done Today',
-                      color: Colors.green,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: StatCard(
-                      icon: Icons.access_time_rounded,
-                      count: '5',
-                      label: 'Pending',
-                      color: Colors.orange,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: StatCard(
-                      icon: Icons.trending_up_rounded,
-                      count: '15',
-                      label: 'Total Tasks',
-                      color: Colors.blue,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Shared Tasks Section
+            // Shared Projects Section
             Padding(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppConstants.paddingMedium),
@@ -245,7 +472,7 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     children: [
                       Text(
-                        'Shared Tasks',
+                        'Shared Projects',
                         style:
                             Theme.of(context).textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
@@ -260,174 +487,40 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                   TextButton(
-                    onPressed: () {},
-                    child: const Text('See All'),
+                    onPressed: () {
+                      widget.onNavigateToProjects?.call('shared');
+                    },
+                    child: const Text('View All'),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 8),
 
-            const TaskCard(
-              title: 'Complete the final documentation',
-              time: '10:30 AM',
-              priority: 'high',
-              assignedTo: 'John Doe',
-              isDone: false,
-            ),
-            const TaskCard(
-              title: 'Review pull request #342',
-              time: '2:00 PM',
-              priority: 'medium',
-              assignedTo: 'Sarah Lee',
-              isDone: false,
-            ),
-            const TaskCard(
-              title: 'Update server dependencies',
-              time: 'Tomorrow',
-              priority: 'medium',
-              assignedTo: 'You',
-              isDone: false,
-            ),
-
-            const SizedBox(height: 24),
-
-            // My Personal Tasks Section
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppConstants.paddingMedium),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'My Tasks',
-                        style:
-                            Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.person_outline,
-                        size: 20,
-                        color: Colors.grey[600],
-                      ),
-                    ],
-                  ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text('See All'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            const TaskCard(
-              title: 'Buy groceries',
-              time: '4:30 PM',
-              priority: 'medium',
-              assignedTo: null,
-              isDone: false,
-            ),
-            const TaskCard(
-              title: 'Call dentist',
-              time: 'Tomorrow',
-              priority: 'low',
-              assignedTo: null,
-              isDone: false,
-            ),
-
-            const SizedBox(height: 24),
-
-            // Personal Journal Banner
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppConstants.paddingMedium),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppConstants.paddingLarge),
+            if (_sharedProjects.isNotEmpty)
+              ..._sharedProjects.take(2).map((project) => _buildSharedProjectCard(project)),
+            if (_sharedProjects.isEmpty)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: 6),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.purple.shade400,
-                      Colors.blue.shade400,
-                    ],
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.grey.shade300,
+                    width: 1,
                   ),
-                  borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.purple.withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.edit_note_rounded,
-                        color: Colors.white,
-                        size: 32,
-                      ),
+                child: const Center(
+                  child: Text(
+                    'No shared projects available',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'My Journal',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                              const SizedBox(width: 6),
-                              Icon(
-                                Icons.lock_outline,
-                                color: Colors.white.withOpacity(0.8),
-                                size: 16,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Write down your thoughts and feelings',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: Colors.white.withOpacity(0.9),
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
 
             const SizedBox(height: 24),
 
@@ -440,9 +533,10 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Text(
                     'Recent Journal Entry',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style:
+                        Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                   ),
                   TextButton(
                     onPressed: () {},
@@ -453,13 +547,20 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 8),
 
-            const RecentJournalCard(
-              date: 'Nov 2, 2025',
-              emoji: '😊',
-              title: 'A Productive Day',
-              description:
-                  'Today was amazing! I completed all my tasks and had time to relax. Looking forward to tomorrow and all the new challenges it brings.',
-            ),
+            if (_recentJournalEntries.isNotEmpty)
+              RecentJournalCard(
+                date: _recentJournalEntries.first.date,
+                emoji: _getMoodEmoji(_recentJournalEntries.first.mood),
+                title: _recentJournalEntries.first.title,
+                description: _recentJournalEntries.first.content,
+              )
+            else
+              const RecentJournalCard(
+                date: 'No entries yet',
+                emoji: '😌',
+                title: 'No journal entries',
+                description: 'Start writing your first journal entry today!',
+              ),
 
             const SizedBox(height: 24),
 
@@ -470,22 +571,12 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        'My Wishlist',
-                        style:
-                            Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.lock_outline,
-                        size: 16,
-                        color: Colors.grey[600],
-                      ),
-                    ],
+                  Text(
+                    'My Wishlist',
+                    style:
+                        Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                   ),
                   TextButton(
                     onPressed: () {},
@@ -502,23 +593,19 @@ class _HomePageState extends State<HomePage> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.paddingMedium),
-                children: const [
-                  WishCard(
-                    title: 'New MacBook Pro',
-                    price: '₱2,499',
-                    image: Icons.laptop_mac,
-                  ),
-                  WishCard(
-                    title: 'Trip to Japan',
-                    price: '₱3,500',
-                    image: Icons.flight_takeoff,
-                  ),
-                  WishCard(
-                    title: 'New Camera',
-                    price: '₱1,200',
-                    image: Icons.camera_alt,
-                  ),
-                ],
+                children: _wishlistItems.isNotEmpty
+                  ? _wishlistItems.map((wish) => WishCard(
+                      title: wish.title,
+                      price: '₱${wish.price}',
+                      image: _getWishIcon(wish.category),
+                    )).toList()
+                  : const [
+                      WishCard(
+                        title: 'No wishlist items yet',
+                        price: '',
+                        image: Icons.add,
+                      ),
+                    ],
               ),
             ),
 

@@ -117,8 +117,47 @@ class _WishlistPageState extends State<WishlistPage> {
 
   List<Wish> _getFilteredItems() {
     final wishes = _controller.wishes;
-    if (_selectedCategory == 'all') return wishes;
-    return wishes.where((item) => item.category == _selectedCategory).toList();
+    List<Wish> filtered = _selectedCategory == 'all'
+        ? wishes
+        : wishes.where((item) => item.category == _selectedCategory).toList();
+
+    // Sort by dateAdded in descending order (most recent first)
+    filtered.sort((a, b) {
+      DateTime? dateA = _parseDate(a.dateAdded);
+      DateTime? dateB = _parseDate(b.dateAdded);
+
+      // If parsing fails, treat as equal (maintain original order)
+      if (dateA == null && dateB == null) return 0;
+      if (dateA == null) return 1; // null dates go to the end
+      if (dateB == null) return -1;
+
+      return dateB.compareTo(dateA); // Descending order
+    });
+
+    return filtered;
+  }
+
+  DateTime? _parseDate(String dateString) {
+    try {
+      // Expected format: "Jan 1, 2023"
+      final months = {
+        'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+        'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+      };
+
+      final parts = dateString.split(' ');
+      if (parts.length != 3) return null;
+
+      final month = months[parts[0]];
+      final day = int.tryParse(parts[1].replaceAll(',', ''));
+      final year = int.tryParse(parts[2]);
+
+      if (month == null || day == null || year == null) return null;
+
+      return DateTime(year, month, day);
+    } catch (e) {
+      return null;
+    }
   }
 
   Color _getCategoryColor(String category) {
