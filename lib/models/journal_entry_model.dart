@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class JournalEntry {
   String? id; // Firestore document ID
   String title;
@@ -5,6 +7,8 @@ class JournalEntry {
   String date;
   String time;
   String mood;
+  DateTime? createdAt;
+  DateTime? updatedAt;
 
   JournalEntry({
     this.id,
@@ -13,6 +17,8 @@ class JournalEntry {
     required this.date,
     required this.time,
     this.mood = 'calm',
+    this.createdAt,
+    this.updatedAt,
   });
 
   // Convert to Map for compatibility with existing code
@@ -23,6 +29,8 @@ class JournalEntry {
       'date': date,
       'time': time,
       'mood': mood,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
     };
   }
 
@@ -34,6 +42,8 @@ class JournalEntry {
       'date': date,
       'time': time,
       'mood': mood,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
     };
   }
 
@@ -46,6 +56,8 @@ class JournalEntry {
       date: map['date'] ?? '',
       time: map['time'] ?? '',
       mood: map['mood'] ?? 'calm',
+      createdAt: map['createdAt'] is DateTime ? map['createdAt'] as DateTime : null,
+      updatedAt: map['updatedAt'] is DateTime ? map['updatedAt'] as DateTime : null,
     );
   }
 
@@ -58,6 +70,16 @@ class JournalEntry {
       date: data['date'] ?? '',
       time: data['time'] ?? '',
       mood: data['mood'] ?? 'calm',
+      createdAt: data['createdAt'] is Timestamp
+          ? (data['createdAt'] as Timestamp).toDate()
+          : data['createdAt'] is DateTime
+              ? data['createdAt'] as DateTime
+              : null,
+      updatedAt: data['updatedAt'] is Timestamp
+          ? (data['updatedAt'] as Timestamp).toDate()
+          : data['updatedAt'] is DateTime
+              ? data['updatedAt'] as DateTime
+              : null,
     );
   }
 
@@ -69,6 +91,8 @@ class JournalEntry {
     String? date,
     String? time,
     String? mood,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return JournalEntry(
       id: id ?? this.id,
@@ -77,6 +101,8 @@ class JournalEntry {
       date: date ?? this.date,
       time: time ?? this.time,
       mood: mood ?? this.mood,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

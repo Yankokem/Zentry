@@ -9,6 +9,8 @@ import 'package:zentry/widgets/home/task_card.dart';
 import 'package:zentry/widgets/home/wish_card.dart';
 import 'package:zentry/widgets/home/recent_journal_card.dart';
 import 'package:zentry/widgets/home/calendar_dialog.dart';
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zentry/services/firebase/journal_service.dart';
 import 'package:zentry/models/journal_entry_model.dart';
 import 'package:zentry/models/project_model.dart';
@@ -35,6 +37,9 @@ class _HomePageState extends State<HomePage> {
   final FirestoreService _firestoreService = FirestoreService();
   final JournalService _journalService = JournalService();
 
+  StreamSubscription<List<JournalEntry>>? _journalSubscription;
+  StreamSubscription<User?>? _authSubscription;
+
   String _firstName = '';
   List<Project> _sharedProjects = [];
   List<JournalEntry> _recentJournalEntries = [];
@@ -46,6 +51,42 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _loadUserName();
     _loadData();
+    _subscribeToJournalEntries();
+  }
+
+  void _subscribeToJournalEntries() {
+    // If user is already signed in, subscribe immediately
+    if (_authService.currentUser != null) {
+      _journalSubscription = _journalService.getEntriesStream().listen((entries) {
+        if (!mounted) return;
+        setState(() {
+          _recentJournalEntries = entries.take(1).toList();
+        });
+      }, onError: (err) {
+        debugPrint('Journal stream error: $err');
+      });
+      return;
+    }
+
+    // Otherwise wait for auth state to become available, then subscribe
+    _authSubscription = _authService.authStateChanges.listen((user) {
+      if (user != null) {
+        // Cancel auth listener once we have a user
+        _authSubscription?.cancel();
+        _authSubscription = null;
+
+        _journalSubscription = _journalService.getEntriesStream().listen((entries) {
+          if (!mounted) return;
+          setState(() {
+            _recentJournalEntries = entries.take(1).toList();
+          });
+        }, onError: (err) {
+          debugPrint('Journal stream error: $err');
+        });
+      }
+    }, onError: (err) {
+      debugPrint('Auth state stream error: $err');
+    });
   }
 
   @override
@@ -55,6 +96,13 @@ class _HomePageState extends State<HomePage> {
     if (_isLoading) {
       _loadData();
     }
+  }
+
+  @override
+  void dispose() {
+    _journalSubscription?.cancel();
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadUserName() async {

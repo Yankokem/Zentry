@@ -73,8 +73,9 @@ class JournalService {
         return JournalEntry.fromFirestore(doc.id, data);
       }).toList();
       
-      // Sort by date string (most recent first)
-      entries.sort((a, b) => b.date.compareTo(a.date));
+      // Sort by createdAt timestamp (most recent first). Fallback to epoch if null.
+      final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+      entries.sort((a, b) => (b.createdAt ?? epoch).compareTo(a.createdAt ?? epoch));
       
       return entries;
     });
@@ -96,8 +97,9 @@ class JournalService {
         return JournalEntry.fromFirestore(doc.id, data);
       }).toList();
       
-      // Sort by date string (most recent first)
-      entries.sort((a, b) => b.date.compareTo(a.date));
+      // Sort by createdAt timestamp (most recent first). Fallback to epoch if null.
+      final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+      entries.sort((a, b) => (b.createdAt ?? epoch).compareTo(a.createdAt ?? epoch));
       
       return entries;
     } catch (e) {
