@@ -201,6 +201,72 @@ class FirestoreService {
     }
   }
 
+  // Get user projects as a stream for real-time updates
+  Stream<List<Project>> getUserProjectsStream(String userId, String userEmail) {
+    try {
+      // Combine both owned and shared projects streams
+      return _db
+          .collection(projectsCollection)
+          .where('userId', isEqualTo: userId)
+          .snapshots()
+          .asyncMap((ownedSnapshot) async {
+        // Get shared projects
+        final sharedSnapshot = await _db
+            .collection(projectsCollection)
+            .where('teamMembers', arrayContains: userEmail)
+            .get();
+
+        final allProjects = <Project>[];
+
+        // Add owned projects
+        allProjects.addAll(
+          ownedSnapshot.docs.map((doc) => Project.fromMap(doc.data()))
+        );
+
+        // Add shared projects (avoid duplicates)
+        for (final doc in sharedSnapshot.docs) {
+          final project = Project.fromMap(doc.data());
+          if (!allProjects.any((p) => p.id == project.id)) {
+            allProjects.add(project);
+          }
+        }
+
+        // Calculate actual ticket counts for each project
+        final projectsWithUpdatedCounts = <Project>[];
+        for (final project in allProjects) {
+          try {
+            final ticketsSnapshot = await _db
+                .collection(projectsCollection)
+                .doc(project.id)
+                .collection(ticketsSubcollection)
+                .get();
+
+            final tickets = ticketsSnapshot.docs
+                .map((doc) => Ticket.fromMap(doc.data()))
+                .toList();
+
+            final totalTickets = tickets.length;
+            final completedTickets = tickets.where((ticket) => ticket.status == 'done').length;
+
+            final updatedProject = project.copyWith(
+              totalTickets: totalTickets,
+              completedTickets: completedTickets,
+            );
+
+            projectsWithUpdatedCounts.add(updatedProject);
+          } catch (e) {
+            print('Error fetching tickets for project ${project.id}: $e');
+            projectsWithUpdatedCounts.add(project);
+          }
+        }
+
+        return projectsWithUpdatedCounts;
+      });
+    } catch (e) {
+      throw Exception('Failed to get user projects stream: $e');
+    }
+  }
+
   // Update a project
   Future<void> updateProject(String projectId, Map<String, dynamic> data) async {
     try {

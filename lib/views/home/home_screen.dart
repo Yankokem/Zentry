@@ -27,8 +27,17 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _onNavigateToTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   late final List<Widget> _pages = [
-    HomePage(onNavigateToProjects: _onNavigateToProjects),
+    HomePage(
+      onNavigateToProjects: _onNavigateToProjects,
+      onNavigateToTab: _onNavigateToTab,
+    ),
     ProjectsPage(filterNotifier: _projectsFilterNotifier, initialFilter: 'all'),
     const JournalPage(),
     const WishlistPage(),

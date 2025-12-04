@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:zentry/config/constants.dart';
 import 'package:zentry/controllers/wishlist_controller.dart';
 import 'package:zentry/models/wish_model.dart';
+import 'package:zentry/providers/wishlist_provider.dart';
 import 'package:zentry/services/firebase/user_service.dart';
 import 'add_wishlist_screen.dart';
 
@@ -30,9 +32,8 @@ class _WishlistPageState extends State<WishlistPage> {
       ),
     );
 
-    // Initialize controller
-    _controller = WishlistController();
-    _controller.initialize();
+    // Get controller from provider instead of creating a new one
+    _controller = Provider.of<WishlistProvider>(context, listen: false).controller;
     _loadUserDetails();
   }
 
