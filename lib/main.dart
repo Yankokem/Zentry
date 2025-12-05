@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'config/theme.dart';
-import 'config/routes.dart';
-import 'providers/theme_provider.dart';
-import 'providers/wishlist_provider.dart';
-import 'providers/settings_provider.dart';
-import 'providers/notification_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
+
+import 'core/core.dart';
+import 'firebase_options.dart';
 
 
 void main() async {
