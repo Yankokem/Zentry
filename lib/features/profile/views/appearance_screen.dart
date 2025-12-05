@@ -3,22 +3,22 @@ import 'package:provider/provider.dart';
 
 import 'package:zentry/core/core.dart';
 
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+class AppearanceScreen extends StatefulWidget {
+  const AppearanceScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<AppearanceScreen> createState() => _AppearanceScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _AppearanceScreenState extends State<AppearanceScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
-    final notificationProvider = Provider.of<NotificationProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('Appearance'),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -48,6 +48,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Theme Section
+              Text(
+                'Theme',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[600],
+                    ),
+              ),
+              const SizedBox(height: 16),
+
+              // Dark Mode Toggle
+              _SettingsCard(
+                title: 'Dark Mode',
+                subtitle: themeProvider.isDarkMode
+                    ? 'Using dark theme'
+                    : 'Using light theme',
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          themeProvider.isDarkMode
+                              ? Icons.dark_mode_rounded
+                              : Icons.light_mode_rounded,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          themeProvider.isDarkMode ? 'Dark' : 'Light',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                      ],
+                    ),
+                    Switch(
+                      value: themeProvider.isDarkMode,
+                      onChanged: (value) {
+                        themeProvider.toggleTheme();
+                      },
+                      activeThumbColor: Theme.of(context).primaryColor,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
               // Display Section
               Text(
                 'Display',
@@ -61,7 +108,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // Font Size Setting
               _SettingsCard(
                 title: 'Font Size',
-                subtitle: 'Adjust text size (${settingsProvider.fontSizeLabel})',
+                subtitle:
+                    'Adjust text size (${settingsProvider.fontSizeLabel})',
                 child: Column(
                   children: [
                     Slider(
@@ -79,9 +127,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: SettingsProvider.fontSizeOptions.map((size) {
                         return Text(
                           _getFontSizeLabel(size),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.grey[600],
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.grey[600],
+                                  ),
                         );
                       }).toList(),
                     ),
@@ -113,9 +162,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Text(
                       'Sample Text',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                     ),
                     const SizedBox(height: 12),
                     Text(

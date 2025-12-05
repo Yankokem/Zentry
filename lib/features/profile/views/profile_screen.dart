@@ -85,21 +85,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _editUsername(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit username feature coming soon!')),
-    );
-  }
-
-  // Removed time-based greeting (not used in profile)
-
   @override
   Widget build(BuildContext context) {
-  final themeProvider = Provider.of<ThemeProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text('Settings'),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -142,35 +134,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 24),
 
-            // Username with Edit Icon (show full name)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _fullName.isNotEmpty
-                      ? _fullName
-                      : (_firstName.isNotEmpty ? _firstName : 'User'),
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => _editUsername(context),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.edit,
-                      size: 18,
-                      color: Theme.of(context).primaryColor,
-                    ),
+            // Username (show full name)
+            Text(
+              _fullName.isNotEmpty
+                  ? _fullName
+                  : (_firstName.isNotEmpty ? _firstName : 'User'),
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                ),
-              ],
             ),
 
             const SizedBox(height: 8),
@@ -233,35 +204,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Preferences',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[600],
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Dark Mode Toggle
-                  _ProfileOption(
-                    icon: themeProvider.isDarkMode
-                        ? Icons.dark_mode_rounded
-                        : Icons.light_mode_rounded,
-                    title: 'Dark Mode',
-                    subtitle: themeProvider.isDarkMode
-                        ? 'Switch to light theme'
-                        : 'Switch to dark theme',
-                    trailing: Switch(
-                      value: themeProvider.isDarkMode,
-                      onChanged: (value) {
-                        themeProvider.toggleTheme();
-                      },
-                      activeThumbColor: Theme.of(context).primaryColor,
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Text(
                     'Account',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
@@ -270,13 +212,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Settings
+                  // Account Settings
                   _ProfileOption(
-                    icon: Icons.settings_rounded,
-                    title: 'Settings',
-                    subtitle: 'App preferences and configurations',
+                    icon: Icons.manage_accounts_rounded,
+                    title: 'Account Settings',
+                    subtitle: 'Update your profile and credentials',
                     onTap: () {
-                      Navigator.pushNamed(context, AppRoutes.settings);
+                      Navigator.pushNamed(context, AppRoutes.accountSettings);
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  Text(
+                    'Preferences',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[600],
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Appearance
+                  _ProfileOption(
+                    icon: Icons.palette_rounded,
+                    title: 'Appearance',
+                    subtitle: 'Customize theme and display',
+                    onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.appearance);
                     },
                   ),
 
@@ -291,8 +254,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Navigator.pushNamed(context, AppRoutes.notifications);
                     },
                   ),
-
-
 
                   const SizedBox(height: 16),
 

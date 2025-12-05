@@ -15,7 +15,8 @@ class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   static const String home = '/home';
   static const String profile = '/profile';
-  static const String settings = '/settings';
+  static const String accountSettings = '/account-settings';
+  static const String appearance = '/appearance';
   static const String about = '/about';
   static const String helpSupport = '/help-support';
   static const String adminDashboard = '/admin';
@@ -66,9 +67,14 @@ class AppRoutes {
           builder: (_) => const ProfileScreen(),
         );
 
-      case AppRoutes.settings:
+      case accountSettings:
         return MaterialPageRoute(
-          builder: (_) => const SettingsScreen(),
+          builder: (_) => const AccountSettingsScreen(),
+        );
+
+      case appearance:
+        return MaterialPageRoute(
+          builder: (_) => const AppearanceScreen(),
         );
 
       case about:
