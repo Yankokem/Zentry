@@ -36,6 +36,9 @@ dependencies:
   # Rich Text Editor
   flutter_quill: ^11.5.0
 
+  # Charts
+  fl_chart: ^0.69.0
+
   # Notifications
   firebase_messaging: 16.0.4
   flutter_local_notifications: ^17.2.2

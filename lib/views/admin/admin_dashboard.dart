@@ -47,43 +47,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
               bottom: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.admin_panel_settings_rounded,
-                            color: Color(0xFFF9ED69),
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Admin Dashboard',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E1E1E),
-                            ),
-                          ),
-                        ),
-                      ],
+                    Image.asset(
+                      'assets/images/bgremove.png',
+                      height: 50,
+                      width: 50,
+                      fit: BoxFit.contain,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Manage your application',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: const Color(0xFF1E1E1E).withOpacity(0.7),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Admin Dashboard',
+                        style: TextStyle(
+                          fontSize: 25,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E1E1E),
+                        ),
                       ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.notifications_outlined,
+                        color: Color(0xFF1E1E1E),
+                      ),
+                      onPressed: () {
+                        // TODO: Navigate to notifications
+                      },
                     ),
                   ],
                 ),
