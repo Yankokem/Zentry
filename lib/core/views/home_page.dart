@@ -540,39 +540,6 @@ class _HomePageState extends State<HomePage> {
                               Navigator.pushNamed(context, AppRoutes.notifications);
                             },
                           ),
-                          ValueListenableBuilder<bool>(
-                            valueListenable: AdminMode.enabled,
-                            builder: (context, isAdmin, _) {
-                              return IconButton(
-                                icon: Icon(
-                                  Icons.admin_panel_settings,
-                                  size: 20,
-                                  color: isAdmin
-                                      ? Theme.of(context).colorScheme.secondary
-                                      : const Color(0xFF1E1E1E),
-                                ),
-                                padding: const EdgeInsets.all(8),
-                                constraints: const BoxConstraints(),
-                                tooltip: 'Admin Mode (test)',
-                                onPressed: () {
-                                  AdminMode.toggle();
-                                  final newVal = AdminMode.enabled.value;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(newVal
-                                          ? 'Admin mode enabled (test)'
-                                          : 'Admin mode disabled'),
-                                      duration: const Duration(seconds: 1),
-                                    ),
-                                  );
-                                  if (newVal) {
-                                    Navigator.pushNamed(
-                                        context, AppRoutes.adminDashboard);
-                                  }
-                                },
-                              );
-                            },
-                          ),
                           IconButton(
                             icon: const Icon(Icons.person_outline, size: 20),
                             color: const Color(0xFF1E1E1E),

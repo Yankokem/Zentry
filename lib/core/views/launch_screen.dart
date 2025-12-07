@@ -46,9 +46,25 @@ class _LaunchScreenState extends State<LaunchScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    // Navigate to login after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
+    // Check if user is already logged in and navigate accordingly
+    Future.delayed(const Duration(seconds: 3), () async {
+      if (!mounted) return;
+      
+      final authService = AuthService();
+      final user = authService.currentUser;
+      
+      if (user != null) {
+        // User is logged in, check if admin
+        final adminService = AdminService();
+        final isAdmin = await adminService.isAdmin();
+        
+        if (isAdmin) {
+          Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.home);
+        }
+      } else {
+        // No user logged in, go to login
         Navigator.pushReplacementNamed(context, AppRoutes.login);
       }
     });

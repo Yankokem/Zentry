@@ -89,7 +89,7 @@ class AppRoutes {
 
       case adminDashboard:
         return MaterialPageRoute(
-          builder: (_) => const AdminDashboard(),
+          builder: (_) => AdminGuard(child: const AdminDashboard()),
         );
 
       case tasks:
@@ -109,15 +109,21 @@ class AppRoutes {
 
       case adminBugReportDetails:
         return MaterialPageRoute(
-          builder: (_) => AdminBugReportDetailsPage(report: settings.arguments as Map<String, dynamic>),
+          builder: (_) => AdminGuard(
+            child: AdminBugReportDetailsPage(
+              report: settings.arguments as Map<String, dynamic>,
+            ),
+          ),
         );
 
       case adminAccountAction:
         final args = settings.arguments as Map<String, dynamic>;
         return MaterialPageRoute(
-          builder: (_) => AdminAccountActionPage(
-            user: args['user'] as Map<String, dynamic>,
-            action: args['action'] as String,
+          builder: (_) => AdminGuard(
+            child: AdminAccountActionPage(
+              user: args['user'] as Map<String, dynamic>,
+              action: args['action'] as String,
+            ),
           ),
         );
 

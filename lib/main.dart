@@ -13,6 +13,15 @@ void main() async {
    await Firebase.initializeApp(
      options: DefaultFirebaseOptions.currentPlatform,
    );
+   
+   // Initialize admin account on app startup
+   try {
+     final adminService = AdminService();
+     await adminService.initializeAdminAccount();
+   } catch (e) {
+     debugPrint('Error initializing admin account: $e');
+   }
+   
    runApp(const MyApp());
 }
 

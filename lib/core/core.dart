@@ -12,6 +12,7 @@ export 'services/firebase/user_service.dart';
 export 'services/firebase/firestore_service.dart';
 export 'services/firebase/firestore_utils.dart';
 export 'services/firebase/firebase_config.dart';
+export 'services/firebase/admin_service.dart';
 export 'services/notification_service.dart';
 export 'services/local/storage_service.dart';
 
@@ -32,6 +33,7 @@ export 'widgets/floating_nav_bar.dart';
 export 'widgets/add_menu_widget.dart';
 export 'widgets/stat_card.dart';
 export 'widgets/compact_calendar_widget.dart';
+export 'widgets/admin_guard.dart';
 
 // Providers
 export 'providers/wishlist_provider.dart';

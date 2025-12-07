@@ -36,7 +36,16 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {});
       if (success) {
         if (!mounted) return;
-        Navigator.pushReplacementNamed(context, AppRoutes.home);
+
+        // Check if user is admin and redirect accordingly
+        final adminService = AdminService();
+        final isAdmin = await adminService.isAdmin();
+
+        if (isAdmin) {
+          Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.home);
+        }
       }
     }
   }
@@ -45,8 +54,15 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       bool success = await _googleController.signInWithGoogle();
       if (success && mounted) {
-        // Auto-login: navigate directly to home
-        Navigator.pushReplacementNamed(context, AppRoutes.home);
+        // Check if user is admin and redirect accordingly
+        final adminService = AdminService();
+        final isAdmin = await adminService.isAdmin();
+
+        if (isAdmin) {
+          Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.home);
+        }
       } else if (mounted) {
         // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -103,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const SizedBox(height: 40),
-                        
+
                         // Logo
                         Center(
                           child: Image.asset(
@@ -112,9 +128,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 100,
                           ),
                         ),
-                        
+
                         const SizedBox(height: 32),
-                        
+
                         // Welcome Back
                         const Text(
                           'Zentry',
@@ -134,9 +150,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        
+
                         const SizedBox(height: 40),
-                        
+
                         // Email Field
                         Container(
                           decoration: BoxDecoration(
@@ -156,9 +172,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             decoration: const InputDecoration(
                               hintText: 'Enter your email address',
                               hintStyle: TextStyle(color: Colors.black38),
-                              prefixIcon: Icon(Icons.email_outlined, color: Colors.black),
+                              prefixIcon: Icon(Icons.email_outlined,
+                                  color: Colors.black),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 16),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -171,9 +189,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             },
                           ),
                         ),
-                        
+
                         const SizedBox(height: 16),
-                        
+
                         // Password Field
                         Container(
                           decoration: BoxDecoration(
@@ -193,10 +211,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             decoration: InputDecoration(
                               hintText: 'Enter your password',
                               hintStyle: const TextStyle(color: Colors.black38),
-                              prefixIcon: const Icon(Icons.lock_outline, color: Colors.black),
+                              prefixIcon: const Icon(Icons.lock_outline,
+                                  color: Colors.black),
                               suffixIcon: IconButton(
                                 icon: Icon(
-                                  _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                                  _isPasswordVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
                                   color: Colors.black,
                                 ),
                                 onPressed: () {
@@ -206,22 +227,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                 },
                               ),
                               border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 16),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter your password';
                               }
-                              if (value.length < AppConstants.minPasswordLength) {
+                              if (value.length <
+                                  AppConstants.minPasswordLength) {
                                 return 'Password must be at least ${AppConstants.minPasswordLength} characters';
                               }
                               return null;
                             },
                           ),
                         ),
-                        
+
                         const SizedBox(height: 12),
-                        
+
                         // Error Message
                         if (_controller.errorMessage != null)
                           Container(
@@ -238,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               textAlign: TextAlign.center,
                             ),
                           ),
-                        
+
                         // Login Button
                         Container(
                           height: 56,
@@ -254,7 +277,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           child: ElevatedButton(
-                            onPressed: _controller.isLoading ? null : _handleLogin,
+                            onPressed:
+                                _controller.isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: Colors.black,
@@ -274,9 +298,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                           ),
                         ),
-                        
+
                         const SizedBox(height: 32),
-                        
+
                         // Divider
                         Row(
                           children: [
@@ -304,9 +328,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ],
                         ),
-                        
+
                         const SizedBox(height: 32),
-                        
+
                         // Google Login Button
                         ListenableBuilder(
                           listenable: _googleController,
@@ -364,9 +388,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             );
                           },
                         ),
-                        
+
                         const SizedBox(height: 32),
-                        
+
                         // Sign Up Link
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -399,7 +423,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ],
                         ),
-                        
+
                         const SizedBox(height: 40),
                       ],
                     ),

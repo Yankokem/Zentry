@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:zentry/core/core.dart';
 import 'package:zentry/features/admin/admin.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -10,6 +11,7 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
+  final AuthService _authService = AuthService();
   int _currentIndex = 0;
 
   final List<Widget> _pages = const [
@@ -67,11 +69,42 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                     IconButton(
                       icon: const Icon(
-                        Icons.notifications_outlined,
+                        Icons.logout_rounded,
                         color: Color(0xFF1E1E1E),
                       ),
-                      onPressed: () {
-                        // TODO: Navigate to notifications
+                      tooltip: 'Logout',
+                      onPressed: () async {
+                        final shouldLogout = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Logout'),
+                            content:
+                                const Text('Are you sure you want to logout?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text(
+                                  'Logout',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (shouldLogout == true) {
+                          await _authService.signOut();
+                          if (!mounted) return;
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            AppRoutes.login,
+                            (route) => false,
+                          );
+                        }
                       },
                     ),
                   ],
