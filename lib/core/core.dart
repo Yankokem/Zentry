@@ -34,6 +34,7 @@ export 'widgets/add_menu_widget.dart';
 export 'widgets/stat_card.dart';
 export 'widgets/compact_calendar_widget.dart';
 export 'widgets/admin_guard.dart';
+export 'widgets/skeleton_loader.dart';
 
 // Providers
 export 'providers/wishlist_provider.dart';

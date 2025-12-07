@@ -25,8 +25,8 @@ class Ticket {
     required this.deadline,
     DateTime? createdAt,
     DateTime? updatedAt,
-  }) : createdAt = createdAt ?? DateTime.now(),
-       updatedAt = updatedAt ?? DateTime.now();
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toMap() {
     return {
@@ -55,7 +55,7 @@ class Ticket {
     }
 
     return Ticket(
-      ticketNumber: map['ticketNumber'],
+      ticketNumber: map['ticketNumber'] ?? 'Unknown',
       userId: map['userId'],
       title: map['title'],
       description: map['description'],
@@ -63,7 +63,9 @@ class Ticket {
       status: map['status'],
       assignedTo: assignedTo,
       projectId: map['projectId'],
-      deadline: map['deadline'] != null ? DateTime.parse(map['deadline']) : DateTime.now(),
+      deadline: map['deadline'] != null
+          ? DateTime.parse(map['deadline'])
+          : DateTime.now(),
       createdAt: map['createdAt'] != null
           ? (map['createdAt'] is Timestamp
               ? (map['createdAt'] as Timestamp).toDate()
