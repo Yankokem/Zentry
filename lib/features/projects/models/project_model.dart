@@ -55,6 +55,9 @@ class Project {
   
   bool isMemberPending(String email) =>
       pendingMembers.any((m) => m.email == email);
+  
+  bool isMemberRejected(String email) =>
+      teamMemberDetails.any((m) => m.email == email && m.isRejected);
 
   Project copyWith({
     String? id,

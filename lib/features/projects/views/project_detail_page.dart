@@ -211,6 +211,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
                   // Roles and their members
                   ...widget.project.roles.map((role) {
+                    // Filter out rejected members from the role
+                    final acceptedMembers = role.members.where((email) {
+                      final memberIndex = widget.project.teamMemberDetails
+                          .indexWhere((m) => m.email == email);
+                      if (memberIndex == -1) return false;
+                      return !widget.project.teamMemberDetails[memberIndex].isRejected;
+                    }).toList();
+                    
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -224,17 +232,30 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ...role.members.map((email) {
-                          final details = _userDetails[email] ?? {};
-                          final displayName =
-                              _userService.getDisplayName(details, email);
-                          final profileUrl = details['profilePictureUrl'] ?? '';
-                          return Padding(
+                        if (acceptedMembers.isEmpty)
+                          Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: _buildMemberTile(
-                                displayName, email, profileUrl),
-                          );
-                        }),
+                            child: Text(
+                              'No Members',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          )
+                        else
+                          ...acceptedMembers.map((email) {
+                            final details = _userDetails[email] ?? {};
+                            final displayName =
+                                _userService.getDisplayName(details, email);
+                            final profileUrl = details['profilePictureUrl'] ?? '';
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _buildMemberTile(
+                                  displayName, email, profileUrl),
+                            );
+                          }),
                         const SizedBox(height: 16),
                       ],
                     );
@@ -248,10 +269,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                             .expand((role) => role.members)
                             .toSet();
                         final creatorEmail = currentUser?.email;
-                        final membersWithoutRoles = widget.project.teamMembers
-                            .where((email) =>
-                                email != creatorEmail &&
-                                !membersInRoles.contains(email))
+                        // Only show members from teamMemberDetails that aren't rejected and don't have roles
+                        final membersWithoutRoles = widget.project.teamMemberDetails
+                            .where((member) =>
+                                member.email != creatorEmail &&
+                                !membersInRoles.contains(member.email) &&
+                                !member.isRejected)
+                            .map((member) => member.email)
                             .toList();
 
                         if (membersWithoutRoles.isEmpty)
@@ -287,10 +311,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       },
                     ),
                   ] else ...[
-                    // No roles defined, show all other members
-                    ...widget.project.teamMembers
-                        .where((email) => email != currentUser?.email)
-                        .map((email) {
+                    // No roles defined, show all members from teamMemberDetails (except rejected)
+                    ...widget.project.teamMemberDetails
+                        .where((member) => 
+                            member.email != currentUser?.email &&
+                            !member.isRejected)
+                        .map((member) {
+                      final email = member.email;
                       final details = _userDetails[email] ?? {};
                       final displayName =
                           _userService.getDisplayName(details, email);

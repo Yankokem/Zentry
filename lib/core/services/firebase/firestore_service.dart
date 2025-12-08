@@ -393,10 +393,23 @@ class FirestoreService {
       // Also remove from legacy teamMembers array
       final teamMembers = List<String>.from(projectData['teamMembers'] ?? []);
       teamMembers.remove(userEmail);
+      
+      // Remove the member from all roles they are assigned to
+      final roles = (projectData['roles'] as List?)
+              ?.map((r) => Map<String, dynamic>.from(r as Map))
+              .toList() ??
+          [];
+      
+      for (var role in roles) {
+        final members = List<String>.from(role['members'] ?? []);
+        members.remove(userEmail);
+        role['members'] = members;
+      }
 
       await projectRef.update({
         'teamMembers': teamMembers,
         'teamMemberDetails': teamMemberDetails,
+        'roles': roles,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {

@@ -305,7 +305,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
 
       // Update notification response status in Firebase
-      await _notificationManager.updateNotificationResponse(notification.id, 'accepted');
+      await _notificationManager.updateNotificationResponse(_userId, notification.id, 'accepted');
 
       // Store response status in memory as well
       if (mounted) {
@@ -382,7 +382,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
 
       // Update notification response status in Firebase
-      await _notificationManager.updateNotificationResponse(notification.id, 'rejected');
+      await _notificationManager.updateNotificationResponse(_userId, notification.id, 'rejected');
 
       // Store response status in memory as well
       if (mounted) {
@@ -416,7 +416,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       onDismissed: (direction) async {
-        await _notificationManager.deleteNotification(notification.id);
+        await _notificationManager.deleteNotification(_userId, notification.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -436,7 +436,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child: InkWell(
         onTap: () async {
           if (!notification.isRead) {
-            await _notificationManager.markAsRead(notification.id);
+            await _notificationManager.markAsRead(_userId, notification.id);
           }
           // TODO: Navigate to relevant screen based on notification type
           _handleNotificationTap(notification);

@@ -17,6 +17,7 @@ class NotificationManager {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// Create a notification in Firestore
+  /// Structure: notifications/users/{userId}/notifications/{notificationId}
   Future<void> _createNotification({
     required String userId,
     required String title,
@@ -25,8 +26,11 @@ class NotificationManager {
     Map<String, dynamic>? data,
   }) async {
     try {
-      await _firestore.collection('notifications').add({
-        'userId': userId,
+      await _firestore
+          .collection('notifications')
+          .doc('users')
+          .collection(userId)
+          .add({
         'title': title,
         'body': body,
         'type': type,
@@ -35,19 +39,21 @@ class NotificationManager {
         'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error creating notification: $e');
+      debugPrint('Error creating notification: $e');
     }
   }
 
   /// Mark notification as read
-  Future<void> markAsRead(String notificationId) async {
+  Future<void> markAsRead(String userId, String notificationId) async {
     try {
       await _firestore
           .collection('notifications')
+          .doc('users')
+          .collection(userId)
           .doc(notificationId)
           .update({'isRead': true});
     } catch (e) {
-      print('Error marking notification as read: $e');
+      debugPrint('Error marking notification as read: $e');
     }
   }
 
@@ -57,7 +63,8 @@ class NotificationManager {
       final batch = _firestore.batch();
       final notifications = await _firestore
           .collection('notifications')
-          .where('userId', isEqualTo: userId)
+          .doc('users')
+          .collection(userId)
           .where('isRead', isEqualTo: false)
           .get();
 
@@ -67,16 +74,21 @@ class NotificationManager {
 
       await batch.commit();
     } catch (e) {
-      print('Error marking all notifications as read: $e');
+      debugPrint('Error marking all notifications as read: $e');
     }
   }
 
   /// Delete a notification
-  Future<void> deleteNotification(String notificationId) async {
+  Future<void> deleteNotification(String userId, String notificationId) async {
     try {
-      await _firestore.collection('notifications').doc(notificationId).delete();
+      await _firestore
+          .collection('notifications')
+          .doc('users')
+          .collection(userId)
+          .doc(notificationId)
+          .delete();
     } catch (e) {
-      print('Error deleting notification: $e');
+      debugPrint('Error deleting notification: $e');
     }
   }
 
@@ -84,7 +96,8 @@ class NotificationManager {
   Stream<List<AppNotification>> getNotificationsStream(String userId) {
     return _firestore
         .collection('notifications')
-        .where('userId', isEqualTo: userId)
+        .doc('users')
+        .collection(userId)
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
@@ -93,7 +106,7 @@ class NotificationManager {
         final data = doc.data();
         return AppNotification(
           id: doc.id,
-          userId: data['userId'] ?? '',
+          userId: userId,
           title: data['title'] ?? '',
           body: data['body'] ?? '',
           type: data['type'] ?? 'custom',
@@ -111,16 +124,22 @@ class NotificationManager {
   Stream<int> getUnreadCountStream(String userId) {
     return _firestore
         .collection('notifications')
-        .where('userId', isEqualTo: userId)
+        .doc('users')
+        .collection(userId)
         .where('isRead', isEqualTo: false)
         .snapshots()
         .map((snapshot) => snapshot.docs.length);
   }
 
   /// Update notification response status (accepted/rejected)
-  Future<void> updateNotificationResponse(String notificationId, String status) async {
+  Future<void> updateNotificationResponse(String userId, String notificationId, String status) async {
     try {
-      await _firestore.collection('notifications').doc(notificationId).update({
+      await _firestore
+          .collection('notifications')
+          .doc('users')
+          .collection(userId)
+          .doc(notificationId)
+          .update({
         'responseStatus': status,
         'respondedAt': FieldValue.serverTimestamp(),
       });
@@ -129,6 +148,58 @@ class NotificationManager {
       rethrow;
     }
   }
+
+  // ==================== Admin Notifications ====================
+  // Future implementation for admin notifications
+  // Structure: notifications/admin/{notificationId}
+  // 
+  // Future<void> _createAdminNotification({
+  //   required String title,
+  //   required String body,
+  //   required String type,
+  //   Map<String, dynamic>? data,
+  // }) async {
+  //   try {
+  //     await _firestore
+  //         .collection('notifications')
+  //         .doc('admin')
+  //         .collection('notifications')
+  //         .add({
+  //       'title': title,
+  //       'body': body,
+  //       'type': type,
+  //       'data': data ?? {},
+  //       'isRead': false,
+  //       'createdAt': FieldValue.serverTimestamp(),
+  //     });
+  //   } catch (e) {
+  //     debugPrint('Error creating admin notification: $e');
+  //   }
+  // }
+  //
+  // Future<Stream<List<AppNotification>>> getAdminNotificationsStream() {
+  //   return _firestore
+  //       .collection('notifications')
+  //       .doc('admin')
+  //       .collection('notifications')
+  //       .orderBy('createdAt', descending: true)
+  //       .snapshots()
+  //       .map((snapshot) {
+  //     return snapshot.docs.map((doc) {
+  //       final data = doc.data();
+  //       return AppNotification(
+  //         id: doc.id,
+  //         userId: 'admin',
+  //         title: data['title'] ?? '',
+  //         body: data['body'] ?? '',
+  //         type: data['type'] ?? 'custom',
+  //         data: Map<String, dynamic>.from(data['data'] ?? {}),
+  //         isRead: data['isRead'] ?? false,
+  //         createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+  //       );
+  //     }).toList();
+  //   });
+  // }
 
   // ==================== Notification Triggers ====================
 
