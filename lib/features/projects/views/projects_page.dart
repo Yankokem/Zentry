@@ -466,6 +466,19 @@ class _ProjectsPageState extends State<ProjectsPage> {
           ),
         ],
       ),
+      bottomNavigationBar: Consumer<WishlistProvider>(
+        builder: (context, wishlistProvider, _) {
+          return FloatingNavBar(
+            currentIndex: 2, // Projects is index 2
+            onTap: (index) {
+              if (index == 2) return; // Already on projects
+              Navigator.pushReplacementNamed(context, '/');
+            },
+            wishlistController: wishlistProvider.isInitialized ? wishlistProvider.controller : null,
+          );
+        },
+      ),
+      extendBody: true,
     );
   }
 }

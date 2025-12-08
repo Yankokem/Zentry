@@ -8,15 +8,16 @@ import 'add_wishlist_screen.dart';
 
 class WishlistPage extends StatefulWidget {
   final String? highlightWishId;
+  final String? showModalForWishId;
 
-  const WishlistPage({super.key, this.highlightWishId});
+  const WishlistPage({super.key, this.highlightWishId, this.showModalForWishId});
 
   @override
   State<WishlistPage> createState() => _WishlistPageState();
 }
 
 class _WishlistPageState extends State<WishlistPage> {
-  late WishlistController _controller;
+  WishlistController? _controller;
   String _selectedCategory = 'all';
   final UserService _userService = UserService();
   Map<String, Map<String, String>> _userDetails = {};
@@ -34,20 +35,41 @@ class _WishlistPageState extends State<WishlistPage> {
     );
 
     // Get controller from provider instead of creating a new one
-    _controller =
-        Provider.of<WishlistProvider>(context, listen: false).controller;
-    _loadUserDetails();
+    // Use addPostFrameCallback to ensure provider is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      final provider = Provider.of<WishlistProvider>(context, listen: false);
+      if (provider.isInitialized) {
+        _controller = provider.controller;
+        _loadUserDetails();
+        
+        // Show modal immediately if showModalForWishId is provided
+        if (widget.showModalForWishId != null) {
+          _showModalForWishId(widget.showModalForWishId!);
+        }
+      }
+    });
 
-    // Set up highlight if wish ID was provided
+    // Set up highlight if wish ID was provided (for backward compatibility)
     if (widget.highlightWishId != null) {
       _highlightedWishId = widget.highlightWishId;
+      // Clear highlight after 3 seconds
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _highlightedWishId = null;
+          });
+        }
+      });
     }
   }
 
   Future<void> _loadUserDetails() async {
+    if (_controller == null) return;
     setState(() => _isLoadingUsers = true);
     final allEmails = <String>{};
-    for (final wish in _controller.wishes) {
+    for (final wish in _controller!.wishes) {
       allEmails.addAll(wish.sharedWith);
     }
 
@@ -120,12 +142,13 @@ class _WishlistPageState extends State<WishlistPage> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    // Don't dispose the controller - it's managed by the Provider
     super.dispose();
   }
 
   List<Wish> _getFilteredItems() {
-    final wishes = _controller.wishes;
+    if (_controller == null) return [];
+    final wishes = _controller!.wishes;
     List<Wish> filtered = _selectedCategory == 'all'
         ? wishes
         : wishes.where((item) => item.category == _selectedCategory).toList();
@@ -180,13 +203,25 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   Color _getCategoryColor(String category) {
-    return _controller.getCategoryColor(category);
+    return _controller?.getCategoryColor(category) ?? Colors.grey;
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading indicator if controller is not yet initialized
+    if (_controller == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF9ED69),
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1E1E1E)),
+          ),
+        ),
+      );
+    }
+
     return AnimatedBuilder(
-      animation: _controller,
+      animation: _controller!,
       builder: (context, _) {
         final filteredItems = _getFilteredItems();
 
@@ -251,7 +286,7 @@ class _WishlistPageState extends State<WishlistPage> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
-                                '${_controller.completedCount}/${_controller.totalCount} items',
+                                '${_controller!.completedCount}/${_controller!.totalCount} items',
                                 style: const TextStyle(
                                   color: Color(0xFFF9ED69),
                                   fontWeight: FontWeight.bold,
@@ -268,7 +303,7 @@ class _WishlistPageState extends State<WishlistPage> {
                             children: [
                               _buildCategoryChip('all', 'All'),
                               const SizedBox(width: 8),
-                              ..._controller.categories.map((category) {
+                              ..._controller!.categories.map((category) {
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8.0),
                                   child: _buildCategoryChip(
@@ -302,6 +337,19 @@ class _WishlistPageState extends State<WishlistPage> {
               ),
             ],
           ),
+          bottomNavigationBar: Consumer<WishlistProvider>(
+            builder: (context, wishlistProvider, _) {
+              return FloatingNavBar(
+                currentIndex: 1, // Wishlist is index 1
+                onTap: (index) {
+                  if (index == 1) return; // Already on wishlist
+                  Navigator.pushReplacementNamed(context, '/');
+                },
+                wishlistController: wishlistProvider.isInitialized ? wishlistProvider.controller : null,
+              );
+            },
+          ),
+          extendBody: true,
         );
       },
     );
@@ -338,96 +386,195 @@ class _WishlistPageState extends State<WishlistPage> {
     final isCompleted = item.completed;
     final isHighlighted = _highlightedWishId == item.id;
 
-    return Card(
-      elevation: 2,
-      color: isCompleted ? Colors.grey[100] : Colors.white,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 500),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isHighlighted ? color.withOpacity(0.15) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isHighlighted 
+              ? color.withOpacity(0.8)
+              : (isCompleted ? Colors.green : color.withOpacity(0.3)),
+          width: isHighlighted ? 3 : 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isHighlighted 
+                ? color.withOpacity(0.3)
+                : (isCompleted ? Colors.green : color).withOpacity(0.1),
+            blurRadius: isHighlighted ? 12 : 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: InkWell(
         onTap: () => _showItemDetails(item),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: color,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              decoration: isCompleted
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                          ),
-                        ),
-                      ],
+              Row(
+                children: [
+                  // Checkbox on the left
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: isCompleted
+                          ? Colors.green.withOpacity(0.1)
+                          : color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(height: 4),
-                    if (item.notes.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 12),
-                        child: Text(
-                          item.notes,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                            decoration: isCompleted
-                                ? TextDecoration.lineThrough
-                                : null,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) {
-                  switch (value) {
-                    case 'edit':
-                      _showEditDialog(item);
-                      break;
-                    case 'delete':
-                      _confirmDelete(item);
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
+                    child: Icon(
+                      isCompleted ? Icons.check_circle : Icons.circle_outlined,
+                      color: isCompleted ? Colors.green : color,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.edit, size: 20),
-                        SizedBox(width: 8),
-                        Text('Edit'),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                item.title,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF1E1E1E),
+                                  decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isCompleted)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.check, size: 12, color: Colors.green),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Acquired',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade600),
+                            const SizedBox(width: 4),
+                            Text(
+                              item.dateAdded,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(Icons.attach_money, size: 12, color: Colors.grey.shade600),
+                            const SizedBox(width: 4),
+                            Text(
+                              '\$${item.price}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 20, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
+                  IconButton(
+                    icon: const Icon(Icons.more_vert, size: 20),
+                    color: Colors.grey.shade600,
+                    onPressed: () => _showOptionsMenu(item),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                item.notes,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
+                  height: 1.4,
+                  decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (isCompleted ? Colors.green : color).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      item.category.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: (isCompleted ? Colors.green : color).withOpacity(0.8),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () async {
+                      if (_controller != null) {
+                        await _controller!.toggleCompleted(item);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isCompleted ? Colors.grey.shade300 : Colors.green,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isCompleted ? Icons.close : Icons.check,
+                            size: 12,
+                            color: isCompleted ? Colors.grey.shade600 : Colors.white,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isCompleted ? 'Not Acquired' : 'Mark Acquired',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isCompleted ? Colors.grey.shade600 : Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -467,6 +614,23 @@ class _WishlistPageState extends State<WishlistPage> {
         ],
       ),
     );
+  }
+
+  void _showModalForWishId(String wishId) {
+    if (_controller == null) return;
+    
+    // Find the wish item by ID
+    final wish = _controller!.wishes.firstWhere(
+      (w) => w.id == wishId,
+      orElse: () => _controller!.wishes.first, // Fallback to first item if not found
+    );
+    
+    // Small delay to ensure the page is fully built before showing modal
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _showItemDetails(wish);
+      }
+    });
   }
 
   void _showItemDetails(Wish item) async {
@@ -627,7 +791,7 @@ class _WishlistPageState extends State<WishlistPage> {
                             value: isCompleted,
                             onChanged: (value) async {
                               final success =
-                                  await _controller.toggleCompleted(item);
+                                  await _controller!.toggleCompleted(item);
                               if (success && mounted) {
                                 Navigator.pop(context);
                               }
@@ -822,7 +986,7 @@ class _WishlistPageState extends State<WishlistPage> {
                   isCompleted ? 'Mark as Not Acquired' : 'Mark as Acquired'),
               onTap: () async {
                 Navigator.pop(context);
-                final success = await _controller.toggleCompleted(item);
+                final success = await _controller!.toggleCompleted(item);
                 if (success && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -873,7 +1037,7 @@ class _WishlistPageState extends State<WishlistPage> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await _controller.deleteWish(item);
+              final success = await _controller!.deleteWish(item);
               if (success && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Item deleted')),
@@ -895,7 +1059,7 @@ class _WishlistPageState extends State<WishlistPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddWishlistScreen(controller: _controller),
+        builder: (context) => AddWishlistScreen(controller: _controller!),
       ),
     );
   }
@@ -905,7 +1069,7 @@ class _WishlistPageState extends State<WishlistPage> {
       context,
       MaterialPageRoute(
         builder: (context) => AddWishlistScreen(
-          controller: _controller,
+          controller: _controller!,
           itemToEdit: item,
         ),
       ),
@@ -1024,7 +1188,7 @@ class _WishlistPageState extends State<WishlistPage> {
                     final String label = name;
                     final String nameLower = name.toLowerCase();
 
-                    final success = await _controller.createCategory(
+                    final success = await _controller!.createCategory(
                       nameLower,
                       label,
                       selectedColor.value

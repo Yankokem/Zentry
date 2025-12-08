@@ -436,18 +436,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
       case 'wishlist_invitation':
       case 'wishlist_update':
-        // Navigate to wishlist page with highlighted item
+        // Navigate to wishlist page and show modal immediately
         final wishlistId = notification.data['wishlistId'];
         if (wishlistId != null && mounted) {
-          // Navigate to wishlist page with highlight
+          // Navigate to wishlist page with modal popup
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => WishlistPage(highlightWishId: wishlistId),
+              builder: (_) => WishlistPage(showModalForWishId: wishlistId),
             ),
           );
         } else if (mounted) {
-          // Navigate to wishlist page without highlight
+          // Navigate to wishlist page without modal
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const WishlistPage()),
@@ -456,7 +456,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         break;
 
       case 'wishlist_removal':
-        // Just navigate to wishlist page
+        // Just navigate to wishlist page without any modal
         if (mounted) {
           Navigator.push(
             context,
