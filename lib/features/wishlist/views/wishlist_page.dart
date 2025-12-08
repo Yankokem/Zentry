@@ -7,7 +7,9 @@ import 'package:zentry/features/wishlist/wishlist.dart';
 import 'add_wishlist_screen.dart';
 
 class WishlistPage extends StatefulWidget {
-  const WishlistPage({super.key});
+  final String? highlightWishId;
+
+  const WishlistPage({super.key, this.highlightWishId});
 
   @override
   State<WishlistPage> createState() => _WishlistPageState();
@@ -19,6 +21,7 @@ class _WishlistPageState extends State<WishlistPage> {
   final UserService _userService = UserService();
   Map<String, Map<String, String>> _userDetails = {};
   bool _isLoadingUsers = true;
+  String? _highlightedWishId;
 
   @override
   void initState() {
@@ -31,8 +34,14 @@ class _WishlistPageState extends State<WishlistPage> {
     );
 
     // Get controller from provider instead of creating a new one
-    _controller = Provider.of<WishlistProvider>(context, listen: false).controller;
+    _controller =
+        Provider.of<WishlistProvider>(context, listen: false).controller;
     _loadUserDetails();
+
+    // Set up highlight if wish ID was provided
+    if (widget.highlightWishId != null) {
+      _highlightedWishId = widget.highlightWishId;
+    }
   }
 
   Future<void> _loadUserDetails() async {
@@ -63,14 +72,16 @@ class _WishlistPageState extends State<WishlistPage> {
 
   List<Widget> _buildSharedWithAvatarStack(List<String> sharedWith) {
     final avatarWidgets = <Widget>[];
-    
+
     for (int i = 0; i < sharedWith.length; i++) {
       final email = sharedWith[i];
       final details = _userDetails[email] ?? {};
       final fullName = details['fullName'] ?? '';
-      final displayName = fullName.isNotEmpty ? fullName : _userService.getDisplayName(details, email);
+      final displayName = fullName.isNotEmpty
+          ? fullName
+          : _userService.getDisplayName(details, email);
       final profileUrl = details['profilePictureUrl'] ?? '';
-      
+
       avatarWidgets.add(
         Positioned(
           left: i * 22.0,
@@ -83,9 +94,8 @@ class _WishlistPageState extends State<WishlistPage> {
               ),
               child: CircleAvatar(
                 radius: 16,
-                backgroundImage: profileUrl.isNotEmpty
-                    ? NetworkImage(profileUrl)
-                    : null,
+                backgroundImage:
+                    profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
                 backgroundColor: Colors.grey.shade300,
                 child: profileUrl.isEmpty
                     ? Text(
@@ -104,7 +114,7 @@ class _WishlistPageState extends State<WishlistPage> {
         ),
       );
     }
-    
+
     return avatarWidgets;
   }
 
@@ -140,8 +150,18 @@ class _WishlistPageState extends State<WishlistPage> {
     try {
       // Expected format: "Jan 1, 2023"
       final months = {
-        'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-        'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+        'Jan': 1,
+        'Feb': 2,
+        'Mar': 3,
+        'Apr': 4,
+        'May': 5,
+        'Jun': 6,
+        'Jul': 7,
+        'Aug': 8,
+        'Sep': 9,
+        'Oct': 10,
+        'Nov': 11,
+        'Dec': 12
       };
 
       final parts = dateString.split(' ');
@@ -174,104 +194,114 @@ class _WishlistPageState extends State<WishlistPage> {
           backgroundColor: const Color(0xFFF9ED69),
           body: Column(
             children: [
-          // Header - EXACTLY like journal
-          Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              color: Color(0xFFF9ED69),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.all(AppConstants.paddingLarge),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Header - EXACTLY like journal
+              Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF9ED69),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppConstants.paddingLarge),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox.shrink(),
-                        IconButton(
-                          icon: const Icon(Icons.add),
-                          color: const Color(0xFF1E1E1E),
-                          onPressed: _showAddDialog,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const SizedBox.shrink(),
+                            IconButton(
+                              icon: const Icon(Icons.add),
+                              color: const Color(0xFF1E1E1E),
+                              onPressed: _showAddDialog,
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'My Wishlist',
+                          style: Theme.of(context)
+                              .textTheme
+                              .displaySmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF1E1E1E),
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Things I want to get',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: const Color(0xFF1E1E1E)
+                                          .withOpacity(0.7),
+                                    ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E1E1E),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${_controller.completedCount}/${_controller.totalCount} items',
+                                style: const TextStyle(
+                                  color: Color(0xFFF9ED69),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildCategoryChip('all', 'All'),
+                              const SizedBox(width: 8),
+                              ..._controller.categories.map((category) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: _buildCategoryChip(
+                                      category.name, category.label),
+                                );
+                              }),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                    Text(
-                      'My Wishlist',
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1E1E1E),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Things I want to get',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFF1E1E1E).withOpacity(0.7),
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '${_controller.completedCount}/${_controller.totalCount} items',
-                            style: const TextStyle(
-                              color: Color(0xFFF9ED69),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildCategoryChip('all', 'All'),
-                          const SizedBox(width: 8),
-                          ..._controller.categories.map((category) {
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: _buildCategoryChip(category.name, category.label),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
 
-          // Items list
-          Expanded(
-            child: Container(
-              color: Colors.grey.shade100,
-              child: filteredItems.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                      itemCount: filteredItems.length,
-                      itemBuilder: (context, index) {
-                        return _buildWishCard(filteredItems[index]);
-                      },
-                    ),
-            ),
+              // Items list
+              Expanded(
+                child: Container(
+                  color: Colors.grey.shade100,
+                  child: filteredItems.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          padding:
+                              const EdgeInsets.all(AppConstants.paddingMedium),
+                          itemCount: filteredItems.length,
+                          itemBuilder: (context, index) {
+                            return _buildWishCard(filteredItems[index]);
+                          },
+                        ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
         );
       },
     );
@@ -306,226 +336,98 @@ class _WishlistPageState extends State<WishlistPage> {
   Widget _buildWishCard(Wish item) {
     final color = _getCategoryColor(item.category);
     final isCompleted = item.completed;
+    final isHighlighted = _highlightedWishId == item.id;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isCompleted ? Colors.green : color.withOpacity(0.3),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: (isCompleted ? Colors.green : color).withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return Card(
+      elevation: 2,
+      color: isCompleted ? Colors.grey[100] : Colors.white,
       child: InkWell(
         onTap: () => _showItemDetails(item),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
             children: [
-              Row(
-                children: [
-                  // Checkbox on the left like the image - NOW FUNCTIONAL!
-                  GestureDetector(
-                    onTap: () async {
-                      await _controller.toggleCompleted(item);
-                    },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: isCompleted
-                            ? Colors.green.withOpacity(0.1)
-                            : _getCategoryColor(item.category).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        isCompleted ? Icons.check_circle : Icons.circle_outlined,
-                        color: isCompleted ? Colors.green : _getCategoryColor(item.category),
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item.title,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF1E1E1E),
-                                  decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (isCompleted)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.check, size: 12, color: Colors.green),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Acquired',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
+                        Container(
+                          width: 4,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade600),
-                            const SizedBox(width: 4),
-                            Text(
-                              item.dateAdded,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              decoration: isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
-                            const SizedBox(width: 12),
-                            Icon(Icons.attach_money, size: 12, color: Colors.grey.shade600),
-                            const SizedBox(width: 4),
-                            Text(
-                              '₱${item.price}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  PopupMenuButton<String>(
-                    padding: EdgeInsets.zero,
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        _showEditDialog(item);
-                      } else if (value == 'delete') {
-                        _confirmDelete(item);
-                      }
-                    },
-                    itemBuilder: (BuildContext context) => [
-                      const PopupMenuItem<String>(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, size: 18),
-                            SizedBox(width: 8),
-                            Text('Edit'),
-                          ],
+                    const SizedBox(height: 4),
+                    if (item.notes.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12),
+                        child: Text(
+                          item.notes,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            decoration: isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const PopupMenuItem<String>(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, size: 18),
-                            SizedBox(width: 8),
-                            Text('Delete'),
-                          ],
-                        ),
-                      ),
-                    ],
-                    icon: const Icon(Icons.more_vert, size: 20),
-                    tooltip: 'More options',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                item.notes,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade700,
-                  height: 1.4,
-                  decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+                  ],
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: (isCompleted ? Colors.green : color).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      item.category.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: (isCompleted ? Colors.green : color).withOpacity(0.8),
-                      ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'edit':
+                      _showEditDialog(item);
+                      break;
+                    case 'delete':
+                      _confirmDelete(item);
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 20),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
                     ),
                   ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () async {
-                      final success = await _controller.toggleCompleted(item);
-                      if (success && mounted) {
-                        setState(() {});
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isCompleted ? Colors.grey.shade300 : Colors.green,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isCompleted ? Icons.close : Icons.check,
-                            size: 12,
-                            color: isCompleted ? Colors.grey.shade600 : Colors.white,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isCompleted ? 'Not Acquired' : 'Mark Acquired',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: isCompleted ? Colors.grey.shade600 : Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 20, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
                     ),
                   ),
                 ],
@@ -536,6 +438,7 @@ class _WishlistPageState extends State<WishlistPage> {
       ),
     );
   }
+
 
   Widget _buildEmptyState() {
     return Center(
@@ -602,7 +505,8 @@ class _WishlistPageState extends State<WishlistPage> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: (isCompleted ? Colors.green : color).withOpacity(0.2),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
                 children: [
@@ -615,7 +519,9 @@ class _WishlistPageState extends State<WishlistPage> {
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+                            decoration: isCompleted
+                                ? TextDecoration.lineThrough
+                                : TextDecoration.none,
                           ),
                         ),
                       ),
@@ -629,9 +535,11 @@ class _WishlistPageState extends State<WishlistPage> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: (isCompleted ? Colors.green : color).withOpacity(0.3),
+                          color: (isCompleted ? Colors.green : color)
+                              .withOpacity(0.3),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -639,12 +547,14 @@ class _WishlistPageState extends State<WishlistPage> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: (isCompleted ? Colors.green : color).withOpacity(0.9),
+                            color: (isCompleted ? Colors.green : color)
+                                .withOpacity(0.9),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                      Icon(Icons.calendar_today,
+                          size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
                         item.dateAdded,
@@ -654,7 +564,8 @@ class _WishlistPageState extends State<WishlistPage> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Icon(Icons.attach_money, size: 14, color: Colors.grey.shade600),
+                      Icon(Icons.attach_money,
+                          size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
                         '₱${item.price}',
@@ -689,17 +600,21 @@ class _WishlistPageState extends State<WishlistPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  isCompleted ? 'Item Acquired' : 'Mark as Acquired',
+                                  isCompleted
+                                      ? 'Item Acquired'
+                                      : 'Mark as Acquired',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color: isCompleted ? Colors.green : Colors.grey.shade800,
+                                    color: isCompleted
+                                        ? Colors.green
+                                        : Colors.grey.shade800,
                                   ),
                                 ),
                                 Text(
                                   isCompleted
-                                    ? 'You have this item in your collection'
-                                    : 'Tap to mark this item as acquired',
+                                      ? 'You have this item in your collection'
+                                      : 'Tap to mark this item as acquired',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey.shade600,
@@ -711,7 +626,8 @@ class _WishlistPageState extends State<WishlistPage> {
                           Switch(
                             value: isCompleted,
                             onChanged: (value) async {
-                              final success = await _controller.toggleCompleted(item);
+                              final success =
+                                  await _controller.toggleCompleted(item);
                               if (success && mounted) {
                                 Navigator.pop(context);
                               }
@@ -725,24 +641,29 @@ class _WishlistPageState extends State<WishlistPage> {
                     if (item.sharedWith.isNotEmpty) ...[
                       Text(
                         'Shared With',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                       ),
                       const SizedBox(height: 8),
                       SizedBox(
                         height: 32,
-                        width: _calculateSharedWithStackWidth(item.sharedWith.length),
+                        width: _calculateSharedWithStackWidth(
+                            item.sharedWith.length),
                         child: Stack(
                           clipBehavior: Clip.none,
-                          children: item.sharedWith.asMap().entries.map((entry) {
+                          children:
+                              item.sharedWith.asMap().entries.map((entry) {
                             final i = entry.key;
                             final email = entry.value;
                             final details = _userDetails[email] ?? {};
                             final fullName = details['fullName'] ?? '';
-                            final displayName = fullName.isNotEmpty ? fullName : email;
-                            final profileUrl = details['profilePictureUrl'] ?? '';
-                            
+                            final displayName =
+                                fullName.isNotEmpty ? fullName : email;
+                            final profileUrl =
+                                details['profilePictureUrl'] ?? '';
+
                             return Positioned(
                               left: i * 22.0,
                               child: GestureDetector(
@@ -762,7 +683,8 @@ class _WishlistPageState extends State<WishlistPage> {
                                   child: Container(
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 2),
+                                      border: Border.all(
+                                          color: Colors.white, width: 2),
                                     ),
                                     child: CircleAvatar(
                                       radius: 18,
@@ -794,8 +716,8 @@ class _WishlistPageState extends State<WishlistPage> {
                     Text(
                       'Notes',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -804,7 +726,9 @@ class _WishlistPageState extends State<WishlistPage> {
                         fontSize: 16,
                         height: 1.6,
                         color: Colors.grey.shade800,
-                        decoration: isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+                        decoration: isCompleted
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
                       ),
                     ),
                   ],
@@ -894,15 +818,19 @@ class _WishlistPageState extends State<WishlistPage> {
                 isCompleted ? Icons.radio_button_unchecked : Icons.check_circle,
                 color: isCompleted ? Colors.orange : Colors.green,
               ),
-              title: Text(isCompleted ? 'Mark as Not Acquired' : 'Mark as Acquired'),
+              title: Text(
+                  isCompleted ? 'Mark as Not Acquired' : 'Mark as Acquired'),
               onTap: () async {
                 Navigator.pop(context);
                 final success = await _controller.toggleCompleted(item);
                 if (success && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(isCompleted ? 'Item marked as not acquired' : 'Item marked as acquired!'),
-                      backgroundColor: isCompleted ? Colors.orange : Colors.green,
+                      content: Text(isCompleted
+                          ? 'Item marked as not acquired'
+                          : 'Item marked as acquired!'),
+                      backgroundColor:
+                          isCompleted ? Colors.orange : Colors.green,
                     ),
                   );
                 }
@@ -983,6 +911,7 @@ class _WishlistPageState extends State<WishlistPage> {
       ),
     );
   }
+
   void _showAddCategoryDialog() {
     final nameController = TextEditingController();
     Color selectedColor = Colors.blue;
@@ -1058,12 +987,15 @@ class _WishlistPageState extends State<WishlistPage> {
                               color: color,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: isSelected ? Colors.black : Colors.grey.shade300,
+                                color: isSelected
+                                    ? Colors.black
+                                    : Colors.grey.shade300,
                                 width: isSelected ? 3 : 1,
                               ),
                             ),
                             child: isSelected
-                                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                ? const Icon(Icons.check,
+                                    color: Colors.white, size: 20)
                                 : null,
                           ),
                         );
@@ -1095,7 +1027,10 @@ class _WishlistPageState extends State<WishlistPage> {
                     final success = await _controller.createCategory(
                       nameLower,
                       label,
-                      selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase(),
+                      selectedColor.value
+                          .toRadixString(16)
+                          .padLeft(8, '0')
+                          .toUpperCase(),
                     );
 
                     if (success && mounted) {
@@ -1128,11 +1063,20 @@ class _WishlistPageState extends State<WishlistPage> {
 
   String _getCurrentDate() {
     final now = DateTime.now();
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
   }
 }
-
-
-
-

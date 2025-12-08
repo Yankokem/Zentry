@@ -1,7 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:zentry/core/core.dart';
+import 'package:zentry/core/services/firebase/notification_manager.dart';
 import 'package:zentry/features/projects/projects.dart';
 
 class AddProjectPage extends StatefulWidget {
@@ -28,8 +30,19 @@ class _AddProjectPageState extends State<AddProjectPage> {
   List<ProjectRole> _roles = [];
   String? _selectedRoleForAssignment;
 
-  final List<String> _statusOptions = ['Planning', 'In Progress', 'Completed', 'On Hold'];
-  final List<String> _colorOptions = ['yellow', 'blue', 'green', 'purple', 'red'];
+  final List<String> _statusOptions = [
+    'Planning',
+    'In Progress',
+    'Completed',
+    'On Hold'
+  ];
+  final List<String> _colorOptions = [
+    'yellow',
+    'blue',
+    'green',
+    'purple',
+    'red'
+  ];
   final List<String> _typeOptions = ['workspace', 'personal'];
 
   final ProjectManager _projectManager = ProjectManager();
@@ -138,7 +151,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
       final suggestions = await _userService.searchUsers(query);
       if (mounted) {
         setState(() {
-          _suggestedEmails = suggestions.where((email) => !_teamMembers.contains(email)).toList();
+          _suggestedEmails = suggestions
+              .where((email) => !_teamMembers.contains(email))
+              .toList();
           _isSearching = false;
         });
       }
@@ -176,7 +191,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
       _newMemberController.clear();
       _suggestedEmails.clear();
     });
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -208,7 +223,8 @@ class _AddProjectPageState extends State<AddProjectPage> {
     }
 
     // Check if role already exists
-    if (_roles.any((role) => role.name.toLowerCase() == roleName.toLowerCase())) {
+    if (_roles
+        .any((role) => role.name.toLowerCase() == roleName.toLowerCase())) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('This role already exists'),
@@ -267,7 +283,8 @@ class _AddProjectPageState extends State<AddProjectPage> {
     final roleIndex = _roles.indexWhere((role) => role.name == roleName);
     if (roleIndex != -1) {
       setState(() {
-        final updatedMembers = _roles[roleIndex].members.where((m) => m != member).toList();
+        final updatedMembers =
+            _roles[roleIndex].members.where((m) => m != member).toList();
         _roles[roleIndex] = _roles[roleIndex].copyWith(members: updatedMembers);
       });
     }
@@ -292,7 +309,16 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
   void _saveProject() async {
     if (_formKey.currentState!.validate()) {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
       if (widget.projectToEdit != null) {
+        // Track which members were added/removed
+        final oldMembers = widget.projectToEdit!.teamMembers.toSet();
+        final newMembers = _teamMembers.toSet();
+        final addedMembers = newMembers.difference(oldMembers);
+        final removedMembers = oldMembers.difference(newMembers);
+
         // Update existing project
         final updatedProject = widget.projectToEdit!.copyWith(
           title: _titleController.text.trim(),
@@ -303,6 +329,138 @@ class _AddProjectPageState extends State<AddProjectPage> {
           roles: _roles,
         );
         await _projectManager.updateProject(updatedProject);
+
+        // Send notifications for added members
+        if (addedMembers.isNotEmpty) {
+          try {
+            final currentUserData =
+                await _firestoreService.getUserData(currentUser.uid);
+            final currentUserName =
+                currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
+
+            for (final memberEmail in addedMembers) {
+              if (memberEmail != currentUser.email) {
+                final memberDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: memberEmail)
+                    .limit(1)
+                    .get();
+
+                if (memberDoc.docs.isNotEmpty) {
+                  final memberId = memberDoc.docs.first.id;
+                  await NotificationManager().notifyProjectInvitation(
+                    recipientUserId: memberId,
+                    projectTitle: _titleController.text.trim(),
+                    projectId: widget.projectToEdit!.id,
+                    inviterName: currentUserName,
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            print('Error sending project invitation notifications: $e');
+          }
+        }
+
+        // Send notifications for removed members
+        if (removedMembers.isNotEmpty) {
+          try {
+            final currentUserData =
+                await _firestoreService.getUserData(currentUser.uid);
+            final currentUserName =
+                currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
+
+            for (final memberEmail in removedMembers) {
+              if (memberEmail != currentUser.email) {
+                final memberDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: memberEmail)
+                    .limit(1)
+                    .get();
+
+                if (memberDoc.docs.isNotEmpty) {
+                  final memberId = memberDoc.docs.first.id;
+                  await NotificationManager().notifyProjectRemoval(
+                    recipientUserId: memberId,
+                    projectTitle: widget.projectToEdit!.title,
+                    projectId: widget.projectToEdit!.id,
+                    removerName: currentUserName,
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            print('Error sending project removal notifications: $e');
+          }
+        }
+
+        // Check for status change and notify team members
+        if (widget.projectToEdit!.status != _selectedStatus) {
+          try {
+            final currentUserData =
+                await _firestoreService.getUserData(currentUser.uid);
+            final currentUserName =
+                currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
+
+            for (final memberEmail in _teamMembers) {
+              if (memberEmail != currentUser.email) {
+                final memberDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: memberEmail)
+                    .limit(1)
+                    .get();
+
+                if (memberDoc.docs.isNotEmpty) {
+                  final memberId = memberDoc.docs.first.id;
+                  await NotificationManager().notifyProjectStatusChanged(
+                    recipientUserId: memberId,
+                    projectTitle: _titleController.text.trim(),
+                    projectId: widget.projectToEdit!.id,
+                    newStatus: _selectedStatus,
+                    changedByName: currentUserName,
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            print('Error sending project status change notifications: $e');
+          }
+        }
+
+        // Check for project milestone
+        if (_selectedStatus == 'Completed') {
+          try {
+            final project = await _firestoreService
+                .getProjectById(widget.projectToEdit!.id);
+            if (project != null && project.totalTickets > 0) {
+              final percentage =
+                  (project.completedTickets / project.totalTickets * 100)
+                      .round();
+
+              // Notify all team members about completion
+              for (final memberEmail in _teamMembers) {
+                final memberDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: memberEmail)
+                    .limit(1)
+                    .get();
+
+                if (memberDoc.docs.isNotEmpty) {
+                  final memberId = memberDoc.docs.first.id;
+                  await NotificationManager().notifyProjectMilestone(
+                    userId: memberId,
+                    projectTitle: _titleController.text.trim(),
+                    projectId: widget.projectToEdit!.id,
+                    milestoneType: 'completed',
+                    percentage: 100,
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            print('Error sending project milestone notifications: $e');
+          }
+        }
       } else {
         // Create new project
         final newProject = Project(
@@ -319,6 +477,38 @@ class _AddProjectPageState extends State<AddProjectPage> {
           roles: _roles,
         );
         await _projectManager.addProject(newProject);
+
+        // Send project invitation notifications to all team members except creator
+        if (_teamMembers.length > 1) {
+          try {
+            final currentUserData =
+                await _firestoreService.getUserData(currentUser.uid);
+            final currentUserName =
+                currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
+
+            for (final memberEmail in _teamMembers) {
+              if (memberEmail != currentUser.email) {
+                final memberDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: memberEmail)
+                    .limit(1)
+                    .get();
+
+                if (memberDoc.docs.isNotEmpty) {
+                  final memberId = memberDoc.docs.first.id;
+                  await NotificationManager().notifyProjectInvitation(
+                    recipientUserId: memberId,
+                    projectTitle: _titleController.text.trim(),
+                    projectId: newProject.id,
+                    inviterName: currentUserName,
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            print('Error sending project invitation notifications: $e');
+          }
+        }
       }
       Navigator.pop(context);
     }
@@ -349,173 +539,180 @@ class _AddProjectPageState extends State<AddProjectPage> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-              // Title Field
-              Row(
-                children: [
-                  Icon(Icons.title, color: Colors.grey.shade600),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Project Title',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _titleController,
-                decoration: InputDecoration(
-                  hintText: 'Enter project title',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a project title';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-
-              // Description Field
-              Row(
-                children: [
-                  Icon(Icons.description, color: Colors.grey.shade600),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Description',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _descriptionController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Enter project description',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a project description';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-
-              // Project Type Dropdown
-              Row(
-                children: [
-                  Icon(Icons.category, color: Colors.grey.shade600),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Project Type',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (widget.projectToEdit != null)
-                // Disabled state - show as a read-only container
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _selectedType == 'workspace' ? Icons.business : Icons.person,
-                        color: _selectedType == 'workspace' ? Colors.blue : Colors.orange,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        _selectedType.capitalize(),
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.grey.shade700,
+            // Title Field
+            Row(
+              children: [
+                Icon(Icons.title, color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Project Title',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        Icons.lock,
-                        size: 16,
-                        color: Colors.grey.shade400,
-                      ),
-                    ],
-                  ),
-                )
-              else
-                // Editable dropdown
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                  ),
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _selectedType,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                    ),
-                    items: _typeOptions.map((type) {
-                      final isWorkspace = type == 'workspace';
-                      final color = isWorkspace ? Colors.blue : Colors.orange;
-                      return DropdownMenuItem(
-                        value: type,
-                        child: Row(
-                          children: [
-                            Icon(
-                              isWorkspace ? Icons.business : Icons.person,
-                              color: color,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(type.capitalize()),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedType = value!;
-                        // Clear team members if switching to personal
-                        if (_selectedType == 'personal') {
-                          final currentUserEmail = FirebaseAuth.instance.currentUser?.email;
-                          _teamMembers = currentUserEmail != null ? [currentUserEmail] : [];
-                        }
-                      });
-                    },
                   ),
                 ),
-              const SizedBox(height: 32),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _titleController,
+              decoration: InputDecoration(
+                hintText: 'Enter project title',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter a project title';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 32),
 
-              // Team Members Field (only show for workspace)
-              if (_selectedType == 'workspace') ...[
+            // Description Field
+            Row(
+              children: [
+                Icon(Icons.description, color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Description',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _descriptionController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Enter project description',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter a project description';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 32),
+
+            // Project Type Dropdown
+            Row(
+              children: [
+                Icon(Icons.category, color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Project Type',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (widget.projectToEdit != null)
+              // Disabled state - show as a read-only container
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _selectedType == 'workspace'
+                          ? Icons.business
+                          : Icons.person,
+                      color: _selectedType == 'workspace'
+                          ? Colors.blue
+                          : Colors.orange,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _selectedType.capitalize(),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Colors.grey.shade700,
+                          ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      Icons.lock,
+                      size: 16,
+                      color: Colors.grey.shade400,
+                    ),
+                  ],
+                ),
+              )
+            else
+              // Editable dropdown
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                ),
+                child: DropdownButtonFormField<String>(
+                  initialValue: _selectedType,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                  ),
+                  items: _typeOptions.map((type) {
+                    final isWorkspace = type == 'workspace';
+                    final color = isWorkspace ? Colors.blue : Colors.orange;
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Row(
+                        children: [
+                          Icon(
+                            isWorkspace ? Icons.business : Icons.person,
+                            color: color,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(type.capitalize()),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedType = value!;
+                      // Clear team members if switching to personal
+                      if (_selectedType == 'personal') {
+                        final currentUserEmail =
+                            FirebaseAuth.instance.currentUser?.email;
+                        _teamMembers =
+                            currentUserEmail != null ? [currentUserEmail] : [];
+                      }
+                    });
+                  },
+                ),
+              ),
+            const SizedBox(height: 32),
+
+            // Team Members Field (only show for workspace)
+            if (_selectedType == 'workspace') ...[
               Row(
                 children: [
                   Icon(Icons.group, color: Colors.grey.shade600),
@@ -542,24 +739,28 @@ class _AddProjectPageState extends State<AddProjectPage> {
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusLarge),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       suffixIcon: _isSearching
                           ? const SizedBox(
                               width: 20,
                               height: 20,
                               child: Padding(
                                 padding: EdgeInsets.all(12),
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               ),
                             )
                           : null,
                     ),
                     validator: (value) {
                       if (value != null && value.isNotEmpty) {
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                            .hasMatch(value.trim())) {
                           return 'Please enter a valid email address';
                         }
                       }
@@ -573,7 +774,8 @@ class _AddProjectPageState extends State<AddProjectPage> {
                       constraints: const BoxConstraints(maxHeight: 200),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusLarge),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.1),
@@ -617,24 +819,24 @@ class _AddProjectPageState extends State<AddProjectPage> {
                 const SizedBox(height: 16),
               ],
             ],
-              const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-              // Role Management Section (only for workspace projects)
-              if (_selectedType == 'workspace') ...[
-                Row(
-                  children: [
-                    Icon(Icons.badge, color: Colors.grey.shade600),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Team Roles (Optional)',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
+            // Role Management Section (only for workspace projects)
+            if (_selectedType == 'workspace') ...[
+              Row(
+                children: [
+                  Icon(Icons.badge, color: Colors.grey.shade600),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Team Roles (Optional)',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               Text(
                 'Assign roles to organize your team by responsibilities',
@@ -677,7 +879,8 @@ class _AddProjectPageState extends State<AddProjectPage> {
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide: BorderSide.none,
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
                             ),
                           ),
                         ),
@@ -687,7 +890,8 @@ class _AddProjectPageState extends State<AddProjectPage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primary,
                             foregroundColor: AppTheme.textDark,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
                           ),
                           child: const Text('Add Role'),
                         ),
@@ -732,10 +936,12 @@ class _AddProjectPageState extends State<AddProjectPage> {
                           ),
                           subtitle: Text(
                             '${role.members.length} member${role.members.length != 1 ? 's' : ''}',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600),
                           ),
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                            icon: const Icon(Icons.delete_outline,
+                                size: 20, color: Colors.red),
                             onPressed: () => _deleteRole(role.name),
                           ),
                           children: [
@@ -749,7 +955,8 @@ class _AddProjectPageState extends State<AddProjectPage> {
                                     hint: const Text('Select member to add'),
                                     isExpanded: true,
                                     items: _teamMembers
-                                        .where((member) => !role.members.contains(member))
+                                        .where((member) =>
+                                            !role.members.contains(member))
                                         .map((member) {
                                       return DropdownMenuItem(
                                         value: member,
@@ -779,9 +986,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
                                       runSpacing: 8,
                                       children: role.members.map((member) {
                                         return Chip(
-                                          label: Text(member, style: const TextStyle(fontSize: 12)),
-                                          deleteIcon: const Icon(Icons.close, size: 14),
-                                          onDeleted: () => _removeMemberFromRole(role.name, member),
+                                          label: Text(member,
+                                              style: const TextStyle(
+                                                  fontSize: 12)),
+                                          deleteIcon:
+                                              const Icon(Icons.close, size: 14),
+                                          onDeleted: () =>
+                                              _removeMemberFromRole(
+                                                  role.name, member),
                                           backgroundColor: Colors.blue.shade50,
                                           deleteIconColor: Colors.red.shade600,
                                         );
@@ -808,135 +1020,136 @@ class _AddProjectPageState extends State<AddProjectPage> {
                 const SizedBox(height: 24),
               ],
               const SizedBox(height: 16),
-              ], // End workspace-only roles section
+            ], // End workspace-only roles section
 
-              // Status Dropdown
-              Row(
-                children: [
-                  Icon(Icons.flag, color: Colors.grey.shade600),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Status',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                ),
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedStatus,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                  ),
-                  items: _statusOptions.map((status) {
-                    final statusColor = _getStatusColor(status);
-                    return DropdownMenuItem(
-                      value: status,
-                      child: Row(
-                        children: [
-                          Icon(_getStatusIcon(status), color: statusColor, size: 20),
-                          const SizedBox(width: 8),
-                          Text(status),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedStatus = value!;
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Color Dropdown
-              Row(
-                children: [
-                  Icon(Icons.palette, color: Colors.grey.shade600),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Color Theme',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                ),
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedColor,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                  ),
-                  items: _colorOptions.map((color) {
-                    return DropdownMenuItem(
-                      value: color,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: _getColorFromString(color),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(color.capitalize()),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedColor = value!;
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(height: 32),
-
-
-
-              // Save Button
-              SizedBox(
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _saveProject,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: AppTheme.textDark,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+            // Status Dropdown
+            Row(
+              children: [
+                Icon(Icons.flag, color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Expanded(
                   child: Text(
-                    widget.projectToEdit != null ? 'Save Changes' : 'Create Project',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                    'Status',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+              ),
+              child: DropdownButtonFormField<String>(
+                initialValue: _selectedStatus,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                ),
+                items: _statusOptions.map((status) {
+                  final statusColor = _getStatusColor(status);
+                  return DropdownMenuItem(
+                    value: status,
+                    child: Row(
+                      children: [
+                        Icon(_getStatusIcon(status),
+                            color: statusColor, size: 20),
+                        const SizedBox(width: 8),
+                        Text(status),
+                      ],
                     ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedStatus = value!;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // Color Dropdown
+            Row(
+              children: [
+                Icon(Icons.palette, color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Color Theme',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+              ),
+              child: DropdownButtonFormField<String>(
+                initialValue: _selectedColor,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                ),
+                items: _colorOptions.map((color) {
+                  return DropdownMenuItem(
+                    value: color,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: _getColorFromString(color),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(color.capitalize()),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedColor = value!;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // Save Button
+            SizedBox(
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _saveProject,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: AppTheme.textDark,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  widget.projectToEdit != null
+                      ? 'Save Changes'
+                      : 'Create Project',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
+            ),
           ],
         ),
       ),
@@ -989,7 +1202,6 @@ class _AddProjectPageState extends State<AddProjectPage> {
         return Colors.grey;
     }
   }
-
 }
 
 extension StringExtension on String {

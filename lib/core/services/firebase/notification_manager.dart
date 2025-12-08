@@ -352,6 +352,86 @@ class NotificationManager {
       },
     );
   }
+
+  /// Notify when removed from a project
+  Future<void> notifyProjectRemoval({
+    required String recipientUserId,
+    required String projectTitle,
+    required String projectId,
+    required String removerName,
+  }) async {
+    await _createNotification(
+      userId: recipientUserId,
+      title: 'Removed from Project',
+      body: '$removerName removed you from "$projectTitle"',
+      type: 'project_removal',
+      data: {
+        'projectId': projectId,
+        'projectTitle': projectTitle,
+      },
+    );
+  }
+
+  /// Notify when unassigned from a task
+  Future<void> notifyTaskUnassigned({
+    required String recipientUserId,
+    required String taskTitle,
+    required String projectTitle,
+    required String taskId,
+    required String projectId,
+    required String unassignerName,
+  }) async {
+    await _createNotification(
+      userId: recipientUserId,
+      title: 'Task Unassignment',
+      body: '$unassignerName unassigned you from "$taskTitle"',
+      type: 'task_unassigned',
+      data: {
+        'taskId': taskId,
+        'projectId': projectId,
+        'taskTitle': taskTitle,
+        'projectTitle': projectTitle,
+      },
+    );
+  }
+
+  /// Notify when added to a shared wishlist
+  Future<void> notifyWishlistInvitation({
+    required String recipientUserId,
+    required String wishlistTitle,
+    required String wishlistId,
+    required String inviterName,
+  }) async {
+    await _createNotification(
+      userId: recipientUserId,
+      title: 'Added to Wishlist',
+      body: '$inviterName shared "$wishlistTitle" with you',
+      type: 'wishlist_invitation',
+      data: {
+        'wishlistId': wishlistId,
+        'wishlistTitle': wishlistTitle,
+      },
+    );
+  }
+
+  /// Notify when removed from a shared wishlist
+  Future<void> notifyWishlistRemoval({
+    required String recipientUserId,
+    required String wishlistTitle,
+    required String wishlistId,
+    required String removerName,
+  }) async {
+    await _createNotification(
+      userId: recipientUserId,
+      title: 'Removed from Wishlist',
+      body: '$removerName removed you from "$wishlistTitle"',
+      type: 'wishlist_removal',
+      data: {
+        'wishlistId': wishlistId,
+        'wishlistTitle': wishlistTitle,
+      },
+    );
+  }
 }
 
 /// Notification model for in-app notifications
@@ -397,8 +477,12 @@ class AppNotification {
     switch (type) {
       case 'project_invitation':
         return Icons.group_add;
+      case 'project_removal':
+        return Icons.person_remove;
       case 'task_assigned':
         return Icons.assignment_ind;
+      case 'task_unassigned':
+        return Icons.assignment_return;
       case 'task_deadline':
         return Icons.alarm;
       case 'task_overdue':
@@ -407,6 +491,10 @@ class AppNotification {
         return Icons.sync;
       case 'wishlist_update':
         return Icons.card_giftcard;
+      case 'wishlist_invitation':
+        return Icons.card_giftcard;
+      case 'wishlist_removal':
+        return Icons.remove_circle_outline;
       case 'journal_milestone':
         return Icons.emoji_events;
       case 'project_milestone':
@@ -422,8 +510,12 @@ class AppNotification {
     switch (type) {
       case 'project_invitation':
         return Colors.blue;
+      case 'project_removal':
+        return Colors.red.shade400;
       case 'task_assigned':
         return Colors.green;
+      case 'task_unassigned':
+        return Colors.orange.shade400;
       case 'task_deadline':
         return Colors.orange;
       case 'task_overdue':
@@ -432,6 +524,10 @@ class AppNotification {
         return Colors.purple;
       case 'wishlist_update':
         return Colors.pink;
+      case 'wishlist_invitation':
+        return Colors.pink.shade300;
+      case 'wishlist_removal':
+        return Colors.red.shade300;
       case 'journal_milestone':
         return Colors.amber;
       case 'project_milestone':

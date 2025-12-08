@@ -17,11 +17,19 @@ class TestNotificationButton extends StatelessWidget {
     }
 
     final notificationTypes = [
-      {'type': 'task_assigned', 'label': 'Task Assigned'},
-      {'type': 'project_invitation', 'label': 'Project Invitation'},
-      {'type': 'task_deadline', 'label': 'Task Deadline'},
-      {'type': 'wishlist_update', 'label': 'Wishlist Update'},
-      {'type': 'journal_milestone', 'label': 'Journal Milestone'},
+      {'type': 'task_assigned', 'label': '✅ Task Assigned'},
+      {'type': 'task_unassigned', 'label': '❌ Task Unassigned'},
+      {'type': 'task_status_changed', 'label': '🔄 Task Status Changed'},
+      {'type': 'task_deadline', 'label': '⏰ Task Deadline'},
+      {'type': 'task_overdue', 'label': '⚠️ Task Overdue'},
+      {'type': 'project_invitation', 'label': '📁 Project Invitation'},
+      {'type': 'project_removal', 'label': '🚫 Project Removal'},
+      {'type': 'project_status_changed', 'label': '📊 Project Status Changed'},
+      {'type': 'project_milestone', 'label': '🎯 Project Milestone'},
+      {'type': 'wishlist_invitation', 'label': '🎁 Wishlist Invitation'},
+      {'type': 'wishlist_update', 'label': '🔔 Wishlist Update'},
+      {'type': 'wishlist_removal', 'label': '❌ Wishlist Removal'},
+      {'type': 'journal_milestone', 'label': '📖 Journal Milestone'},
     ];
 
     await showDialog(
@@ -74,12 +82,26 @@ class TestNotificationButton extends StatelessWidget {
           );
           break;
 
-        case 'project_invitation':
-          await notificationManager.notifyProjectInvitation(
+        case 'task_unassigned':
+          await notificationManager.notifyTaskUnassigned(
             recipientUserId: userId,
-            projectTitle: 'Website Redesign',
+            taskTitle: 'Test Task - API Integration',
+            projectTitle: 'Backend Project',
+            taskId: 'TICK-54321',
             projectId: 'test-project-id',
-            inviterName: 'Jane Smith',
+            unassignerName: 'Project Lead',
+          );
+          break;
+
+        case 'task_status_changed':
+          await notificationManager.notifyTaskStatusChanged(
+            recipientUserId: userId,
+            taskTitle: 'Test Task - UI Design',
+            projectTitle: 'Design Project',
+            newStatus: 'In Review',
+            taskId: 'TICK-11111',
+            projectId: 'test-project-id',
+            changedByName: 'Team Member',
           );
           break;
 
@@ -94,13 +116,79 @@ class TestNotificationButton extends StatelessWidget {
           );
           break;
 
-        case 'wishlist_update':
-          await notificationManager.notifyWishlistUpdate(
+        case 'task_overdue':
+          await notificationManager.notifyTaskOverdue(
+            userId: userId,
+            taskTitle: 'Code Review',
+            projectTitle: 'Development Project',
+            taskId: 'TICK-99999',
+            projectId: 'test-project-id',
+          );
+          break;
+
+        case 'project_invitation':
+          await notificationManager.notifyProjectInvitation(
+            recipientUserId: userId,
+            projectTitle: 'Website Redesign',
+            projectId: 'test-project-id',
+            inviterName: 'Jane Smith',
+          );
+          break;
+
+        case 'project_removal':
+          await notificationManager.notifyProjectRemoval(
+            recipientUserId: userId,
+            projectTitle: 'Old Project',
+            projectId: 'test-project-id',
+            removerName: 'Admin User',
+          );
+          break;
+
+        case 'project_status_changed':
+          await notificationManager.notifyProjectStatusChanged(
+            recipientUserId: userId,
+            projectTitle: 'Marketing Campaign',
+            projectId: 'test-project-id',
+            newStatus: 'Completed',
+            changedByName: 'Project Manager',
+          );
+          break;
+
+        case 'project_milestone':
+          await notificationManager.notifyProjectMilestone(
+            userId: userId,
+            projectTitle: 'E-commerce Platform',
+            projectId: 'test-project-id',
+            milestoneType: 'halfway',
+            percentage: 50,
+          );
+          break;
+
+        case 'wishlist_invitation':
+          await notificationManager.notifyWishlistInvitation(
             recipientUserId: userId,
             wishlistTitle: 'Birthday Wishlist',
             wishlistId: 'test-wish-id',
+            inviterName: 'Sarah Connor',
+          );
+          break;
+
+        case 'wishlist_update':
+          await notificationManager.notifyWishlistUpdate(
+            recipientUserId: userId,
+            wishlistTitle: 'Holiday Shopping',
+            wishlistId: 'test-wish-id',
             updaterName: 'Sarah Connor',
             action: 'completed',
+          );
+          break;
+
+        case 'wishlist_removal':
+          await notificationManager.notifyWishlistRemoval(
+            recipientUserId: userId,
+            wishlistTitle: 'Shared Wishlist',
+            wishlistId: 'test-wish-id',
+            removerName: 'John Doe',
           );
           break;
 

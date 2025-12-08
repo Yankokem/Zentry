@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:zentry/core/core.dart';
 import 'package:zentry/core/services/firebase/notification_manager.dart';
 import 'package:zentry/core/services/firebase/firestore_service.dart';
 import 'package:zentry/features/projects/projects.dart';
 import 'package:zentry/features/journal/views/journal_page.dart';
-import 'package:zentry/features/wishlist/views/wishlist_page.dart';
+import 'package:zentry/features/wishlist/wishlist.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -348,9 +349,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     // Navigation logic based on notification type
     switch (notification.type) {
       case 'project_invitation':
-      case 'project_status_changed':
-      case 'project_milestone':
-        // Navigate to project details
+        // Navigate to the specific project detail page
         final projectId = notification.data['projectId'];
         if (projectId != null) {
           try {
@@ -374,26 +373,52 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               );
             }
           }
+        }
+        break;
+
+      case 'project_removal':
+        // Navigate to projects list page
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProjectsPage()),
+          );
+        }
+        break;
+
+      case 'project_status_changed':
+      case 'project_milestone':
+        // Navigate to projects list page
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProjectsPage()),
+          );
         }
         break;
 
       case 'task_assigned':
+      case 'task_unassigned':
       case 'task_deadline':
       case 'task_overdue':
       case 'task_status_changed':
-        // Navigate to project with task highlighted
+        // Navigate to project detail with highlighted ticket
         final projectId = notification.data['projectId'];
-        if (projectId != null) {
+        final taskId = notification.data['taskId'];
+        if (projectId != null && taskId != null) {
           try {
             final project = await _firestoreService.getProjectById(projectId);
             if (project != null && mounted) {
+              // Navigate to project detail page with highlight
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ProjectDetailPage(project: project),
+                  builder: (_) => ProjectDetailPage(
+                    project: project,
+                    highlightTicketId: taskId,
+                  ),
                 ),
               );
-              // TODO: Add task highlighting functionality to ProjectDetailPage
             } else if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Project not found')),
@@ -402,15 +427,36 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           } catch (e) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error loading project: $e')),
+                SnackBar(content: Text('Error loading ticket: $e')),
               );
             }
           }
         }
         break;
 
+      case 'wishlist_invitation':
       case 'wishlist_update':
-        // Navigate to wishlist
+        // Navigate to wishlist page with highlighted item
+        final wishlistId = notification.data['wishlistId'];
+        if (wishlistId != null && mounted) {
+          // Navigate to wishlist page with highlight
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => WishlistPage(highlightWishId: wishlistId),
+            ),
+          );
+        } else if (mounted) {
+          // Navigate to wishlist page without highlight
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const WishlistPage()),
+          );
+        }
+        break;
+
+      case 'wishlist_removal':
+        // Just navigate to wishlist page
         if (mounted) {
           Navigator.push(
             context,

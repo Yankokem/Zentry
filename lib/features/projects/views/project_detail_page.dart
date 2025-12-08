@@ -7,10 +7,12 @@ import 'package:zentry/features/projects/projects.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   final Project project;
+  final String? highlightTicketId;
 
   const ProjectDetailPage({
     super.key,
     required this.project,
+    this.highlightTicketId,
   });
 
   @override
@@ -22,6 +24,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   final UserService _userService = UserService();
   Map<String, Map<String, String>> _userDetails = {};
   bool _isLoadingUsers = true;
+  String? _highlightedTicketId;
 
   @override
   void initState() {
@@ -33,11 +36,17 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       ),
     );
     _loadUserDetails();
+
+    // Set up highlight if ticket ID was provided
+    if (widget.highlightTicketId != null) {
+      _highlightedTicketId = widget.highlightTicketId;
+    }
   }
 
   Future<void> _loadUserDetails() async {
     if (widget.project.teamMembers.isNotEmpty) {
-      final details = await _userService.getUsersDetailsByEmails(widget.project.teamMembers);
+      final details = await _userService
+          .getUsersDetailsByEmails(widget.project.teamMembers);
       if (mounted) {
         setState(() {
           _userDetails = details;
@@ -90,13 +99,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   List<Widget> _buildDetailAvatarStack() {
     final avatarWidgets = <Widget>[];
-    
+
     for (int i = 0; i < widget.project.teamMembers.length; i++) {
       final member = widget.project.teamMembers[i];
       final details = _userDetails[member] ?? {};
       final displayName = _userService.getDisplayName(details, member);
       final profileUrl = details['profilePictureUrl'] ?? '';
-      
+
       avatarWidgets.add(
         Positioned(
           left: i * 20.0,
@@ -109,9 +118,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               ),
               child: CircleAvatar(
                 radius: 13,
-                backgroundImage: profileUrl.isNotEmpty
-                    ? NetworkImage(profileUrl)
-                    : null,
+                backgroundImage:
+                    profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
                 backgroundColor: Colors.grey.shade300,
                 child: profileUrl.isEmpty
                     ? Text(
@@ -131,7 +139,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ),
       );
     }
-    
+
     return avatarWidgets;
   }
 
@@ -140,10 +148,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     Map<String, String>? creatorDetails;
     final currentUser = FirebaseAuth.instance.currentUser;
     final isCreator = currentUser?.uid == widget.project.userId;
-    
+
     if (isCreator && currentUser?.email != null) {
       // If current user is the creator, use their details
-      creatorDetails = await _userService.getUserDetailsByEmail(currentUser!.email!);
+      creatorDetails =
+          await _userService.getUserDetailsByEmail(currentUser!.email!);
     } else {
       // Find creator from team members or fetch by userId
       for (final email in widget.project.teamMembers) {
@@ -192,7 +201,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   const SizedBox(height: 8),
                   if (creatorDetails != null)
                     _buildMemberTile(
-                      creatorDetails['fullName'] ?? creatorDetails['email'] ?? 'Unknown',
+                      creatorDetails['fullName'] ??
+                          creatorDetails['email'] ??
+                          'Unknown',
                       currentUser?.email ?? '',
                       creatorDetails['profilePictureUrl'] ?? '',
                     ),
@@ -215,11 +226,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         const SizedBox(height: 8),
                         ...role.members.map((email) {
                           final details = _userDetails[email] ?? {};
-                          final displayName = _userService.getDisplayName(details, email);
+                          final displayName =
+                              _userService.getDisplayName(details, email);
                           final profileUrl = details['profilePictureUrl'] ?? '';
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: _buildMemberTile(displayName, email, profileUrl),
+                            child: _buildMemberTile(
+                                displayName, email, profileUrl),
                           );
                         }),
                         const SizedBox(height: 16),
@@ -236,12 +249,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                             .toSet();
                         final creatorEmail = currentUser?.email;
                         final membersWithoutRoles = widget.project.teamMembers
-                            .where((email) => 
-                                email != creatorEmail && 
+                            .where((email) =>
+                                email != creatorEmail &&
                                 !membersInRoles.contains(email))
                             .toList();
 
-                        if (membersWithoutRoles.isEmpty) return const SizedBox.shrink();
+                        if (membersWithoutRoles.isEmpty)
+                          return const SizedBox.shrink();
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,11 +272,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                             const SizedBox(height: 8),
                             ...membersWithoutRoles.map((email) {
                               final details = _userDetails[email] ?? {};
-                              final displayName = _userService.getDisplayName(details, email);
-                              final profileUrl = details['profilePictureUrl'] ?? '';
+                              final displayName =
+                                  _userService.getDisplayName(details, email);
+                              final profileUrl =
+                                  details['profilePictureUrl'] ?? '';
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 8),
-                                child: _buildMemberTile(displayName, email, profileUrl),
+                                child: _buildMemberTile(
+                                    displayName, email, profileUrl),
                               );
                             }),
                           ],
@@ -275,7 +292,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         .where((email) => email != currentUser?.email)
                         .map((email) {
                       final details = _userDetails[email] ?? {};
-                      final displayName = _userService.getDisplayName(details, email);
+                      final displayName =
+                          _userService.getDisplayName(details, email);
                       final profileUrl = details['profilePictureUrl'] ?? '';
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -297,15 +315,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       children: [
         CircleAvatar(
           radius: 20,
-          backgroundImage: profileUrl.isNotEmpty
-              ? NetworkImage(profileUrl)
-              : null,
+          backgroundImage:
+              profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
           backgroundColor: Colors.grey.shade300,
           child: profileUrl.isEmpty
               ? Text(
-                  displayName.isNotEmpty
-                      ? displayName[0].toUpperCase()
-                      : '?',
+                  displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -394,7 +409,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                 widget.project.description,
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: const Color(0xFF1E1E1E).withOpacity(0.7),
+                                  color:
+                                      const Color(0xFF1E1E1E).withOpacity(0.7),
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -447,7 +463,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                 ..._buildDetailAvatarStack(),
                                 if (widget.project.teamMembers.isNotEmpty)
                                   Positioned(
-                                    left: widget.project.teamMembers.length * 20.0,
+                                    left: widget.project.teamMembers.length *
+                                        20.0,
                                     child: GestureDetector(
                                       onTap: () => _showMembersModal(),
                                       child: Tooltip(
@@ -458,7 +475,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                           decoration: BoxDecoration(
                                             color: Colors.grey.shade200,
                                             shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 2),
+                                            border: Border.all(
+                                                color: Colors.white, width: 2),
                                           ),
                                           child: const Icon(
                                             Icons.people,
@@ -655,10 +673,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                           padding: const EdgeInsets.all(16),
                           itemCount: tickets.length,
                           itemBuilder: (context, index) {
+                            final ticket = tickets[index];
+                            final isHighlighted =
+                                _highlightedTicketId == ticket.ticketNumber;
                             return TicketCard(
-                              ticket: tickets[index],
+                              ticket: ticket,
+                              isHighlighted: isHighlighted,
                               onTap: () {
-                                _showTicketDetailsSheet(tickets[index]);
+                                _showTicketDetailsSheet(ticket);
                               },
                             );
                           },
@@ -691,7 +713,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               children: [
                 // Ticket Number
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
@@ -740,13 +763,15 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             const SizedBox(height: 24),
 
             // Details
-            _buildDetailRow(Icons.flag_outlined, 'Priority', ticket.priority.toUpperCase()),
+            _buildDetailRow(
+                Icons.flag_outlined, 'Priority', ticket.priority.toUpperCase()),
             const SizedBox(height: 12),
-            
+
             // Assigned To with Avatar Stack
             Row(
               children: [
-                Icon(Icons.person_outline, size: 20, color: Colors.grey.shade600),
+                Icon(Icons.person_outline,
+                    size: 20, color: Colors.grey.shade600),
                 const SizedBox(width: 12),
                 Text(
                   'Assigned To: ',
@@ -767,8 +792,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               ),
             ),
             const SizedBox(height: 12),
-            
-            _buildDetailRow(Icons.assignment_outlined, 'Status', _formatStatus(ticket.status)),
+
+            _buildDetailRow(Icons.assignment_outlined, 'Status',
+                _formatStatus(ticket.status)),
 
             const SizedBox(height: 24),
 
@@ -875,7 +901,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   void _showEditTicketDialog(Ticket ticket) {
-    TicketDialogs.showEditTicketDialog(context, ticket, widget.project.teamMembers, _refreshTickets);
+    TicketDialogs.showEditTicketDialog(
+        context, ticket, widget.project.teamMembers, _refreshTickets);
   }
 
   Color _getColorForEmail(String email) {
@@ -893,7 +920,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     return colors[hash % colors.length];
   }
 
-  Widget _buildAssigneeAvatarStack(List<String> assignees, {VoidCallback? onViewMore}) {
+  Widget _buildAssigneeAvatarStack(List<String> assignees,
+      {VoidCallback? onViewMore}) {
     if (assignees.isEmpty) {
       return Row(
         children: [
@@ -907,7 +935,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     // Show max 4 avatars stacked plus a "View" button
     final visibleCount = assignees.length > 4 ? 4 : assignees.length;
     final hasMore = assignees.length > 4;
-    final stackWidth = hasMore ? (visibleCount * 16.0) + 28 : (visibleCount * 16.0) + 16;
+    final stackWidth =
+        hasMore ? (visibleCount * 16.0) + 28 : (visibleCount * 16.0) + 16;
 
     return Row(
       children: [
@@ -916,68 +945,72 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           height: 32,
           child: Stack(
             children: [
-            ...List.generate(visibleCount, (index) {
-              final email = assignees[index];
-              final details = _userDetails[email] ?? {};
-              final displayName = _userService.getDisplayName(details, email);
-              final profileUrl = details['profilePictureUrl'] ?? '';
-              final firstLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : email[0].toUpperCase();
+              ...List.generate(visibleCount, (index) {
+                final email = assignees[index];
+                final details = _userDetails[email] ?? {};
+                final displayName = _userService.getDisplayName(details, email);
+                final profileUrl = details['profilePictureUrl'] ?? '';
+                final firstLetter = displayName.isNotEmpty
+                    ? displayName[0].toUpperCase()
+                    : email[0].toUpperCase();
 
-              return Positioned(
-                left: index * 16.0,
-                child: Tooltip(
-                  message: displayName,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundImage: profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
-                      backgroundColor: _getColorForEmail(email),
-                      child: profileUrl.isEmpty
-                          ? Text(
-                              firstLetter,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            )
-                          : null,
+                return Positioned(
+                  left: index * 16.0,
+                  child: Tooltip(
+                    message: displayName,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: CircleAvatar(
+                        radius: 14,
+                        backgroundImage: profileUrl.isNotEmpty
+                            ? NetworkImage(profileUrl)
+                            : null,
+                        backgroundColor: _getColorForEmail(email),
+                        child: profileUrl.isEmpty
+                            ? Text(
+                                firstLetter,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : null,
+                      ),
                     ),
                   ),
-                ),
-              );
-            }),
-            if (hasMore)
-              Positioned(
-                left: visibleCount * 16.0,
-                child: Tooltip(
-                  message: '${assignees.length - 4} more',
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      color: Colors.grey.shade300,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '+${assignees.length - 4}',
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E1E1E),
+                );
+              }),
+              if (hasMore)
+                Positioned(
+                  left: visibleCount * 16.0,
+                  child: Tooltip(
+                    message: '${assignees.length - 4} more',
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        color: Colors.grey.shade300,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '+${assignees.length - 4}',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1E1E),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
           ),
         ),
         const SizedBox(width: 12),
@@ -1035,7 +1068,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 final details = _userDetails[email] ?? {};
                 final displayName = _userService.getDisplayName(details, email);
                 final profileUrl = details['profilePictureUrl'] ?? '';
-                final firstLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : email[0].toUpperCase();
+                final firstLetter = displayName.isNotEmpty
+                    ? displayName[0].toUpperCase()
+                    : email[0].toUpperCase();
 
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1044,11 +1079,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.grey.shade300, width: 1),
+                          border:
+                              Border.all(color: Colors.grey.shade300, width: 1),
                         ),
                         child: CircleAvatar(
                           radius: 18,
-                          backgroundImage: profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                          backgroundImage: profileUrl.isNotEmpty
+                              ? NetworkImage(profileUrl)
+                              : null,
                           backgroundColor: _getColorForEmail(email),
                           child: profileUrl.isEmpty
                               ? Text(
@@ -1104,8 +1142,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildStatusOption('todo', 'To Do', Colors.grey.shade400, ticket),
-            _buildStatusOption('in_progress', 'In Progress', Colors.orange.shade400, ticket),
-            _buildStatusOption('in_review', 'In Review', Colors.purple.shade400, ticket),
+            _buildStatusOption(
+                'in_progress', 'In Progress', Colors.orange.shade400, ticket),
+            _buildStatusOption(
+                'in_review', 'In Review', Colors.purple.shade400, ticket),
             _buildStatusOption('done', 'Done', Colors.green.shade400, ticket),
           ],
         ),
@@ -1113,17 +1153,19 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
-  Widget _buildStatusOption(String statusValue, String statusLabel, Color color, Ticket ticket) {
+  Widget _buildStatusOption(
+      String statusValue, String statusLabel, Color color, Ticket ticket) {
     final isCurrentStatus = ticket.status == statusValue;
-    
+
     return InkWell(
       onTap: () {
         if (!isCurrentStatus) {
           final updatedTicket = ticket.copyWith(status: statusValue);
-          _projectManager.updateTicket(ticket.projectId, ticket.ticketNumber, updatedTicket);
+          _projectManager.updateTicket(
+              ticket.projectId, ticket.ticketNumber, updatedTicket);
           Navigator.pop(context);
           _refreshTickets();
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Moved to $statusLabel'),
@@ -1184,10 +1226,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           ),
           ElevatedButton(
             onPressed: () {
-              _projectManager.deleteTicket(ticket.projectId, ticket.ticketNumber);
+              _projectManager.deleteTicket(
+                  ticket.projectId, ticket.ticketNumber);
               Navigator.pop(context);
               _refreshTickets();
-              
+
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('${ticket.ticketNumber} deleted'),

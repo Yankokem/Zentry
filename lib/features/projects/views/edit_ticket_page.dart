@@ -1,6 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'package:zentry/core/core.dart';
+import 'package:zentry/core/services/firebase/notification_manager.dart';
 import 'package:zentry/features/projects/projects.dart';
 
 class MultiSelectDialog extends StatefulWidget {
@@ -57,7 +60,9 @@ class _MultiSelectDialogState extends State<MultiSelectDialog> {
   Widget _buildAvatar(String email) {
     final url = _getProfilePictureUrl(email);
     final displayName = _getDisplayName(email);
-    final firstLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : email[0].toUpperCase();
+    final firstLetter = displayName.isNotEmpty
+        ? displayName[0].toUpperCase()
+        : email[0].toUpperCase();
 
     if (url.isNotEmpty) {
       return CircleAvatar(
@@ -98,11 +103,13 @@ class _MultiSelectDialogState extends State<MultiSelectDialog> {
     final rolesList = <Widget>[];
 
     for (final role in widget.project.roles) {
-      final roleMembers = role.members.where((email) => widget.items.contains(email)).toList();
-      
+      final roleMembers =
+          role.members.where((email) => widget.items.contains(email)).toList();
+
       if (roleMembers.isNotEmpty) {
         // Role header with checkbox
-        final allRoleSelected = roleMembers.every((email) => _selectedItems.contains(email));
+        final allRoleSelected =
+            roleMembers.every((email) => _selectedItems.contains(email));
 
         rolesList.add(
           Theme(
@@ -148,7 +155,8 @@ class _MultiSelectDialogState extends State<MultiSelectDialog> {
                 return Container(
                   color: Colors.grey.shade50,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Row(
                       children: [
                         Checkbox(
@@ -200,7 +208,8 @@ class _MultiSelectDialogState extends State<MultiSelectDialog> {
 
     // Add "Other Members" section for users not in any role
     final unassignedMembers = widget.items
-        .where((email) => !widget.project.roles.any((role) => role.members.contains(email)))
+        .where((email) =>
+            !widget.project.roles.any((role) => role.members.contains(email)))
         .toList();
 
     if (unassignedMembers.isNotEmpty) {
@@ -434,7 +443,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, size: 20, color: Colors.grey.shade600),
+                        Icon(Icons.info_outline,
+                            size: 20, color: Colors.grey.shade600),
                         const SizedBox(width: 8),
                         Text(
                           'Basic Information',
@@ -464,7 +474,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: _getProjectColor(), width: 2),
+                          borderSide:
+                              BorderSide(color: _getProjectColor(), width: 2),
                         ),
                         filled: true,
                         fillColor: Colors.grey.shade50,
@@ -482,7 +493,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
                       style: const TextStyle(fontSize: 16),
                       decoration: InputDecoration(
                         labelText: 'Description',
-                        hintText: 'Provide detailed information about this ticket',
+                        hintText:
+                            'Provide detailed information about this ticket',
                         labelStyle: TextStyle(color: Colors.grey.shade600),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -494,7 +506,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: _getProjectColor(), width: 2),
+                          borderSide:
+                              BorderSide(color: _getProjectColor(), width: 2),
                         ),
                         filled: true,
                         fillColor: Colors.grey.shade50,
@@ -532,7 +545,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.settings_outlined, size: 20, color: Colors.grey.shade600),
+                        Icon(Icons.settings_outlined,
+                            size: 20, color: Colors.grey.shade600),
                         const SizedBox(width: 8),
                         Text(
                           'Configuration',
@@ -553,7 +567,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
                           value: 'low',
                           child: Row(
                             children: [
-                              Icon(Icons.arrow_downward, color: Colors.green, size: 18),
+                              Icon(Icons.arrow_downward,
+                                  color: Colors.green, size: 18),
                               SizedBox(width: 8),
                               Text('Low'),
                             ],
@@ -563,7 +578,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
                           value: 'medium',
                           child: Row(
                             children: [
-                              Icon(Icons.remove, color: Colors.orange, size: 18),
+                              Icon(Icons.remove,
+                                  color: Colors.orange, size: 18),
                               SizedBox(width: 8),
                               Text('Medium'),
                             ],
@@ -573,14 +589,16 @@ class _EditTicketPageState extends State<EditTicketPage> {
                           value: 'high',
                           child: Row(
                             children: [
-                              Icon(Icons.arrow_upward, color: Colors.red, size: 18),
+                              Icon(Icons.arrow_upward,
+                                  color: Colors.red, size: 18),
                               SizedBox(width: 8),
                               Text('High'),
                             ],
                           ),
                         ),
                       ],
-                      onChanged: (value) => setState(() => selectedPriority = value!),
+                      onChanged: (value) =>
+                          setState(() => selectedPriority = value!),
                     ),
                     const SizedBox(height: 16),
                     _buildDropdownField(
@@ -591,7 +609,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
                           value: 'todo',
                           child: Row(
                             children: [
-                              Icon(Icons.circle_outlined, color: Colors.grey, size: 18),
+                              Icon(Icons.circle_outlined,
+                                  color: Colors.grey, size: 18),
                               SizedBox(width: 8),
                               Text('To Do'),
                             ],
@@ -601,7 +620,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
                           value: 'in_progress',
                           child: Row(
                             children: [
-                              Icon(Icons.play_arrow, color: Colors.orange, size: 18),
+                              Icon(Icons.play_arrow,
+                                  color: Colors.orange, size: 18),
                               SizedBox(width: 8),
                               Text('In Progress'),
                             ],
@@ -611,7 +631,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
                           value: 'in_review',
                           child: Row(
                             children: [
-                              Icon(Icons.visibility, color: Colors.purple, size: 18),
+                              Icon(Icons.visibility,
+                                  color: Colors.purple, size: 18),
                               SizedBox(width: 8),
                               Text('In Review'),
                             ],
@@ -621,14 +642,16 @@ class _EditTicketPageState extends State<EditTicketPage> {
                           value: 'done',
                           child: Row(
                             children: [
-                              Icon(Icons.check_circle, color: Colors.green, size: 18),
+                              Icon(Icons.check_circle,
+                                  color: Colors.green, size: 18),
                               SizedBox(width: 8),
                               Text('Done'),
                             ],
                           ),
                         ),
                       ],
-                      onChanged: (value) => setState(() => selectedStatus = value!),
+                      onChanged: (value) =>
+                          setState(() => selectedStatus = value!),
                     ),
                     const SizedBox(height: 16),
                     _buildDateField(),
@@ -724,7 +747,8 @@ class _EditTicketPageState extends State<EditTicketPage> {
             ),
             child: Row(
               children: [
-                Icon(Icons.calendar_today, color: Colors.grey.shade600, size: 18),
+                Icon(Icons.calendar_today,
+                    color: Colors.grey.shade600, size: 18),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -732,7 +756,9 @@ class _EditTicketPageState extends State<EditTicketPage> {
                         ? '${selectedDeadline!.day}/${selectedDeadline!.month}/${selectedDeadline!.year}'
                         : 'Select deadline',
                     style: TextStyle(
-                      color: selectedDeadline != null ? Colors.black : Colors.grey.shade600,
+                      color: selectedDeadline != null
+                          ? Colors.black
+                          : Colors.grey.shade600,
                       fontSize: 16,
                     ),
                   ),
@@ -771,7 +797,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
     );
   }
 
-  void _saveChanges() {
+  void _saveChanges() async {
     if (_formKey.currentState!.validate()) {
       if (selectedDeadline == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -787,6 +813,18 @@ class _EditTicketPageState extends State<EditTicketPage> {
         return;
       }
 
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Track assignee changes
+      final oldAssignees = widget.ticket.assignedTo.toSet();
+      final newAssignees = selectedAssignees.toSet();
+      final addedAssignees = newAssignees.difference(oldAssignees);
+      final removedAssignees = oldAssignees.difference(newAssignees);
+
+      // Track status change
+      final statusChanged = widget.ticket.status != selectedStatus;
+
       final updatedTicket = widget.ticket.copyWith(
         title: titleController.text,
         description: descController.text,
@@ -796,8 +834,229 @@ class _EditTicketPageState extends State<EditTicketPage> {
         deadline: selectedDeadline,
       );
 
-      ProjectManager().updateTicket(widget.ticket.projectId, widget.ticket.ticketNumber, updatedTicket);
+      ProjectManager().updateTicket(
+          widget.ticket.projectId, widget.ticket.ticketNumber, updatedTicket);
       widget.refreshTickets();
+
+      // Send notifications for newly assigned members
+      if (addedAssignees.isNotEmpty) {
+        try {
+          final firestoreService = FirestoreService();
+          final currentUserData =
+              await firestoreService.getUserData(currentUser.uid);
+          final currentUserName =
+              currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
+          final project =
+              await firestoreService.getProjectById(widget.ticket.projectId);
+
+          for (final assigneeEmail in addedAssignees) {
+            if (assigneeEmail != currentUser.email) {
+              final assigneeDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .where('email', isEqualTo: assigneeEmail)
+                  .limit(1)
+                  .get();
+
+              if (assigneeDoc.docs.isNotEmpty) {
+                final assigneeId = assigneeDoc.docs.first.id;
+                await NotificationManager().notifyTaskAssigned(
+                  recipientUserId: assigneeId,
+                  taskTitle: titleController.text,
+                  projectTitle: project?.title ?? 'Unknown Project',
+                  taskId: widget.ticket.ticketNumber,
+                  projectId: widget.ticket.projectId,
+                  assignerName: currentUserName,
+                );
+              }
+            }
+          }
+        } catch (e) {
+          print('Error sending task assignment notifications: \$e');
+        }
+      }
+
+      // Send notifications for unassigned members
+      if (removedAssignees.isNotEmpty) {
+        try {
+          final firestoreService = FirestoreService();
+          final currentUserData =
+              await firestoreService.getUserData(currentUser.uid);
+          final currentUserName =
+              currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
+          final project =
+              await firestoreService.getProjectById(widget.ticket.projectId);
+
+          for (final assigneeEmail in removedAssignees) {
+            if (assigneeEmail != currentUser.email) {
+              final assigneeDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .where('email', isEqualTo: assigneeEmail)
+                  .limit(1)
+                  .get();
+
+              if (assigneeDoc.docs.isNotEmpty) {
+                final assigneeId = assigneeDoc.docs.first.id;
+                await NotificationManager().notifyTaskUnassigned(
+                  recipientUserId: assigneeId,
+                  taskTitle: widget.ticket.title,
+                  projectTitle: project?.title ?? 'Unknown Project',
+                  taskId: widget.ticket.ticketNumber,
+                  projectId: widget.ticket.projectId,
+                  unassignerName: currentUserName,
+                );
+              }
+            }
+          }
+        } catch (e) {
+          print('Error sending task unassignment notifications: \$e');
+        }
+      }
+
+      // Send notifications for status change to all assignees (except the person who made the change)
+      if (statusChanged) {
+        try {
+          final firestoreService = FirestoreService();
+          final currentUserData =
+              await firestoreService.getUserData(currentUser.uid);
+          final currentUserName =
+              currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
+          final project =
+              await firestoreService.getProjectById(widget.ticket.projectId);
+
+          for (final assigneeEmail in selectedAssignees) {
+            if (assigneeEmail != currentUser.email) {
+              final assigneeDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .where('email', isEqualTo: assigneeEmail)
+                  .limit(1)
+                  .get();
+
+              if (assigneeDoc.docs.isNotEmpty) {
+                final assigneeId = assigneeDoc.docs.first.id;
+                await NotificationManager().notifyTaskStatusChanged(
+                  recipientUserId: assigneeId,
+                  taskTitle: titleController.text,
+                  projectTitle: project?.title ?? 'Unknown Project',
+                  newStatus: selectedStatus,
+                  taskId: widget.ticket.ticketNumber,
+                  projectId: widget.ticket.projectId,
+                  changedByName: currentUserName,
+                );
+              }
+            }
+          }
+
+          // Check for project milestones after ticket update
+          if (project != null && project.totalTickets > 0) {
+            final newCompletedCount = selectedStatus == 'done'
+                ? project.completedTickets + 1
+                : project.completedTickets;
+            final percentage =
+                (newCompletedCount / project.totalTickets * 100).round();
+
+            // Notify on 50%, 90%, or 100% completion
+            String? milestoneType;
+            if (percentage == 50) {
+              milestoneType = 'halfway';
+            } else if (percentage == 90) {
+              milestoneType = 'almost_done';
+            } else if (percentage == 100) {
+              milestoneType = 'completed';
+            }
+
+            if (milestoneType != null) {
+              // Notify all team members
+              for (final memberEmail in project.teamMembers) {
+                final memberDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: memberEmail)
+                    .limit(1)
+                    .get();
+
+                if (memberDoc.docs.isNotEmpty) {
+                  final memberId = memberDoc.docs.first.id;
+                  await NotificationManager().notifyProjectMilestone(
+                    userId: memberId,
+                    projectTitle: project.title,
+                    projectId: project.id,
+                    milestoneType: milestoneType,
+                    percentage: percentage,
+                  );
+                }
+              }
+            }
+          }
+        } catch (e) {
+          print('Error sending task status change notifications: \$e');
+        }
+      }
+
+      // Check for deadline notifications (24 hours warning)
+      if (selectedDeadline != null) {
+        final timeUntilDeadline = selectedDeadline!.difference(DateTime.now());
+        if (timeUntilDeadline.inHours > 0 && timeUntilDeadline.inHours <= 24) {
+          try {
+            final firestoreService = FirestoreService();
+            final project =
+                await firestoreService.getProjectById(widget.ticket.projectId);
+
+            for (final assigneeEmail in selectedAssignees) {
+              final assigneeDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .where('email', isEqualTo: assigneeEmail)
+                  .limit(1)
+                  .get();
+
+              if (assigneeDoc.docs.isNotEmpty) {
+                final assigneeId = assigneeDoc.docs.first.id;
+                await NotificationManager().notifyTaskDeadlineApproaching(
+                  userId: assigneeId,
+                  taskTitle: titleController.text,
+                  projectTitle: project?.title ?? 'Unknown Project',
+                  taskId: widget.ticket.ticketNumber,
+                  projectId: widget.ticket.projectId,
+                  deadline: selectedDeadline!,
+                );
+              }
+            }
+          } catch (e) {
+            print('Error sending deadline notifications: \$e');
+          }
+        }
+      }
+
+      // Check for overdue tasks
+      if (selectedDeadline != null &&
+          selectedDeadline!.isBefore(DateTime.now()) &&
+          selectedStatus != 'done') {
+        try {
+          final firestoreService = FirestoreService();
+          final project =
+              await firestoreService.getProjectById(widget.ticket.projectId);
+
+          for (final assigneeEmail in selectedAssignees) {
+            final assigneeDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .where('email', isEqualTo: assigneeEmail)
+                .limit(1)
+                .get();
+
+            if (assigneeDoc.docs.isNotEmpty) {
+              final assigneeId = assigneeDoc.docs.first.id;
+              await NotificationManager().notifyTaskOverdue(
+                userId: assigneeId,
+                taskTitle: titleController.text,
+                projectTitle: project?.title ?? 'Unknown Project',
+                taskId: widget.ticket.ticketNumber,
+                projectId: widget.ticket.projectId,
+              );
+            }
+          }
+        } catch (e) {
+          print('Error sending overdue notifications: \$e');
+        }
+      }
+
       Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -851,7 +1110,8 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
 
   Future<void> _loadUserDetails() async {
     try {
-      _userDetails = await _userService.getUsersDetailsByEmails(widget.project.teamMembers);
+      _userDetails = await _userService
+          .getUsersDetailsByEmails(widget.project.teamMembers);
     } catch (e) {
       _userDetails = {};
     }
@@ -887,7 +1147,9 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
   Widget _buildAvatar(String email, {double radius = 16}) {
     final url = _getProfilePictureUrl(email);
     final displayName = _getDisplayName(email);
-    final firstLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : email[0].toUpperCase();
+    final firstLetter = displayName.isNotEmpty
+        ? displayName[0].toUpperCase()
+        : email[0].toUpperCase();
 
     if (url.isNotEmpty) {
       return CircleAvatar(
@@ -947,10 +1209,13 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
     final roleWidgets = <Widget>[];
 
     for (final role in widget.project.roles) {
-      final roleMembers = role.members.where((email) => widget.project.teamMembers.contains(email)).toList();
+      final roleMembers = role.members
+          .where((email) => widget.project.teamMembers.contains(email))
+          .toList();
 
       if (roleMembers.isNotEmpty) {
-        final allRoleSelected = roleMembers.every((email) => _selectedItems.contains(email));
+        final allRoleSelected =
+            roleMembers.every((email) => _selectedItems.contains(email));
 
         roleWidgets.add(
           Container(
@@ -998,7 +1263,8 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
                     children: roleMembers.map((email) {
                       final isSelected = _selectedItems.contains(email);
                       return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         child: Row(
                           children: [
                             Checkbox(
@@ -1053,7 +1319,8 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
 
     // Add "Other Members" section for users not in any role
     final unassignedMembers = widget.project.teamMembers
-        .where((email) => !widget.project.roles.any((role) => role.members.contains(email)))
+        .where((email) =>
+            !widget.project.roles.any((role) => role.members.contains(email)))
         .toList();
 
     if (unassignedMembers.isNotEmpty) {
@@ -1136,7 +1403,8 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
       children: roleWidgets.isEmpty
           ? [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey.shade300),
                   borderRadius: BorderRadius.circular(12),

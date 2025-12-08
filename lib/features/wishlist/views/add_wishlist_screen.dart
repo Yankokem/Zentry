@@ -125,6 +125,18 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       imageUrl = await _uploadWishlistImage();
     }
 
+    final bool isEditing = widget.itemToEdit != null;
+
+    // Track member changes if editing
+    Set<String>? addedMembers;
+    Set<String>? removedMembers;
+    if (isEditing) {
+      final oldMembers = widget.itemToEdit!.sharedWith.toSet();
+      final newMembers = _teamMembers.toSet();
+      addedMembers = newMembers.difference(oldMembers);
+      removedMembers = oldMembers.difference(newMembers);
+    }
+
     final wish = Wish(
       id: widget.itemToEdit?.id,
       title: _titleController.text.trim(),
@@ -140,7 +152,6 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     debugPrint('📦 Wish object sharedWith: ${wish.sharedWith}');
 
     bool success;
-    final bool isEditing = widget.itemToEdit != null;
     if (isEditing) {
       success = await widget.controller.updateWish(wish);
     } else {
@@ -148,7 +159,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     }
 
     // Send notifications to shared members
-    if (success && _teamMembers.isNotEmpty) {
+    if (success) {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
         try {
@@ -156,25 +167,95 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
               await _firestoreService.getUserData(currentUser.uid);
           final currentUserName = currentUserData?['fullName'] ?? 'Someone';
 
-          // Notify each shared member (except current user)
-          for (final memberEmail in _teamMembers) {
-            if (memberEmail != currentUser.email) {
-              // Query Firestore to get user ID from email
-              final memberUserDoc = await FirebaseFirestore.instance
-                  .collection('users')
-                  .where('email', isEqualTo: memberEmail.toLowerCase())
-                  .limit(1)
-                  .get();
+          if (isEditing) {
+            // Notify newly added members
+            if (addedMembers != null && addedMembers.isNotEmpty) {
+              for (final memberEmail in addedMembers) {
+                if (memberEmail != currentUser.email) {
+                  final memberUserDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .where('email', isEqualTo: memberEmail.toLowerCase())
+                      .limit(1)
+                      .get();
 
-              if (memberUserDoc.docs.isNotEmpty) {
-                final memberUserId = memberUserDoc.docs.first.id;
-                await NotificationManager().notifyWishlistUpdate(
-                  recipientUserId: memberUserId,
-                  wishlistTitle: wish.title,
-                  wishlistId: wish.id ?? '',
-                  updaterName: currentUserName,
-                  action: isEditing ? 'updated' : 'added',
-                );
+                  if (memberUserDoc.docs.isNotEmpty) {
+                    final memberUserId = memberUserDoc.docs.first.id;
+                    await NotificationManager().notifyWishlistInvitation(
+                      recipientUserId: memberUserId,
+                      wishlistTitle: wish.title,
+                      wishlistId: wish.id ?? '',
+                      inviterName: currentUserName,
+                    );
+                  }
+                }
+              }
+            }
+
+            // Notify removed members
+            if (removedMembers != null && removedMembers.isNotEmpty) {
+              for (final memberEmail in removedMembers) {
+                if (memberEmail != currentUser.email) {
+                  final memberUserDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .where('email', isEqualTo: memberEmail.toLowerCase())
+                      .limit(1)
+                      .get();
+
+                  if (memberUserDoc.docs.isNotEmpty) {
+                    final memberUserId = memberUserDoc.docs.first.id;
+                    await NotificationManager().notifyWishlistRemoval(
+                      recipientUserId: memberUserId,
+                      wishlistTitle: wish.title,
+                      wishlistId: wish.id ?? '',
+                      removerName: currentUserName,
+                    );
+                  }
+                }
+              }
+            }
+
+            // Notify existing members about update (excluding newly added and removed)
+            final existingMembers =
+                _teamMembers.toSet().difference(addedMembers ?? {});
+            for (final memberEmail in existingMembers) {
+              if (memberEmail != currentUser.email) {
+                final memberUserDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: memberEmail.toLowerCase())
+                    .limit(1)
+                    .get();
+
+                if (memberUserDoc.docs.isNotEmpty) {
+                  final memberUserId = memberUserDoc.docs.first.id;
+                  await NotificationManager().notifyWishlistUpdate(
+                    recipientUserId: memberUserId,
+                    wishlistTitle: wish.title,
+                    wishlistId: wish.id ?? '',
+                    updaterName: currentUserName,
+                    action: 'updated',
+                  );
+                }
+              }
+            }
+          } else {
+            // New wishlist - notify all shared members
+            for (final memberEmail in _teamMembers) {
+              if (memberEmail != currentUser.email) {
+                final memberUserDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: memberEmail.toLowerCase())
+                    .limit(1)
+                    .get();
+
+                if (memberUserDoc.docs.isNotEmpty) {
+                  final memberUserId = memberUserDoc.docs.first.id;
+                  await NotificationManager().notifyWishlistInvitation(
+                    recipientUserId: memberUserId,
+                    wishlistTitle: wish.title,
+                    wishlistId: wish.id ?? '',
+                    inviterName: currentUserName,
+                  );
+                }
               }
             }
           }
