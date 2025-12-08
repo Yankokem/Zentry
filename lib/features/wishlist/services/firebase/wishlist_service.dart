@@ -120,9 +120,12 @@ class WishlistService {
     sharedSubscription = sharedWishesStream.listen(
       (snapshot) {
         try {
-          currentSharedWishes = snapshot.docs.map((doc) =>
-            Wish.fromFirestore(doc.id, doc.data() as Map<String, dynamic>)
-          ).toList();
+          // Filter to only include wishes where current user has accepted the invitation
+          currentSharedWishes = snapshot.docs
+              .map((doc) =>
+                  Wish.fromFirestore(doc.id, doc.data() as Map<String, dynamic>))
+              .where((wish) => wish.isSharedWithAccepted(userEmail))
+              .toList();
           emitCombined();
         } catch (e) {
           if (!controller.isClosed) {
@@ -341,6 +344,75 @@ class WishlistService {
       }
     } catch (e) {
       throw Exception('Failed to delete all wishes: $e');
+    }
+  }
+
+  // ===== WISHLIST INVITATION OPERATIONS =====
+
+  /// Accept a wishlist sharing invitation
+  Future<void> acceptWishlistInvitation(String wishId, String userEmail) async {
+    try {
+      final wishRef = _wishlistRef.doc(wishId);
+      final wishDoc = await wishRef.get();
+      
+      if (!wishDoc.exists) {
+        throw Exception('Wish not found');
+      }
+
+      final wishData = wishDoc.data() as Map<String, dynamic>;
+      final sharedWithDetails = (wishData['sharedWithDetails'] as List?)
+              ?.map((m) => Map<String, dynamic>.from(m as Map))
+              .toList() ??
+          [];
+
+      // Find and update the share status
+      final shareIndex = sharedWithDetails.indexWhere((s) => s['email'] == userEmail);
+      if (shareIndex != -1) {
+        sharedWithDetails[shareIndex]['status'] = 'accepted';
+        sharedWithDetails[shareIndex]['respondedAt'] = DateTime.now().toIso8601String();
+
+        await wishRef.update({
+          'sharedWithDetails': sharedWithDetails,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        throw Exception('Invitation not found');
+      }
+    } catch (e) {
+      throw Exception('Failed to accept wishlist invitation: $e');
+    }
+  }
+
+  /// Reject a wishlist sharing invitation
+  Future<void> rejectWishlistInvitation(String wishId, String userEmail) async {
+    try {
+      final wishRef = _wishlistRef.doc(wishId);
+      final wishDoc = await wishRef.get();
+      
+      if (!wishDoc.exists) {
+        throw Exception('Wish not found');
+      }
+
+      final wishData = wishDoc.data() as Map<String, dynamic>;
+      final sharedWithDetails = (wishData['sharedWithDetails'] as List?)
+              ?.map((m) => Map<String, dynamic>.from(m as Map))
+              .toList() ??
+          [];
+
+      // Remove the share invitation
+      sharedWithDetails.removeWhere((s) => s['email'] == userEmail);
+      
+      // Also remove from legacy sharedWith array
+      final sharedWith = List<String>.from(wishData['sharedWith'] ?? []);
+      sharedWith.remove(userEmail);
+
+      await wishRef.update({
+        'sharedWith': sharedWith,
+        'sharedWithDetails': sharedWithDetails,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Failed to reject wishlist invitation: $e');
     }
   }
 }

@@ -335,6 +335,75 @@ class FirestoreService {
     }
   }
 
+  // ===== PROJECT INVITATION OPERATIONS =====
+
+  /// Accept a project invitation
+  Future<void> acceptProjectInvitation(String projectId, String userEmail) async {
+    try {
+      final projectRef = _db.collection(projectsCollection).doc(projectId);
+      final projectDoc = await projectRef.get();
+      
+      if (!projectDoc.exists) {
+        throw Exception('Project not found');
+      }
+
+      final projectData = projectDoc.data()!;
+      final teamMemberDetails = (projectData['teamMemberDetails'] as List?)
+              ?.map((m) => Map<String, dynamic>.from(m as Map))
+              .toList() ??
+          [];
+
+      // Find and update the member's status
+      final memberIndex = teamMemberDetails.indexWhere((m) => m['email'] == userEmail);
+      if (memberIndex != -1) {
+        teamMemberDetails[memberIndex]['status'] = 'accepted';
+        teamMemberDetails[memberIndex]['respondedAt'] = DateTime.now().toIso8601String();
+
+        await projectRef.update({
+          'teamMemberDetails': teamMemberDetails,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        throw Exception('Invitation not found');
+      }
+    } catch (e) {
+      throw Exception('Failed to accept invitation: $e');
+    }
+  }
+
+  /// Reject a project invitation
+  Future<void> rejectProjectInvitation(String projectId, String userEmail) async {
+    try {
+      final projectRef = _db.collection(projectsCollection).doc(projectId);
+      final projectDoc = await projectRef.get();
+      
+      if (!projectDoc.exists) {
+        throw Exception('Project not found');
+      }
+
+      final projectData = projectDoc.data()!;
+      final teamMemberDetails = (projectData['teamMemberDetails'] as List?)
+              ?.map((m) => Map<String, dynamic>.from(m as Map))
+              .toList() ??
+          [];
+
+      // Remove the member from the list
+      teamMemberDetails.removeWhere((m) => m['email'] == userEmail);
+      
+      // Also remove from legacy teamMembers array
+      final teamMembers = List<String>.from(projectData['teamMembers'] ?? []);
+      teamMembers.remove(userEmail);
+
+      await projectRef.update({
+        'teamMembers': teamMembers,
+        'teamMemberDetails': teamMemberDetails,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Failed to reject invitation: $e');
+    }
+  }
+
   // ===== TICKET OPERATIONS =====
 
   // Create a new ticket (now stored in project subcollection)

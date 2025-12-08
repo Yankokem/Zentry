@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:zentry/core/core.dart';
 import 'package:zentry/core/services/firebase/notification_manager.dart';
 import 'package:zentry/features/wishlist/wishlist.dart';
+import 'package:zentry/features/wishlist/models/shared_with_detail_model.dart';
 
 class AddWishlistScreen extends StatefulWidget {
   final WishlistController controller;
@@ -137,8 +138,33 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       removedMembers = oldMembers.difference(newMembers);
     }
 
+    // Build sharedWithDetails with status information
+    final List<SharedWithDetail> sharedWithDetails = _teamMembers.map((email) {
+      // Check if this is an existing share or new invitation
+      if (widget.itemToEdit != null) {
+        try {
+          final existingShare = widget.itemToEdit!.sharedWithDetails
+              .firstWhere((s) => s.email == email);
+          
+          // Keep existing status for old members
+          if (existingShare.status == 'accepted' || existingShare.status == 'rejected') {
+            return existingShare;
+          }
+        } catch (e) {
+          // Member not found in existing shares, create new pending invitation
+        }
+      }
+      
+      // Create new pending invitation for new members
+      return SharedWithDetail(
+        email: email,
+        status: 'pending',
+      );
+    }).toList();
+
     final wish = Wish(
       id: widget.itemToEdit?.id,
+      userId: widget.itemToEdit?.userId ?? FirebaseAuth.instance.currentUser?.uid ?? '',
       title: _titleController.text.trim(),
       price: _priceController.text.trim(),
       category: _selectedCategory,
@@ -146,20 +172,24 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       dateAdded: widget.itemToEdit?.dateAdded ?? _getCurrentDate(),
       completed: widget.itemToEdit?.completed ?? false,
       sharedWith: _teamMembers,
+      sharedWithDetails: sharedWithDetails,
       imageUrl: imageUrl,
     );
 
     debugPrint('📦 Wish object sharedWith: ${wish.sharedWith}');
 
     bool success;
+    String? createdWishId;
     if (isEditing) {
       success = await widget.controller.updateWish(wish);
+      createdWishId = wish.id; // Use existing ID for edits
     } else {
-      success = await widget.controller.createWish(wish);
+      createdWishId = await widget.controller.createWish(wish);
+      success = createdWishId != null;
     }
 
     // Send notifications to shared members
-    if (success) {
+    if (success && createdWishId != null) {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
         try {
@@ -183,7 +213,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                     await NotificationManager().notifyWishlistInvitation(
                       recipientUserId: memberUserId,
                       wishlistTitle: wish.title,
-                      wishlistId: wish.id ?? '',
+                      wishlistId: createdWishId,
                       inviterName: currentUserName,
                     );
                   }
@@ -214,26 +244,33 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
               }
             }
 
-            // Notify existing members about update (excluding newly added and removed)
+            // Notify existing accepted members about update (excluding newly added and removed)
             final existingMembers =
                 _teamMembers.toSet().difference(addedMembers ?? {});
             for (final memberEmail in existingMembers) {
               if (memberEmail != currentUser.email) {
-                final memberUserDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .where('email', isEqualTo: memberEmail.toLowerCase())
-                    .limit(1)
-                    .get();
+                // Only notify if they have accepted the wishlist
+                final shareDetail = wish.sharedWithDetails
+                    .firstWhere((s) => s.email == memberEmail, 
+                        orElse: () => SharedWithDetail(email: memberEmail, status: 'pending'));
+                
+                if (shareDetail.isAccepted) {
+                  final memberUserDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .where('email', isEqualTo: memberEmail.toLowerCase())
+                      .limit(1)
+                      .get();
 
-                if (memberUserDoc.docs.isNotEmpty) {
-                  final memberUserId = memberUserDoc.docs.first.id;
-                  await NotificationManager().notifyWishlistUpdate(
-                    recipientUserId: memberUserId,
-                    wishlistTitle: wish.title,
-                    wishlistId: wish.id ?? '',
-                    updaterName: currentUserName,
-                    action: 'updated',
-                  );
+                  if (memberUserDoc.docs.isNotEmpty) {
+                    final memberUserId = memberUserDoc.docs.first.id;
+                    await NotificationManager().notifyWishlistUpdate(
+                      recipientUserId: memberUserId,
+                      wishlistTitle: wish.title,
+                      wishlistId: wish.id ?? '',
+                      updaterName: currentUserName,
+                      action: 'updated',
+                    );
+                  }
                 }
               }
             }
@@ -252,7 +289,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                   await NotificationManager().notifyWishlistInvitation(
                     recipientUserId: memberUserId,
                     wishlistTitle: wish.title,
-                    wishlistId: wish.id ?? '',
+                    wishlistId: createdWishId,
                     inviterName: currentUserName,
                   );
                 }

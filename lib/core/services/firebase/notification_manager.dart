@@ -101,6 +101,7 @@ class NotificationManager {
           isRead: data['isRead'] ?? false,
           createdAt:
               (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          responseStatus: data['responseStatus'],
         );
       }).toList();
     });
@@ -116,6 +117,19 @@ class NotificationManager {
         .map((snapshot) => snapshot.docs.length);
   }
 
+  /// Update notification response status (accepted/rejected)
+  Future<void> updateNotificationResponse(String notificationId, String status) async {
+    try {
+      await _firestore.collection('notifications').doc(notificationId).update({
+        'responseStatus': status,
+        'respondedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error updating notification response: $e');
+      rethrow;
+    }
+  }
+
   // ==================== Notification Triggers ====================
 
   /// Notify when added to a project
@@ -124,16 +138,18 @@ class NotificationManager {
     required String projectTitle,
     required String projectId,
     required String inviterName,
+    String? role,
   }) async {
     await _createNotification(
       userId: recipientUserId,
       title: 'New Project Invitation',
-      body: '$inviterName added you to "$projectTitle"',
+      body: '$inviterName added you to "$projectTitle"${role != null ? ' as $role' : ''}',
       type: 'project_invitation',
       data: {
         'projectId': projectId,
         'projectTitle': projectTitle,
         'inviterName': inviterName,
+        if (role != null) 'role': role,
       },
     );
   }
@@ -432,6 +448,82 @@ class NotificationManager {
       },
     );
   }
+
+  /// Notify owner when project invitation is accepted
+  Future<void> notifyProjectInvitationAccepted({
+    required String recipientUserId,
+    required String projectTitle,
+    required String projectId,
+    required String accepterName,
+  }) async {
+    await _createNotification(
+      userId: recipientUserId,
+      title: 'Project Invitation Accepted',
+      body: '$accepterName accepted your invitation to "$projectTitle"',
+      type: 'project_invitation_accepted',
+      data: {
+        'projectId': projectId,
+        'projectTitle': projectTitle,
+      },
+    );
+  }
+
+  /// Notify owner when project invitation is rejected
+  Future<void> notifyProjectInvitationRejected({
+    required String recipientUserId,
+    required String projectTitle,
+    required String projectId,
+    required String rejecterName,
+  }) async {
+    await _createNotification(
+      userId: recipientUserId,
+      title: 'Project Invitation Declined',
+      body: '$rejecterName declined your invitation to "$projectTitle"',
+      type: 'project_invitation_rejected',
+      data: {
+        'projectId': projectId,
+        'projectTitle': projectTitle,
+      },
+    );
+  }
+
+  /// Notify owner when wishlist invitation is accepted
+  Future<void> notifyWishlistInvitationAccepted({
+    required String recipientUserId,
+    required String wishlistTitle,
+    required String wishlistId,
+    required String accepterName,
+  }) async {
+    await _createNotification(
+      userId: recipientUserId,
+      title: 'Wishlist Invitation Accepted',
+      body: '$accepterName accepted your wishlist invitation for "$wishlistTitle"',
+      type: 'wishlist_invitation_accepted',
+      data: {
+        'wishlistId': wishlistId,
+        'wishlistTitle': wishlistTitle,
+      },
+    );
+  }
+
+  /// Notify owner when wishlist invitation is rejected
+  Future<void> notifyWishlistInvitationRejected({
+    required String recipientUserId,
+    required String wishlistTitle,
+    required String wishlistId,
+    required String rejecterName,
+  }) async {
+    await _createNotification(
+      userId: recipientUserId,
+      title: 'Wishlist Invitation Declined',
+      body: '$rejecterName declined your wishlist invitation for "$wishlistTitle"',
+      type: 'wishlist_invitation_rejected',
+      data: {
+        'wishlistId': wishlistId,
+        'wishlistTitle': wishlistTitle,
+      },
+    );
+  }
 }
 
 /// Notification model for in-app notifications
@@ -444,6 +536,7 @@ class AppNotification {
   final Map<String, dynamic> data;
   final bool isRead;
   final DateTime createdAt;
+  final String? responseStatus; // 'accepted', 'rejected', or null for pending
 
   AppNotification({
     required this.id,
@@ -454,6 +547,7 @@ class AppNotification {
     required this.data,
     required this.isRead,
     required this.createdAt,
+    this.responseStatus,
   });
 
   String getTimeAgo() {
@@ -510,6 +604,10 @@ class AppNotification {
     switch (type) {
       case 'project_invitation':
         return Colors.blue;
+      case 'project_invitation_accepted':
+        return Colors.green;
+      case 'project_invitation_rejected':
+        return Colors.red.shade300;
       case 'project_removal':
         return Colors.red.shade400;
       case 'task_assigned':
@@ -526,6 +624,10 @@ class AppNotification {
         return Colors.pink;
       case 'wishlist_invitation':
         return Colors.pink.shade300;
+      case 'wishlist_invitation_accepted':
+        return Colors.green;
+      case 'wishlist_invitation_rejected':
+        return Colors.red.shade300;
       case 'wishlist_removal':
         return Colors.red.shade300;
       case 'journal_milestone':

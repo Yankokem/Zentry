@@ -9,6 +9,7 @@ export 'views/add_wishlist_screen.dart';
 // Models
 export 'models/wish_model.dart';
 export 'models/category_model.dart';
+export 'models/shared_with_detail_model.dart';
 
 // Services
 export 'services/wishlist_manager.dart';

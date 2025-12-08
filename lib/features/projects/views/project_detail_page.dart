@@ -311,19 +311,23 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Widget _buildMemberTile(String displayName, String email, String profileUrl) {
+    // Check if member is pending
+    final isPending = widget.project.isMemberPending(email);
+    
     return Row(
       children: [
         CircleAvatar(
           radius: 20,
           backgroundImage:
               profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
-          backgroundColor: Colors.grey.shade300,
+          backgroundColor: isPending ? Colors.orange.shade100 : Colors.grey.shade300,
           child: profileUrl.isEmpty
               ? Text(
                   displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
+                    color: isPending ? Colors.orange : null,
                   ),
                 )
               : null,
@@ -333,12 +337,35 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                displayName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
+              Row(
+                children: [
+                  Text(
+                    displayName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (isPending) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange.shade300),
+                      ),
+                      child: Text(
+                        'Pending',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               Text(
                 email,
@@ -902,7 +929,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   void _showEditTicketDialog(Ticket ticket) {
     TicketDialogs.showEditTicketDialog(
-        context, ticket, widget.project.teamMembers, _refreshTickets);
+        context, ticket, widget.project, _refreshTickets);
   }
 
   Color _getColorForEmail(String email) {

@@ -14,6 +14,7 @@ export 'models/project_model.dart';
 export 'models/ticket_model.dart';
 export 'models/task_model.dart';
 export 'models/project_role_model.dart';
+export 'models/team_member_model.dart';
 
 // Services
 export 'services/project_manager.dart';

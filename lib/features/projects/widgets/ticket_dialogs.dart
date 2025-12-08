@@ -436,7 +436,7 @@ class TicketDialogs {
                                     context: context,
                                     builder: (context) => MultiSelectDialog(
                                       title: 'Assign To',
-                                      items: project.teamMembers,
+                                      items: project.acceptedMemberEmails,
                                       selectedItems: selectedAssignees,
                                       onSelectionChanged: (selected) {
                                         setDialogState(() {
@@ -503,6 +503,25 @@ class TicketDialogs {
               onPressed: () {
                 if (titleController.text.isNotEmpty &&
                     descController.text.isNotEmpty) {
+                  // Validate all assignees are accepted members
+                  final pendingAssignees = selectedAssignees
+                      .where((email) => !project.acceptedMemberEmails.contains(email))
+                      .toList();
+                  
+                  if (pendingAssignees.isNotEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Cannot assign to pending members: ${pendingAssignees.join(", ")}',
+                        ),
+                        backgroundColor: Colors.orange,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                    return;
+                  }
+
                   // Generate ticket number
                   final ticketNumber = 'TICK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
@@ -557,7 +576,7 @@ class TicketDialogs {
   static void showEditTicketDialog(
     BuildContext context,
     Ticket ticket,
-    List<String> teamMembers,
+    Project project,
     VoidCallback refreshTickets,
   ) {
     final titleController = TextEditingController(text: ticket.title);
@@ -940,7 +959,7 @@ class TicketDialogs {
                                 context: context,
                                 builder: (context) => MultiSelectDialog(
                                   title: 'Assign To',
-                                  items: teamMembers,
+                                  items: project.acceptedMemberEmails,
                                   selectedItems: selectedAssignees,
                                   onSelectionChanged: (selected) {
                                     setDialogState(() {
@@ -1005,6 +1024,25 @@ class TicketDialogs {
               onPressed: () {
                 if (titleController.text.isNotEmpty &&
                     descController.text.isNotEmpty) {
+                  // Validate all assignees are accepted members
+                  final pendingAssignees = selectedAssignees
+                      .where((email) => !project.acceptedMemberEmails.contains(email))
+                      .toList();
+                  
+                  if (pendingAssignees.isNotEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Cannot assign to pending members: ${pendingAssignees.join(", ")}',
+                        ),
+                        backgroundColor: Colors.orange,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                    return;
+                  }
+
                   final updatedTicket = ticket.copyWith(
                     title: titleController.text,
                     description: descController.text,

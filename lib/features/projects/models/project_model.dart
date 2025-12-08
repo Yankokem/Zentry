@@ -1,12 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'project_role_model.dart';
+import 'team_member_model.dart';
 
 class Project {
   final String id;
   final String userId;
   final String title;
   final String description;
-  final List<String> teamMembers;
+  final List<String> teamMembers; // Kept for backward compatibility
+  final List<TeamMember> teamMemberDetails; // New detailed member info
   final String status;
   final int totalTickets;
   final int completedTickets;
@@ -24,6 +26,7 @@ class Project {
     required this.title,
     required this.description,
     required this.teamMembers,
+    this.teamMemberDetails = const [],
     required this.status,
     required this.totalTickets,
     required this.completedTickets,
@@ -36,6 +39,22 @@ class Project {
     this.roles = const [],
   }) : createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
+  
+  // Helper getters for team member management
+  List<TeamMember> get acceptedMembers => 
+      teamMemberDetails.where((m) => m.isAccepted).toList();
+  
+  List<TeamMember> get pendingMembers => 
+      teamMemberDetails.where((m) => m.isPending).toList();
+  
+  List<String> get acceptedMemberEmails =>
+      acceptedMembers.map((m) => m.email).toList();
+  
+  bool isMemberAccepted(String email) =>
+      acceptedMembers.any((m) => m.email == email);
+  
+  bool isMemberPending(String email) =>
+      pendingMembers.any((m) => m.email == email);
 
   Project copyWith({
     String? id,
@@ -43,6 +62,7 @@ class Project {
     String? title,
     String? description,
     List<String>? teamMembers,
+    List<TeamMember>? teamMemberDetails,
     String? status,
     int? totalTickets,
     int? completedTickets,
@@ -60,6 +80,7 @@ class Project {
       title: title ?? this.title,
       description: description ?? this.description,
       teamMembers: teamMembers ?? this.teamMembers,
+      teamMemberDetails: teamMemberDetails ?? this.teamMemberDetails,
       status: status ?? this.status,
       totalTickets: totalTickets ?? this.totalTickets,
       completedTickets: completedTickets ?? this.completedTickets,
@@ -85,6 +106,7 @@ class Project {
       'title': title,
       'description': description,
       'teamMembers': teamMembers,
+      'teamMemberDetails': teamMemberDetails.map((m) => m.toMap()).toList(),
       'status': status,
       'totalTickets': totalTickets,
       'completedTickets': completedTickets,
@@ -99,12 +121,32 @@ class Project {
   }
 
   factory Project.fromMap(Map<String, dynamic> map) {
+    // Handle backward compatibility: if teamMemberDetails doesn't exist,
+    // create it from teamMembers with 'accepted' status
+    List<TeamMember> memberDetails = [];
+    if (map['teamMemberDetails'] != null) {
+      memberDetails = (map['teamMemberDetails'] as List)
+          .map((m) => TeamMember.fromMap(m as Map<String, dynamic>))
+          .toList();
+    } else if (map['teamMembers'] != null) {
+      // Migrate old data: assume existing members are accepted
+      memberDetails = (map['teamMembers'] as List)
+          .map((email) => TeamMember(
+                email: email as String,
+                status: 'accepted',
+                invitedAt: DateTime.now(),
+                respondedAt: DateTime.now(),
+              ))
+          .toList();
+    }
+    
     return Project(
       id: map['id'],
       userId: map['userId'],
       title: map['title'],
       description: map['description'],
-      teamMembers: List<String>.from(map['teamMembers']),
+      teamMembers: List<String>.from(map['teamMembers'] ?? []),
+      teamMemberDetails: memberDetails,
       status: map['status'],
       totalTickets: map['totalTickets'],
       completedTickets: map['completedTickets'],

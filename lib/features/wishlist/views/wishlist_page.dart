@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/features/wishlist/wishlist.dart';
@@ -19,6 +20,7 @@ class WishlistPage extends StatefulWidget {
 class _WishlistPageState extends State<WishlistPage> {
   WishlistController? _controller;
   String _selectedCategory = 'all';
+  String _selectedOwnership = 'personal'; // Default to 'personal'
   final UserService _userService = UserService();
   Map<String, Map<String, String>> _userDetails = {};
   bool _isLoadingUsers = true;
@@ -149,9 +151,20 @@ class _WishlistPageState extends State<WishlistPage> {
   List<Wish> _getFilteredItems() {
     if (_controller == null) return [];
     final wishes = _controller!.wishes;
-    List<Wish> filtered = _selectedCategory == 'all'
-        ? wishes
-        : wishes.where((item) => item.category == _selectedCategory).toList();
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    
+    // First filter by ownership (personal/shared)
+    List<Wish> filtered = wishes;
+    if (_selectedOwnership == 'personal') {
+      filtered = wishes.where((wish) => wish.isOwner(currentUserId)).toList();
+    } else if (_selectedOwnership == 'shared') {
+      filtered = wishes.where((wish) => !wish.isOwner(currentUserId)).toList();
+    }
+    
+    // Then filter by category
+    if (_selectedCategory != 'all') {
+      filtered = filtered.where((item) => item.category == _selectedCategory).toList();
+    }
 
     // Sort by dateAdded in descending order (most recent first)
     filtered.sort((a, b) {
@@ -319,20 +332,56 @@ class _WishlistPageState extends State<WishlistPage> {
                 ),
               ),
 
-              // Items list
+              // Items list with toggle inside
               Expanded(
                 child: Container(
                   color: Colors.grey.shade100,
-                  child: filteredItems.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          padding:
-                              const EdgeInsets.all(AppConstants.paddingMedium),
-                          itemCount: filteredItems.length,
-                          itemBuilder: (context, index) {
-                            return _buildWishCard(filteredItems[index]);
-                          },
+                  child: Column(
+                    children: [
+                      // Ownership filter toggle
+                      Container(
+                        color: Colors.grey.shade100,
+                        padding: const EdgeInsets.fromLTRB(
+                          AppConstants.paddingLarge,
+                          12,
+                          AppConstants.paddingLarge,
+                          12,
                         ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(25),
+                            border: Border.all(
+                              color: const Color(0xFFF9ED69),
+                              width: 2,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _buildOwnershipToggle('personal', 'Personal'),
+                              ),
+                              Expanded(
+                                child: _buildOwnershipToggle('shared', 'Shared'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Items list
+                      Expanded(
+                        child: filteredItems.isEmpty
+                            ? _buildEmptyState()
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                                itemCount: filteredItems.length,
+                                itemBuilder: (context, index) {
+                                  return _buildWishCard(filteredItems[index]);
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -352,6 +401,33 @@ class _WishlistPageState extends State<WishlistPage> {
           extendBody: true,
         );
       },
+    );
+  }
+
+  Widget _buildOwnershipToggle(String ownership, String label) {
+    final isSelected = _selectedOwnership == ownership;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedOwnership = ownership;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFF9ED69) : Colors.white,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isSelected ? const Color(0xFF1E1E1E) : const Color(0xFF1E1E1E),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+      ),
     );
   }
 
@@ -802,7 +878,9 @@ class _WishlistPageState extends State<WishlistPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    if (item.sharedWith.isNotEmpty) ...[
+                    // Only show Shared With section to the owner and if there are shares
+                    if (item.isOwner(FirebaseAuth.instance.currentUser?.uid ?? '') && 
+                        item.sharedWithDetails.isNotEmpty) ...[
                       Text(
                         'Shared With',
                         style:
@@ -810,72 +888,83 @@ class _WishlistPageState extends State<WishlistPage> {
                                   fontWeight: FontWeight.bold,
                                 ),
                       ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 32,
-                        width: _calculateSharedWithStackWidth(
-                            item.sharedWith.length),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children:
-                              item.sharedWith.asMap().entries.map((entry) {
-                            final i = entry.key;
-                            final email = entry.value;
-                            final details = _userDetails[email] ?? {};
-                            final fullName = details['fullName'] ?? '';
-                            final displayName =
-                                fullName.isNotEmpty ? fullName : email;
-                            final profileUrl =
-                                details['profilePictureUrl'] ?? '';
+                      const SizedBox(height: 12),
+                      ...item.sharedWithDetails.map((shareDetail) {
+                        final email = shareDetail.email;
+                        final details = _userDetails[email] ?? {};
+                        final fullName = details['fullName'] ?? '';
+                        final displayName =
+                            fullName.isNotEmpty ? fullName : email;
+                        final profileUrl =
+                            details['profilePictureUrl'] ?? '';
+                        final isPending = shareDetail.isPending;
 
-                            return Positioned(
-                              left: i * 22.0,
-                              child: GestureDetector(
-                                onDoubleTap: () {
-                                  // Show name in SnackBar for mobile users
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(displayName),
-                                      duration: const Duration(seconds: 2),
-                                      behavior: SnackBarBehavior.floating,
-                                      margin: const EdgeInsets.all(16),
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundImage: profileUrl.isNotEmpty
+                                    ? NetworkImage(profileUrl)
+                                    : null,
+                                backgroundColor: isPending 
+                                    ? Colors.orange.shade100 
+                                    : Colors.grey.shade300,
+                                child: profileUrl.isEmpty
+                                    ? Text(
+                                        displayName.isNotEmpty
+                                            ? displayName[0].toUpperCase()
+                                            : '?',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: isPending 
+                                              ? Colors.orange.shade700 
+                                              : Colors.grey.shade700,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      displayName,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  );
-                                },
-                                child: Tooltip(
-                                  message: displayName,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: Colors.white, width: 2),
-                                    ),
-                                    child: CircleAvatar(
-                                      radius: 18,
-                                      backgroundImage: profileUrl.isNotEmpty
-                                          ? NetworkImage(profileUrl)
-                                          : null,
-                                      backgroundColor: Colors.grey.shade300,
-                                      child: profileUrl.isEmpty
-                                          ? Text(
-                                              displayName.isNotEmpty
-                                                  ? displayName[0].toUpperCase()
-                                                  : '?',
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            )
-                                          : null,
-                                    ),
-                                  ),
+                                    if (isPending)
+                                      Container(
+                                        margin: const EdgeInsets.only(top: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange.shade100,
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'Pending',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.orange.shade700,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      const SizedBox(height: 4),
                     ],
                     Text(
                       'Notes',
@@ -913,37 +1002,59 @@ class _WishlistPageState extends State<WishlistPage> {
               ),
               child: Row(
                 children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _showEditDialog(item);
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Edit'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF9ED69),
-                        foregroundColor: const Color(0xFF1E1E1E),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                  // Show edit/delete only to owner
+                  if (item.isOwner(FirebaseAuth.instance.currentUser?.uid ?? '')) ...[
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showEditDialog(item);
+                        },
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF9ED69),
+                          foregroundColor: const Color(0xFF1E1E1E),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _confirmDelete(item);
-                      },
-                      icon: const Icon(Icons.delete),
-                      label: const Text('Delete'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey.shade800,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _confirmDelete(item);
+                        },
+                        icon: const Icon(Icons.delete),
+                        label: const Text('Delete'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade800,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ),
-                  ),
+                  ] else ...[
+                    // Shared users can only view - show info text
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Shared item - View only',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1000,22 +1111,25 @@ class _WishlistPageState extends State<WishlistPage> {
                 }
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.edit, color: Color(0xFF1E1E1E)),
-              title: const Text('Edit'),
-              onTap: () {
-                Navigator.pop(context);
-                _showEditDialog(item);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDelete(item);
-              },
-            ),
+            // Only show edit/delete to owner
+            if (item.isOwner(FirebaseAuth.instance.currentUser?.uid ?? '')) ...[
+              ListTile(
+                leading: const Icon(Icons.edit, color: Color(0xFF1E1E1E)),
+                title: const Text('Edit'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEditDialog(item);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Delete'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDelete(item);
+                },
+              ),
+            ],
             const SizedBox(height: 20),
           ],
         ),

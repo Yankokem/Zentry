@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/wish_model.dart';
 import '../models/category_model.dart';
 import '../services/firebase/wishlist_service.dart';
 import '../services/firebase/category_service.dart';
+import '../../../core/services/firebase/notification_manager.dart';
+import '../../../core/core.dart';
 
 /// Controller for managing wishlist state and business logic
 /// Uses ChangeNotifier for reactive state management
@@ -84,15 +88,15 @@ class WishlistController extends ChangeNotifier {
   }
 
   /// Create a new wish
-  Future<bool> createWish(Wish wish) async {
+  Future<String?> createWish(Wish wish) async {
     try {
       _error = null;
-      await _service.createWish(wish);
-      return true;
+      final wishId = await _service.createWish(wish);
+      return wishId;
     } catch (e) {
       _error = 'Failed to create wish: $e';
       notifyListeners();
-      return false;
+      return null;
     }
   }
 
@@ -125,7 +129,46 @@ class WishlistController extends ChangeNotifier {
       }
 
       _error = null;
-      await _service.toggleCompleted(wish.id!, !wish.completed);
+      final newCompletedStatus = !wish.completed;
+      await _service.toggleCompleted(wish.id!, newCompletedStatus);
+      
+      // Notify accepted members if wishlist is marked as acquired
+      if (newCompletedStatus && wish.acceptedShares.isNotEmpty) {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          try {
+            final firestoreService = FirestoreService();
+            final currentUserData = await firestoreService.getUserData(currentUser.uid);
+            final currentUserName = currentUserData?['fullName'] ?? 'Someone';
+            
+            for (final shareDetail in wish.acceptedShares) {
+              final memberEmail = shareDetail.email;
+              if (memberEmail != currentUser.email) {
+                final memberUserDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: memberEmail.toLowerCase())
+                    .limit(1)
+                    .get();
+
+                if (memberUserDoc.docs.isNotEmpty) {
+                  final memberUserId = memberUserDoc.docs.first.id;
+                  await NotificationManager().notifyWishlistUpdate(
+                    recipientUserId: memberUserId,
+                    wishlistTitle: wish.title,
+                    wishlistId: wish.id!,
+                    updaterName: currentUserName,
+                    action: 'acquired',
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint('Failed to send notifications: $e');
+            // Don't fail the toggle operation if notifications fail
+          }
+        }
+      }
+      
       return true;
     } catch (e) {
       _error = 'Failed to toggle wish: $e';

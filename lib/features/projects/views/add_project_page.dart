@@ -307,6 +307,31 @@ class _AddProjectPageState extends State<AddProjectPage> {
     );
   }
 
+  // Helper method to find role for a member
+  String? _getMemberRole(String email) {
+    for (final role in _roles) {
+      if (role.members.contains(email)) {
+        return role.name;
+      }
+    }
+    return null;
+  }
+
+  // Helper method to create teamMemberDetails from teamMembers
+  List<TeamMember> _buildTeamMemberDetails(String currentUserEmail) {
+    return _teamMembers.map((email) {
+      final role = _getMemberRole(email);
+      // Current user (creator) is always accepted, others start as pending
+      final status = email == currentUserEmail ? 'accepted' : 'pending';
+      return TeamMember(
+        email: email,
+        status: status,
+        role: role,
+        invitedAt: DateTime.now(),
+      );
+    }).toList();
+  }
+
   void _saveProject() async {
     if (_formKey.currentState!.validate()) {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -319,11 +344,15 @@ class _AddProjectPageState extends State<AddProjectPage> {
         final addedMembers = newMembers.difference(oldMembers);
         final removedMembers = oldMembers.difference(newMembers);
 
+        // Build updated teamMemberDetails
+        final teamMemberDetails = _buildTeamMemberDetails(currentUser.email!);
+        
         // Update existing project
         final updatedProject = widget.projectToEdit!.copyWith(
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
           teamMembers: _teamMembers,
+          teamMemberDetails: teamMemberDetails,
           status: _selectedStatus,
           color: _selectedColor,
           roles: _roles,
@@ -348,11 +377,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
                 if (memberDoc.docs.isNotEmpty) {
                   final memberId = memberDoc.docs.first.id;
+                  final memberRole = _getMemberRole(memberEmail);
                   await NotificationManager().notifyProjectInvitation(
                     recipientUserId: memberId,
                     projectTitle: _titleController.text.trim(),
                     projectId: widget.projectToEdit!.id,
                     inviterName: currentUserName,
+                    role: memberRole,
                   );
                 }
               }
@@ -462,6 +493,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
           }
         }
       } else {
+        // Build teamMemberDetails for new project
+        final teamMemberDetails = _buildTeamMemberDetails(currentUser.email!);
+        
         // Create new project
         final newProject = Project(
           id: 'proj_${DateTime.now().millisecondsSinceEpoch}',
@@ -469,6 +503,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
           teamMembers: _teamMembers,
+          teamMemberDetails: teamMemberDetails,
           status: _selectedStatus,
           totalTickets: 0,
           completedTickets: 0,
@@ -496,11 +531,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
                 if (memberDoc.docs.isNotEmpty) {
                   final memberId = memberDoc.docs.first.id;
+                  final memberRole = _getMemberRole(memberEmail);
                   await NotificationManager().notifyProjectInvitation(
                     recipientUserId: memberId,
                     projectTitle: _titleController.text.trim(),
                     projectId: newProject.id,
                     inviterName: currentUserName,
+                    role: memberRole,
                   );
                 }
               }

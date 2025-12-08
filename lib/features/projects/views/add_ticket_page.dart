@@ -32,7 +32,9 @@ class _AddTicketPageState extends State<AddTicketPage> {
   @override
   void initState() {
     super.initState();
-    selectedAssignees = [widget.project.teamMembers.first];
+    if (widget.project.acceptedMemberEmails.isNotEmpty) {
+      selectedAssignees = [widget.project.acceptedMemberEmails.first];
+    }
   }
 
   Color _getProjectColor() {
@@ -533,6 +535,28 @@ class _AddTicketPageState extends State<AddTicketPage> {
         return;
       }
 
+      // Validate all assignees are accepted members
+      final pendingAssignees = selectedAssignees
+          .where((email) => !widget.project.acceptedMemberEmails.contains(email))
+          .toList();
+      
+      if (pendingAssignees.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Cannot assign to pending members: ${pendingAssignees.join(", ")}. They must accept the project invitation first.',
+            ),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+        return;
+      }
+
       // Generate ticket number
       final ticketNumber =
           'TICK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
@@ -669,7 +693,7 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
   Future<void> _loadUserDetails() async {
     try {
       _userDetails = await _userService
-          .getUsersDetailsByEmails(widget.project.teamMembers);
+          .getUsersDetailsByEmails(widget.project.acceptedMemberEmails);
     } catch (e) {
       _userDetails = {};
     }
@@ -768,7 +792,7 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
 
     for (final role in widget.project.roles) {
       final roleMembers = role.members
-          .where((email) => widget.project.teamMembers.contains(email))
+          .where((email) => widget.project.acceptedMemberEmails.contains(email))
           .toList();
 
       if (roleMembers.isNotEmpty) {
@@ -876,7 +900,7 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
     }
 
     // Add "Other Members" section for users not in any role
-    final unassignedMembers = widget.project.teamMembers
+    final unassignedMembers = widget.project.acceptedMemberEmails
         .where((email) =>
             !widget.project.roles.any((role) => role.members.contains(email)))
         .toList();
