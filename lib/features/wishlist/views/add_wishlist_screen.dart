@@ -1,10 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:zentry/core/core.dart';
+import 'package:zentry/core/services/firebase/notification_manager.dart';
 import 'package:zentry/features/wishlist/wishlist.dart';
-
-
-
-
 
 class AddWishlistScreen extends StatefulWidget {
   final WishlistController controller;
@@ -28,12 +29,15 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
   final _notesController = TextEditingController();
   final _userService = UserService();
   final _firestoreService = FirestoreService();
+  final _cloudinaryService = CloudinaryService();
   final List<String> _teamMembers = [];
   List<String> _suggestedEmails = [];
   bool _isSearching = false;
 
   String _selectedCategory = 'tech';
   bool _isLoading = false;
+  File? _selectedImage;
+  String? _uploadedImageUrl;
 
   @override
   void initState() {
@@ -44,6 +48,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       _notesController.text = widget.itemToEdit!.notes;
       _selectedCategory = widget.itemToEdit!.category;
       _teamMembers.addAll(widget.itemToEdit!.sharedWith);
+      _uploadedImageUrl = widget.itemToEdit!.imageUrl;
     }
   }
 
@@ -60,6 +65,50 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     return widget.controller.getCategoryColor(category);
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
+    }
+  }
+
+  Future<String?> _uploadWishlistImage() async {
+    if (_selectedImage == null) return _uploadedImageUrl;
+
+    try {
+      final imageUrl = await _cloudinaryService.uploadImage(
+        _selectedImage!,
+        uploadType: CloudinaryUploadType.wishlistImage,
+        publicId: 'wishlist_${DateTime.now().millisecondsSinceEpoch}',
+      );
+      return imageUrl;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
+      return null;
+    }
+  }
+
   Future<void> _saveWishlistItem() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -67,7 +116,14 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
 
     setState(() => _isLoading = true);
 
-    debugPrint('📝 Saving wishlist with ${_teamMembers.length} shared members: $_teamMembers');
+    debugPrint(
+        '📝 Saving wishlist with ${_teamMembers.length} shared members: $_teamMembers');
+
+    // Upload image if selected
+    String? imageUrl = _uploadedImageUrl;
+    if (_selectedImage != null) {
+      imageUrl = await _uploadWishlistImage();
+    }
 
     final wish = Wish(
       id: widget.itemToEdit?.id,
@@ -78,17 +134,55 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       dateAdded: widget.itemToEdit?.dateAdded ?? _getCurrentDate(),
       completed: widget.itemToEdit?.completed ?? false,
       sharedWith: _teamMembers,
+      imageUrl: imageUrl,
     );
 
     debugPrint('📦 Wish object sharedWith: ${wish.sharedWith}');
 
     bool success;
-    if (widget.itemToEdit != null) {
+    final bool isEditing = widget.itemToEdit != null;
+    if (isEditing) {
       success = await widget.controller.updateWish(wish);
     } else {
       success = await widget.controller.createWish(wish);
     }
 
+    // Send notifications to shared members
+    if (success && _teamMembers.isNotEmpty) {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        try {
+          final currentUserData =
+              await _firestoreService.getUserData(currentUser.uid);
+          final currentUserName = currentUserData?['fullName'] ?? 'Someone';
+
+          // Notify each shared member (except current user)
+          for (final memberEmail in _teamMembers) {
+            if (memberEmail != currentUser.email) {
+              // Query Firestore to get user ID from email
+              final memberUserDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .where('email', isEqualTo: memberEmail.toLowerCase())
+                  .limit(1)
+                  .get();
+
+              if (memberUserDoc.docs.isNotEmpty) {
+                final memberUserId = memberUserDoc.docs.first.id;
+                await NotificationManager().notifyWishlistUpdate(
+                  recipientUserId: memberUserId,
+                  wishlistTitle: wish.title,
+                  wishlistId: wish.id ?? '',
+                  updaterName: currentUserName,
+                  action: isEditing ? 'updated' : 'added',
+                );
+              }
+            }
+          }
+        } catch (e) {
+          print('Error sending wishlist notifications: $e');
+        }
+      }
+    }
     setState(() => _isLoading = false);
 
     if (success && mounted) {
@@ -204,8 +298,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                               color: color,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color:
-                                    isSelected ? Colors.black : Colors.grey,
+                                color: isSelected ? Colors.black : Colors.grey,
                                 width: isSelected ? 3 : 1,
                               ),
                             ),
@@ -237,8 +330,10 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                       return;
                     }
 
-                    final categoryName = nameController.text.trim().toLowerCase();
-                    final displayLabel = categoryName[0].toUpperCase() + categoryName.substring(1);
+                    final categoryName =
+                        nameController.text.trim().toLowerCase();
+                    final displayLabel = categoryName[0].toUpperCase() +
+                        categoryName.substring(1);
 
                     final success = await widget.controller.createCategory(
                       categoryName,
@@ -290,7 +385,9 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       final suggestions = await _userService.searchUsers(query);
       if (mounted) {
         setState(() {
-          _suggestedEmails = suggestions.where((email) => !_teamMembers.contains(email)).toList();
+          _suggestedEmails = suggestions
+              .where((email) => !_teamMembers.contains(email))
+              .toList();
           _isSearching = false;
         });
       }
@@ -450,7 +547,9 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          widget.itemToEdit != null ? 'Edit Wishlist Item' : 'New Wishlist Item',
+          widget.itemToEdit != null
+              ? 'Edit Wishlist Item'
+              : 'New Wishlist Item',
           style: const TextStyle(
             color: Color(0xFF1E1E1E),
             fontSize: 20,
@@ -483,8 +582,9 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                         runSpacing: 8,
                         children: widget.controller.categories.map((category) {
                           final isSelected = _selectedCategory == category.name;
-                          final categoryColor = _getCategoryColor(category.name);
-                          
+                          final categoryColor =
+                              _getCategoryColor(category.name);
+
                           return GestureDetector(
                             onTap: () {
                               setState(() => _selectedCategory = category.name);
@@ -545,6 +645,83 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                   ],
                 );
               },
+            ),
+            const SizedBox(height: 24),
+
+            // Image Attachment Section
+            Text(
+              'Item Image (Optional)',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppTheme.textDark,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                height: _selectedImage != null || _uploadedImageUrl != null
+                    ? 200
+                    : 120,
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                  image: _selectedImage != null
+                      ? DecorationImage(
+                          image: FileImage(_selectedImage!),
+                          fit: BoxFit.cover,
+                        )
+                      : _uploadedImageUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(_uploadedImageUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                ),
+                child: _selectedImage == null && _uploadedImageUrl == null
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_photo_alternate,
+                              size: 48, color: Colors.grey.shade400),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tap to add an image of the item',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Stack(
+                        children: [
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: GestureDetector(
+                              onTap: () => setState(() {
+                                _selectedImage = null;
+                                _uploadedImageUrl = null;
+                              }),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: const BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -623,11 +800,13 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                   ),
                   validator: (value) {
                     if (value != null && value.isNotEmpty) {
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                          .hasMatch(value.trim())) {
                         return 'Please enter a valid email address';
                       }
                     }
@@ -700,7 +879,8 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                     runSpacing: 8,
                     children: _teamMembers.map((email) {
                       final userDetails = usersDetails[email] ?? {};
-                      final displayName = _userService.getDisplayName(userDetails, email);
+                      final displayName =
+                          _userService.getDisplayName(userDetails, email);
                       return Chip(
                         label: Text(displayName),
                         deleteIcon: const Icon(Icons.close, size: 16),
@@ -772,6 +952,3 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     );
   }
 }
-
-
-

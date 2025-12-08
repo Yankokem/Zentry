@@ -7,6 +7,7 @@ class JournalEntry {
   String date;
   String time;
   String mood;
+  String? imageUrl; // Cloudinary image URL
   DateTime? createdAt;
   DateTime? updatedAt;
 
@@ -17,6 +18,7 @@ class JournalEntry {
     required this.date,
     required this.time,
     this.mood = 'calm',
+    this.imageUrl,
     this.createdAt,
     this.updatedAt,
   });
@@ -29,6 +31,7 @@ class JournalEntry {
       'date': date,
       'time': time,
       'mood': mood,
+      'imageUrl': imageUrl,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };
@@ -42,6 +45,7 @@ class JournalEntry {
       'date': date,
       'time': time,
       'mood': mood,
+      'imageUrl': imageUrl,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };
@@ -56,8 +60,11 @@ class JournalEntry {
       date: map['date'] ?? '',
       time: map['time'] ?? '',
       mood: map['mood'] ?? 'calm',
-      createdAt: map['createdAt'] is DateTime ? map['createdAt'] as DateTime : null,
-      updatedAt: map['updatedAt'] is DateTime ? map['updatedAt'] as DateTime : null,
+      imageUrl: map['imageUrl'],
+      createdAt:
+          map['createdAt'] is DateTime ? map['createdAt'] as DateTime : null,
+      updatedAt:
+          map['updatedAt'] is DateTime ? map['updatedAt'] as DateTime : null,
     );
   }
 
@@ -70,6 +77,7 @@ class JournalEntry {
       date: data['date'] ?? '',
       time: data['time'] ?? '',
       mood: data['mood'] ?? 'calm',
+      imageUrl: data['imageUrl'],
       createdAt: data['createdAt'] is Timestamp
           ? (data['createdAt'] as Timestamp).toDate()
           : data['createdAt'] is DateTime
@@ -91,6 +99,7 @@ class JournalEntry {
     String? date,
     String? time,
     String? mood,
+    String? imageUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -101,6 +110,7 @@ class JournalEntry {
       date: date ?? this.date,
       time: time ?? this.time,
       mood: mood ?? this.mood,
+      imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

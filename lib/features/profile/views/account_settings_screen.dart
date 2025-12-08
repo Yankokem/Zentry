@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:country_picker/country_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:google_places_flutter/google_places_flutter.dart';
+import 'package:google_places_flutter/model/prediction.dart';
 
 import 'package:zentry/core/core.dart';
 
@@ -17,6 +17,7 @@ class AccountSettingsScreen extends StatefulWidget {
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   final AuthService _authService = AuthService();
   final FirestoreService _firestoreService = FirestoreService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _firstNameController = TextEditingController();
@@ -105,14 +106,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     if (_selectedImage == null) return _profileImageUrl;
 
     try {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_images')
-          .child('$userId.jpg');
-
-      await storageRef.putFile(_selectedImage!);
-      final downloadUrl = await storageRef.getDownloadURL();
-      return downloadUrl;
+      // Upload to Cloudinary using the account photo preset
+      final imageUrl = await _cloudinaryService.uploadImage(
+        _selectedImage!,
+        uploadType: CloudinaryUploadType.accountPhoto,
+        publicId: userId,
+      );
+      return imageUrl;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -183,16 +183,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     }
   }
 
-  void _selectLocation() {
-    showCountryPicker(
-      context: context,
-      showPhoneCode: false,
-      onSelect: (Country country) {
-        setState(() {
-          _locationController.text = country.displayNameNoCountryCode;
-        });
-      },
-    );
+  void _onPlaceSelected(Prediction prediction) {
+    setState(() {
+      _locationController.text = prediction.description ?? '';
+    });
   }
 
   @override
@@ -233,7 +227,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               child: Text(
                 'Save',
                 style: TextStyle(
-                  color: Theme.of(context).primaryColor,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFF9ED69) // Yellow for dark mode
+                      : Colors.black, // Black for light mode
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
                 ),
@@ -435,7 +431,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     ),
                   ),
                   initialCountryCode:
-                      _countryCode.isNotEmpty ? _countryCode : 'US',
+                      _countryCode.isNotEmpty ? _countryCode : 'PH',
                   onChanged: (phone) {
                     setState(() {
                       _phoneNumber = phone.completeNumber;
@@ -446,23 +442,54 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
                 const SizedBox(height: 16),
 
-                // Location
-                TextFormField(
-                  controller: _locationController,
-                  decoration: InputDecoration(
+                // Location - Google Places Autocomplete
+                GooglePlaceAutoCompleteTextField(
+                  textEditingController: _locationController,
+                  googleAPIKey:
+                      "YOUR_GOOGLE_PLACES_API_KEY", // TODO: Replace with your actual API key
+                  inputDecoration: InputDecoration(
                     labelText: 'Location',
+                    hintText: 'Search for your complete address',
                     prefixIcon: const Icon(Icons.location_on_outlined),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.search),
-                      onPressed: _selectLocation,
-                    ),
                     border: OutlineInputBorder(
                       borderRadius:
                           BorderRadius.circular(AppConstants.radiusMedium),
                     ),
                   ),
-                  readOnly: true,
-                  onTap: _selectLocation,
+                  debounceTime: 800,
+                  countries: const [
+                    "ph"
+                  ], // Prioritize Philippines but allow all countries
+                  isLatLngRequired: false,
+                  getPlaceDetailWithLatLng: (Prediction prediction) {
+                    _onPlaceSelected(prediction);
+                  },
+                  itemClick: (Prediction prediction) {
+                    _locationController.text = prediction.description ?? '';
+                    _locationController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: prediction.description?.length ?? 0),
+                    );
+                  },
+                  seperatedBuilder: const Divider(height: 1),
+                  containerHorizontalPadding: 10,
+                  itemBuilder: (context, index, Prediction prediction) {
+                    return Container(
+                      padding: const EdgeInsets.all(10),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              prediction.description ?? "",
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  isCrossBtnShown: true,
                 ),
 
                 const SizedBox(height: 32),

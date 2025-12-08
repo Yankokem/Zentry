@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:zentry/core/core.dart';
+import 'package:zentry/core/services/firebase/notification_manager.dart';
 import 'package:zentry/features/projects/projects.dart';
 
 class AddTicketPage extends StatefulWidget {
@@ -107,7 +110,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, size: 20, color: Colors.grey.shade600),
+                        Icon(Icons.info_outline,
+                            size: 20, color: Colors.grey.shade600),
                         const SizedBox(width: 8),
                         Text(
                           'Basic Information',
@@ -137,7 +141,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: _getProjectColor(), width: 2),
+                          borderSide:
+                              BorderSide(color: _getProjectColor(), width: 2),
                         ),
                         filled: true,
                         fillColor: Colors.grey.shade50,
@@ -155,7 +160,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
                       style: const TextStyle(fontSize: 16),
                       decoration: InputDecoration(
                         labelText: 'Description',
-                        hintText: 'Provide detailed information about this ticket',
+                        hintText:
+                            'Provide detailed information about this ticket',
                         labelStyle: TextStyle(color: Colors.grey.shade600),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -167,7 +173,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: _getProjectColor(), width: 2),
+                          borderSide:
+                              BorderSide(color: _getProjectColor(), width: 2),
                         ),
                         filled: true,
                         fillColor: Colors.grey.shade50,
@@ -205,7 +212,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.settings_outlined, size: 20, color: Colors.grey.shade600),
+                        Icon(Icons.settings_outlined,
+                            size: 20, color: Colors.grey.shade600),
                         const SizedBox(width: 8),
                         Text(
                           'Configuration',
@@ -226,7 +234,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
                           value: 'low',
                           child: Row(
                             children: [
-                              Icon(Icons.arrow_downward, color: Colors.green, size: 18),
+                              Icon(Icons.arrow_downward,
+                                  color: Colors.green, size: 18),
                               SizedBox(width: 8),
                               Text('Low'),
                             ],
@@ -236,7 +245,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
                           value: 'medium',
                           child: Row(
                             children: [
-                              Icon(Icons.remove, color: Colors.orange, size: 18),
+                              Icon(Icons.remove,
+                                  color: Colors.orange, size: 18),
                               SizedBox(width: 8),
                               Text('Medium'),
                             ],
@@ -246,14 +256,16 @@ class _AddTicketPageState extends State<AddTicketPage> {
                           value: 'high',
                           child: Row(
                             children: [
-                              Icon(Icons.arrow_upward, color: Colors.red, size: 18),
+                              Icon(Icons.arrow_upward,
+                                  color: Colors.red, size: 18),
                               SizedBox(width: 8),
                               Text('High'),
                             ],
                           ),
                         ),
                       ],
-                      onChanged: (value) => setState(() => selectedPriority = value!),
+                      onChanged: (value) =>
+                          setState(() => selectedPriority = value!),
                     ),
                     const SizedBox(height: 16),
                     _buildDropdownField(
@@ -264,7 +276,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
                           value: 'todo',
                           child: Row(
                             children: [
-                              Icon(Icons.circle_outlined, color: Colors.grey, size: 18),
+                              Icon(Icons.circle_outlined,
+                                  color: Colors.grey, size: 18),
                               SizedBox(width: 8),
                               Text('To Do'),
                             ],
@@ -274,7 +287,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
                           value: 'in_progress',
                           child: Row(
                             children: [
-                              Icon(Icons.play_arrow, color: Colors.orange, size: 18),
+                              Icon(Icons.play_arrow,
+                                  color: Colors.orange, size: 18),
                               SizedBox(width: 8),
                               Text('In Progress'),
                             ],
@@ -284,7 +298,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
                           value: 'in_review',
                           child: Row(
                             children: [
-                              Icon(Icons.visibility, color: Colors.purple, size: 18),
+                              Icon(Icons.visibility,
+                                  color: Colors.purple, size: 18),
                               SizedBox(width: 8),
                               Text('In Review'),
                             ],
@@ -294,14 +309,16 @@ class _AddTicketPageState extends State<AddTicketPage> {
                           value: 'done',
                           child: Row(
                             children: [
-                              Icon(Icons.check_circle, color: Colors.green, size: 18),
+                              Icon(Icons.check_circle,
+                                  color: Colors.green, size: 18),
                               SizedBox(width: 8),
                               Text('Done'),
                             ],
                           ),
                         ),
                       ],
-                      onChanged: (value) => setState(() => selectedStatus = value!),
+                      onChanged: (value) =>
+                          setState(() => selectedStatus = value!),
                     ),
                     const SizedBox(height: 16),
                     _buildDateField(),
@@ -374,51 +391,133 @@ class _AddTicketPageState extends State<AddTicketPage> {
           ),
         ),
         const SizedBox(height: 8),
-        InkWell(
-          onTap: () async {
-            final pickedDate = await showDatePicker(
-              context: context,
-              initialDate: selectedDeadline ?? DateTime.now(),
-              firstDate: DateTime.now(),
-              lastDate: DateTime.now().add(const Duration(days: 365)),
-            );
-            if (pickedDate != null) {
-              setState(() {
-                selectedDeadline = pickedDate;
-              });
-            }
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.grey.shade50,
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.calendar_today, color: Colors.grey.shade600, size: 18),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    selectedDeadline != null
-                        ? '${selectedDeadline!.day}/${selectedDeadline!.month}/${selectedDeadline!.year}'
-                        : 'Select deadline',
-                    style: TextStyle(
-                      color: selectedDeadline != null ? Colors.black : Colors.grey.shade600,
-                      fontSize: 16,
-                    ),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: InkWell(
+                onTap: () async {
+                  final pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDeadline ?? DateTime.now(),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (pickedDate != null) {
+                    setState(() {
+                      selectedDeadline = DateTime(
+                        pickedDate.year,
+                        pickedDate.month,
+                        pickedDate.day,
+                        selectedDeadline?.hour ?? 11,
+                        selectedDeadline?.minute ?? 59,
+                      );
+                    });
+                  }
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.grey.shade50,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_today,
+                          color: Colors.grey.shade600, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          selectedDeadline != null
+                              ? '${selectedDeadline!.day}/${selectedDeadline!.month}/${selectedDeadline!.year}'
+                              : 'Date',
+                          style: TextStyle(
+                            color: selectedDeadline != null
+                                ? Colors.black
+                                : Colors.grey.shade600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: InkWell(
+                onTap: () async {
+                  final pickedTime = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay(
+                      hour: selectedDeadline?.hour ?? 11,
+                      minute: selectedDeadline?.minute ?? 59,
+                    ),
+                  );
+                  if (pickedTime != null) {
+                    setState(() {
+                      if (selectedDeadline != null) {
+                        selectedDeadline = DateTime(
+                          selectedDeadline!.year,
+                          selectedDeadline!.month,
+                          selectedDeadline!.day,
+                          pickedTime.hour,
+                          pickedTime.minute,
+                        );
+                      } else {
+                        // If no date selected yet, default to today
+                        selectedDeadline = DateTime(
+                          DateTime.now().year,
+                          DateTime.now().month,
+                          DateTime.now().day,
+                          pickedTime.hour,
+                          pickedTime.minute,
+                        );
+                      }
+                    });
+                  }
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.grey.shade50,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.access_time,
+                          color: Colors.grey.shade600, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          selectedDeadline != null
+                              ? '${selectedDeadline!.hour.toString().padLeft(2, '0')}:${selectedDeadline!.minute.toString().padLeft(2, '0')}'
+                              : 'Time',
+                          style: TextStyle(
+                            color: selectedDeadline != null
+                                ? Colors.black
+                                : Colors.grey.shade600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  void _saveTicket() {
+  void _saveTicket() async {
     if (_formKey.currentState!.validate()) {
       if (selectedDeadline == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -435,7 +534,8 @@ class _AddTicketPageState extends State<AddTicketPage> {
       }
 
       // Generate ticket number
-      final ticketNumber = 'TICK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      final ticketNumber =
+          'TICK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
       final newTicket = Ticket(
         ticketNumber: ticketNumber,
@@ -449,7 +549,45 @@ class _AddTicketPageState extends State<AddTicketPage> {
         deadline: selectedDeadline!,
       );
 
-      ProjectManager().addTicket(newTicket);
+      await ProjectManager().addTicket(newTicket);
+
+      // Send notifications to assigned users
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final firestoreService = FirestoreService();
+
+      if (currentUser != null) {
+        try {
+          final currentUserData =
+              await firestoreService.getUserData(currentUser.uid);
+          final currentUserName = currentUserData?['fullName'] ?? 'Someone';
+
+          // Notify each assigned user (except current user)
+          for (final assigneeEmail in selectedAssignees) {
+            if (assigneeEmail != currentUser.email) {
+              // Query Firestore to get user ID from email
+              final assigneeUserDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .where('email', isEqualTo: assigneeEmail.toLowerCase())
+                  .limit(1)
+                  .get();
+
+              if (assigneeUserDoc.docs.isNotEmpty) {
+                final assigneeUserId = assigneeUserDoc.docs.first.id;
+                await NotificationManager().notifyTaskAssigned(
+                  recipientUserId: assigneeUserId,
+                  taskTitle: titleController.text,
+                  projectTitle: widget.project.title,
+                  taskId: ticketNumber,
+                  projectId: widget.project.id,
+                  assignerName: currentUserName,
+                );
+              }
+            }
+          }
+        } catch (e) {
+          print('Error sending notifications: $e');
+        }
+      }
       widget.refreshTickets();
       Navigator.pop(context);
 
@@ -530,7 +668,8 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
 
   Future<void> _loadUserDetails() async {
     try {
-      _userDetails = await _userService.getUsersDetailsByEmails(widget.project.teamMembers);
+      _userDetails = await _userService
+          .getUsersDetailsByEmails(widget.project.teamMembers);
     } catch (e) {
       _userDetails = {};
     }
@@ -566,7 +705,9 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
   Widget _buildAvatar(String email, {double radius = 16}) {
     final url = _getProfilePictureUrl(email);
     final displayName = _getDisplayName(email);
-    final firstLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : email[0].toUpperCase();
+    final firstLetter = displayName.isNotEmpty
+        ? displayName[0].toUpperCase()
+        : email[0].toUpperCase();
 
     if (url.isNotEmpty) {
       return CircleAvatar(
@@ -626,10 +767,13 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
     final roleWidgets = <Widget>[];
 
     for (final role in widget.project.roles) {
-      final roleMembers = role.members.where((email) => widget.project.teamMembers.contains(email)).toList();
+      final roleMembers = role.members
+          .where((email) => widget.project.teamMembers.contains(email))
+          .toList();
 
       if (roleMembers.isNotEmpty) {
-        final allRoleSelected = roleMembers.every((email) => _selectedItems.contains(email));
+        final allRoleSelected =
+            roleMembers.every((email) => _selectedItems.contains(email));
 
         roleWidgets.add(
           Container(
@@ -677,7 +821,8 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
                     children: roleMembers.map((email) {
                       final isSelected = _selectedItems.contains(email);
                       return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         child: Row(
                           children: [
                             Checkbox(
@@ -732,7 +877,8 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
 
     // Add "Other Members" section for users not in any role
     final unassignedMembers = widget.project.teamMembers
-        .where((email) => !widget.project.roles.any((role) => role.members.contains(email)))
+        .where((email) =>
+            !widget.project.roles.any((role) => role.members.contains(email)))
         .toList();
 
     if (unassignedMembers.isNotEmpty) {
@@ -815,7 +961,8 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
       children: roleWidgets.isEmpty
           ? [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey.shade300),
                   borderRadius: BorderRadius.circular(12),
@@ -899,7 +1046,9 @@ class _MultiSelectDialogState extends State<MultiSelectDialog> {
   Widget _buildAvatar(String email) {
     final url = _getProfilePictureUrl(email);
     final displayName = _getDisplayName(email);
-    final firstLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : email[0].toUpperCase();
+    final firstLetter = displayName.isNotEmpty
+        ? displayName[0].toUpperCase()
+        : email[0].toUpperCase();
 
     if (url.isNotEmpty) {
       return CircleAvatar(
@@ -940,11 +1089,13 @@ class _MultiSelectDialogState extends State<MultiSelectDialog> {
     final rolesList = <Widget>[];
 
     for (final role in widget.project.roles) {
-      final roleMembers = role.members.where((email) => widget.items.contains(email)).toList();
-      
+      final roleMembers =
+          role.members.where((email) => widget.items.contains(email)).toList();
+
       if (roleMembers.isNotEmpty) {
         // Role header with checkbox
-        final allRoleSelected = roleMembers.every((email) => _selectedItems.contains(email));
+        final allRoleSelected =
+            roleMembers.every((email) => _selectedItems.contains(email));
 
         rolesList.add(
           Theme(
@@ -990,7 +1141,8 @@ class _MultiSelectDialogState extends State<MultiSelectDialog> {
                 return Container(
                   color: Colors.grey.shade50,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Row(
                       children: [
                         Checkbox(
@@ -1042,7 +1194,8 @@ class _MultiSelectDialogState extends State<MultiSelectDialog> {
 
     // Add "Other Members" section for users not in any role
     final unassignedMembers = widget.items
-        .where((email) => !widget.project.roles.any((role) => role.members.contains(email)))
+        .where((email) =>
+            !widget.project.roles.any((role) => role.members.contains(email)))
         .toList();
 
     if (unassignedMembers.isNotEmpty) {

@@ -47,10 +47,12 @@ dependencies:
   # Form Fields
   intl_phone_field: ^3.2.0
   country_picker: ^2.0.26
+  google_places_flutter: ^2.0.9
   
-  # Image Picker
+  # Image Picker & Storage
   image_picker: ^1.0.7
   firebase_storage: ^13.0.4
+  cloudinary_public: ^0.23.1
 
   cupertino_icons: ^1.0.6
 

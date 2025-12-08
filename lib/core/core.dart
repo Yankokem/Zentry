@@ -15,6 +15,7 @@ export 'services/firebase/firebase_config.dart';
 export 'services/firebase/admin_service.dart';
 export 'services/notification_service.dart';
 export 'services/local/storage_service.dart';
+export 'services/cloudinary_service.dart';
 
 // Models
 export 'models/user_model.dart';
@@ -35,6 +36,7 @@ export 'widgets/stat_card.dart';
 export 'widgets/compact_calendar_widget.dart';
 export 'widgets/admin_guard.dart';
 export 'widgets/skeleton_loader.dart';
+export 'widgets/test_notification_button.dart';
 
 // Providers
 export 'providers/wishlist_provider.dart';

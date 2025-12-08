@@ -7,6 +7,7 @@ class Wish {
   final String dateAdded;
   final bool completed;
   final List<String> sharedWith; // List of user emails
+  final String? imageUrl; // Cloudinary image URL
 
   Wish({
     this.id,
@@ -17,6 +18,7 @@ class Wish {
     required this.dateAdded,
     this.completed = false,
     this.sharedWith = const [],
+    this.imageUrl,
   });
 
   // Convert to Map for compatibility with existing code
@@ -29,6 +31,7 @@ class Wish {
       'dateAdded': dateAdded,
       'completed': completed,
       'sharedWith': sharedWith,
+      'imageUrl': imageUrl,
     };
   }
 
@@ -42,6 +45,7 @@ class Wish {
       'dateAdded': dateAdded,
       'completed': completed,
       'sharedWith': sharedWith,
+      'imageUrl': imageUrl,
       'createdAt': dateAdded, // Keep original dateAdded for display
     };
   }
@@ -56,6 +60,7 @@ class Wish {
       dateAdded: map['dateAdded'] ?? '',
       completed: map['completed'] ?? false,
       sharedWith: List<String>.from(map['sharedWith'] ?? []),
+      imageUrl: map['imageUrl'],
     );
   }
 
@@ -70,6 +75,7 @@ class Wish {
       dateAdded: data['dateAdded'] ?? '',
       completed: data['completed'] ?? false,
       sharedWith: List<String>.from(data['sharedWith'] ?? []),
+      imageUrl: data['imageUrl'],
     );
   }
 
@@ -83,6 +89,7 @@ class Wish {
     String? dateAdded,
     bool? completed,
     List<String>? sharedWith,
+    String? imageUrl,
   }) {
     return Wish(
       id: id ?? this.id,
@@ -93,6 +100,7 @@ class Wish {
       dateAdded: dateAdded ?? this.dateAdded,
       completed: completed ?? this.completed,
       sharedWith: sharedWith ?? this.sharedWith,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 }

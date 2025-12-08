@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/features/journal/journal.dart';
@@ -16,10 +18,12 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
   final _contentEditorController = RichTextEditorController();
   final _journalService = JournalService();
   final _moodService = MoodService();
+  final _cloudinaryService = CloudinaryService();
 
   String _selectedMood = 'happy';
   List<Mood> _moods = Mood.defaultMoods;
   bool _isLoading = false;
+  File? _selectedImage;
 
   @override
   void initState() {
@@ -32,7 +36,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
   void _loadMoods() {
     // Set initial value from cache
     _moods = Mood.defaultMoods;
-    
+
     // Listen to real-time updates from Firestore
     _moodService.getMoodsStream().listen((moods) {
       if (mounted) {
@@ -87,7 +91,8 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: selectedColor, width: 2),
+                            borderSide:
+                                BorderSide(color: selectedColor, width: 2),
                           ),
                         ),
                       ),
@@ -102,15 +107,26 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                       spacing: 12,
                       runSpacing: 12,
                       children: [
-                        Colors.blue, Colors.green, Colors.purple, Colors.orange,
-                        Colors.red, Colors.pink, Colors.teal, Colors.indigo,
-                        Colors.amber, Colors.cyan, Colors.lime, Colors.brown,
+                        Colors.blue,
+                        Colors.green,
+                        Colors.purple,
+                        Colors.orange,
+                        Colors.red,
+                        Colors.pink,
+                        Colors.teal,
+                        Colors.indigo,
+                        Colors.amber,
+                        Colors.cyan,
+                        Colors.lime,
+                        Colors.brown,
                       ].map((color) {
                         final isSelected = color.value == selectedColor.value;
                         return GestureDetector(
-                          onTap: () => setDialogState(() => selectedColor = color),
+                          onTap: () =>
+                              setDialogState(() => selectedColor = color),
                           child: Container(
-                            width: 40, height: 40,
+                            width: 40,
+                            height: 40,
                             decoration: BoxDecoration(
                               color: color,
                               shape: BoxShape.circle,
@@ -120,7 +136,8 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                               ),
                             ),
                             child: isSelected
-                                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                ? const Icon(Icons.check,
+                                    color: Colors.white, size: 20)
                                 : null,
                           ),
                         );
@@ -147,9 +164,13 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                     }
 
                     final moodName = nameController.text.trim().toLowerCase();
-                    final displayLabel = moodName[0].toUpperCase() + moodName.substring(1);
+                    final displayLabel =
+                        moodName[0].toUpperCase() + moodName.substring(1);
                     // Format color hex properly (AARRGGBB format)
-                    final colorHex = selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase();
+                    final colorHex = selectedColor.value
+                        .toRadixString(16)
+                        .padLeft(8, '0')
+                        .toUpperCase();
 
                     try {
                       await _moodService.createMood(Mood(
@@ -238,7 +259,9 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                 Navigator.pop(context);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red),
                   );
                 }
               }
@@ -254,6 +277,50 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
     );
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
+    }
+  }
+
+  Future<String?> _uploadJournalImage() async {
+    if (_selectedImage == null) return null;
+
+    try {
+      final imageUrl = await _cloudinaryService.uploadImage(
+        _selectedImage!,
+        uploadType: CloudinaryUploadType.journalImage,
+        publicId: 'journal_${DateTime.now().millisecondsSinceEpoch}',
+      );
+      return imageUrl;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
+      return null;
+    }
+  }
+
   Future<void> _saveJournalEntry() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -262,12 +329,19 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Upload image if selected
+      String? imageUrl;
+      if (_selectedImage != null) {
+        imageUrl = await _uploadJournalImage();
+      }
+
       final entry = JournalEntry(
         title: _titleController.text.trim(),
         content: _contentEditorController.getJsonContent(),
         date: _getCurrentDate(),
         time: _getCurrentTime(),
         mood: _selectedMood,
+        imageUrl: imageUrl,
       );
 
       // Create new entry in Firestore
@@ -287,7 +361,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -302,23 +376,31 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
 
   String _getCurrentDate() {
     final now = DateTime.now();
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
   }
 
   String _getCurrentTime() {
     final now = DateTime.now();
-    final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
+    final hour =
+        now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
     final minute = now.minute.toString().padLeft(2, '0');
     final period = now.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';
   }
-
-
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -366,12 +448,16 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                         onTap: () => setState(() => _selectedMood = mood.name),
                         onLongPress: () => _showDeleteMoodDialog(mood),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: isSelected ? mood.color : mood.color.withOpacity(0.2),
+                            color: isSelected
+                                ? mood.color
+                                : mood.color.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: isSelected ? mood.color : Colors.transparent,
+                              color:
+                                  isSelected ? mood.color : Colors.transparent,
                               width: 2,
                             ),
                           ),
@@ -380,7 +466,8 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: isSelected ? Colors.white : AppTheme.textDark,
+                              color:
+                                  isSelected ? Colors.white : AppTheme.textDark,
                             ),
                           ),
                         ),
@@ -396,12 +483,82 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                     decoration: BoxDecoration(
                       color: AppTheme.surface,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade400, width: 1.5),
+                      border:
+                          Border.all(color: Colors.grey.shade400, width: 1.5),
                     ),
-                    child: const Icon(Icons.add, size: 20, color: AppTheme.textDark),
+                    child: const Icon(Icons.add,
+                        size: 20, color: AppTheme.textDark),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 24),
+
+            // Image Attachment Section
+            Text(
+              'Add Image (Optional)',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppTheme.textDark,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                height: _selectedImage != null ? 200 : 120,
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                  image: _selectedImage != null
+                      ? DecorationImage(
+                          image: FileImage(_selectedImage!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: _selectedImage == null
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_photo_alternate,
+                              size: 48, color: Colors.grey.shade400),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tap to add an image',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Stack(
+                        children: [
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => _selectedImage = null),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: const BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
             const SizedBox(height: 24),
 

@@ -14,6 +14,9 @@ void main() async {
      options: DefaultFirebaseOptions.currentPlatform,
    );
    
+   // Initialize Cloudinary service
+   CloudinaryService().initialize();
+   
    // Initialize admin account on app startup
    try {
      final adminService = AdminService();

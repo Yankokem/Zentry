@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 
 import 'package:zentry/core/core.dart';
+import 'package:zentry/core/services/firebase/notification_manager.dart';
+import 'package:zentry/core/widgets/test_notification_button.dart';
 import 'package:zentry/features/projects/projects.dart';
 import 'package:zentry/features/journal/journal.dart';
 import 'package:zentry/features/wishlist/wishlist.dart';
@@ -701,15 +703,55 @@ class _HomePageState extends State<HomePage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.notifications_outlined,
-                                  size: 20),
-                              color: const Color(0xFF1E1E1E),
-                              padding: const EdgeInsets.all(8),
-                              constraints: const BoxConstraints(),
-                              onPressed: () {
-                                Navigator.pushNamed(
-                                    context, AppRoutes.notifications);
+                            StreamBuilder<int>(
+                              stream: NotificationManager()
+                                  .getUnreadCountStream(_currentUserId ?? ''),
+                              builder: (context, snapshot) {
+                                final unreadCount = snapshot.data ?? 0;
+                                return Stack(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                          Icons.notifications_outlined,
+                                          size: 20),
+                                      color: const Color(0xFF1E1E1E),
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () {
+                                        Navigator.pushNamed(
+                                            context, AppRoutes.notifications);
+                                      },
+                                    ),
+                                    if (unreadCount > 0)
+                                      Positioned(
+                                        right: 6,
+                                        top: 6,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red,
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 16,
+                                            minHeight: 16,
+                                          ),
+                                          child: Text(
+                                            unreadCount > 9
+                                                ? '9+'
+                                                : unreadCount.toString(),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
                               },
                             ),
                             IconButton(
@@ -1252,6 +1294,8 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
+      // Uncomment to enable test notifications (development only)
+       floatingActionButton: const TestNotificationButton(),
     );
   }
 }

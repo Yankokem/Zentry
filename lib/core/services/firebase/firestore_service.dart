@@ -7,7 +7,8 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String usersCollection = 'users';
   static const String projectsCollection = 'projects';
-  static const String ticketsSubcollection = 'tickets'; // Tickets are now subcollection under projects
+  static const String ticketsSubcollection =
+      'tickets'; // Tickets are now subcollection under projects
 
   // Store user data in Firestore after signup
   Future<void> createUserDocument({
@@ -21,7 +22,7 @@ class FirestoreService {
       await _db.collection(usersCollection).doc(uid).set({
         'uid': uid,
         'firstName': firstName,
-        'lastName': lastName, 
+        'lastName': lastName,
         'fullName': fullName,
         'email': email,
         'createdAt': FieldValue.serverTimestamp(),
@@ -151,8 +152,7 @@ class FirestoreService {
 
       // Add owned projects
       allProjects.addAll(
-        ownedProjectsQuery.docs.map((doc) => Project.fromMap(doc.data()))
-      );
+          ownedProjectsQuery.docs.map((doc) => Project.fromMap(doc.data())));
 
       // Add shared projects (avoid duplicates)
       for (final doc in sharedProjectsQuery.docs) {
@@ -179,7 +179,8 @@ class FirestoreService {
 
           // Count total tickets and completed tickets
           final totalTickets = tickets.length;
-          final completedTickets = tickets.where((ticket) => ticket.status == 'done').length;
+          final completedTickets =
+              tickets.where((ticket) => ticket.status == 'done').length;
 
           // Update project with calculated counts
           final updatedProject = project.copyWith(
@@ -220,8 +221,7 @@ class FirestoreService {
 
         // Add owned projects
         allProjects.addAll(
-          ownedSnapshot.docs.map((doc) => Project.fromMap(doc.data()))
-        );
+            ownedSnapshot.docs.map((doc) => Project.fromMap(doc.data())));
 
         // Add shared projects (avoid duplicates)
         for (final doc in sharedSnapshot.docs) {
@@ -246,7 +246,8 @@ class FirestoreService {
                 .toList();
 
             final totalTickets = tickets.length;
-            final completedTickets = tickets.where((ticket) => ticket.status == 'done').length;
+            final completedTickets =
+                tickets.where((ticket) => ticket.status == 'done').length;
 
             final updatedProject = project.copyWith(
               totalTickets: totalTickets,
@@ -267,8 +268,41 @@ class FirestoreService {
     }
   }
 
+  // Get a single project by ID
+  Future<Project?> getProjectById(String projectId) async {
+    try {
+      final doc = await _db.collection(projectsCollection).doc(projectId).get();
+      if (!doc.exists) return null;
+
+      final project = Project.fromMap(doc.data()!);
+
+      // Get actual ticket counts
+      final ticketsSnapshot = await _db
+          .collection(projectsCollection)
+          .doc(projectId)
+          .collection(ticketsSubcollection)
+          .get();
+
+      final tickets = ticketsSnapshot.docs
+          .map((doc) => Ticket.fromMap(doc.data()))
+          .toList();
+
+      final totalTickets = tickets.length;
+      final completedTickets =
+          tickets.where((t) => t.status == 'Completed').length;
+
+      return project.copyWith(
+        totalTickets: totalTickets,
+        completedTickets: completedTickets,
+      );
+    } catch (e) {
+      throw Exception('Failed to get project: $e');
+    }
+  }
+
   // Update a project
-  Future<void> updateProject(String projectId, Map<String, dynamic> data) async {
+  Future<void> updateProject(
+      String projectId, Map<String, dynamic> data) async {
     try {
       await _db.collection(projectsCollection).doc(projectId).update({
         ...data,
@@ -334,9 +368,8 @@ class FirestoreService {
 
       // For each project, get its tickets from subcollection
       for (final projectDoc in projectsSnapshot.docs) {
-        final ticketsSnapshot = await projectDoc.reference
-            .collection(ticketsSubcollection)
-            .get();
+        final ticketsSnapshot =
+            await projectDoc.reference.collection(ticketsSubcollection).get();
 
         final tickets = ticketsSnapshot.docs
             .map((doc) => Ticket.fromMap(doc.data()))
@@ -369,7 +402,8 @@ class FirestoreService {
   }
 
   // Get tickets by status for a project (from subcollection)
-  Future<List<Ticket>> getProjectTicketsByStatus(String projectId, String status) async {
+  Future<List<Ticket>> getProjectTicketsByStatus(
+      String projectId, String status) async {
     try {
       final querySnapshot = await _db
           .collection(projectsCollection)
@@ -387,7 +421,8 @@ class FirestoreService {
   }
 
   // Update a ticket (in project subcollection)
-  Future<void> updateTicket(String projectId, String ticketNumber, Map<String, dynamic> data) async {
+  Future<void> updateTicket(
+      String projectId, String ticketNumber, Map<String, dynamic> data) async {
     try {
       await _db
           .collection(projectsCollection)
