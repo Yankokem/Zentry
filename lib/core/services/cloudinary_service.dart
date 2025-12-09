@@ -21,14 +21,14 @@ class CloudinaryService {
   static const String _cloudName = 'dg1cz2twr';
 
   // Upload presets for different image types
-  // TODO: After creating signed presets in Cloudinary dashboard, update these names
+  // These names must match EXACTLY with your Cloudinary dashboard presets
   static const Map<CloudinaryUploadType, String> _uploadPresets = {
-    CloudinaryUploadType.accountPhoto: 'zentry_account_photos',
+    CloudinaryUploadType.accountPhoto: 'zentry_accounts_photos',
     CloudinaryUploadType.journalImage: 'zentry_journal_images',
     CloudinaryUploadType.projectImage: 'zentry_project_images',
     CloudinaryUploadType.wishlistImage: 'zentry_wishlist_images',
     CloudinaryUploadType.bugReport: 'zentry_bug_reports',
-    CloudinaryUploadType.accountAppeal: 'zentry_account_appeals',
+    CloudinaryUploadType.accountAppeal: 'zentry_account_appeal',
   };
 
   late final Map<CloudinaryUploadType, CloudinaryPublic> _cloudinaryInstances;
@@ -49,13 +49,14 @@ class CloudinaryService {
   /// 
   /// [file] - The image file to upload
   /// [uploadType] - The type of upload (determines which preset to use)
-  /// [publicId] - Optional custom public ID for the image
   /// 
   /// Returns the secure URL of the uploaded image
+  /// 
+  /// Note: For unsigned presets, do not specify publicId or folder.
+  /// Cloudinary will auto-generate unique IDs and use preset folder settings.
   Future<String> uploadImage(
     File file, {
     required CloudinaryUploadType uploadType,
-    String? publicId,
   }) async {
     try {
       final cloudinary = _cloudinaryInstances[uploadType];
@@ -63,16 +64,23 @@ class CloudinaryService {
         throw Exception('CloudinaryService not initialized. Call initialize() first.');
       }
 
+      // For unsigned presets:
+      // - Don't specify publicId (Cloudinary auto-generates)
+      // - Don't specify folder (use preset's folder setting)
+      // - Don't add extra parameters that unsigned presets don't support
       final response = await cloudinary.uploadFile(
         CloudinaryFile.fromFile(
           file.path,
-          publicId: publicId,
           resourceType: CloudinaryResourceType.Image,
         ),
       );
 
       return response.secureUrl;
+    } on CloudinaryException catch (e) {
+      // Cloudinary-specific errors
+      throw Exception('Cloudinary error: ${e.message}');
     } catch (e) {
+      // Provide more detailed error information
       throw Exception('Failed to upload image to Cloudinary: $e');
     }
   }

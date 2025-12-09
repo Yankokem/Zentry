@@ -215,21 +215,28 @@ After creating all presets, you need your API credentials:
 
 **Note**: Since `cloudinary_public` package only supports **unsigned** uploads, and you want to use **signed** presets, you have two options:
 
-#### Option A: Switch to Unsigned Presets (Easier)
-Simply change "Signing Mode" to **Unsigned** for all presets above. This works with the current code but is less secure.
+#### ⚠️ IMPORTANT: Use Unsigned Presets
 
-#### Option B: Use Signed Uploads (More Secure, Recommended)
+The `cloudinary_public` package used in this app **only supports UNSIGNED presets**.
 
-You'll need to use the full `cloudinary` package instead of `cloudinary_public`. Here's what needs to change:
+**You MUST change "Signing Mode" to UNSIGNED** for all presets above.
 
-**1. Update pubspec.yaml:**
-```yaml
-dependencies:
-  # Replace cloudinary_public with cloudinary
-  cloudinary: ^1.5.0  # Instead of cloudinary_public
-```
+**Steps:**
+1. When creating each preset, set **Signing Mode** to **Unsigned**
+2. All other settings (folder, file size, transformations) remain the same
+3. After creating unsigned presets, the app will work without errors
 
-**2. I'll update the CloudinaryService for you to support signed uploads with multiple presets.**
+**Why Unsigned?**
+- The `cloudinary_public` package doesn't support signed uploads
+- Unsigned presets still provide folder organization and transformations
+- For production apps with high security needs, you would switch to the full `cloudinary` SDK
+
+**Security Note:**
+While unsigned presets are less secure than signed ones, you can still protect your account by:
+- Setting strict file size limits in each preset
+- Configuring allowed file formats
+- Monitoring upload activity in Cloudinary dashboard
+- Using Cloudinary's usage quotas and alerts
 
 ---
 

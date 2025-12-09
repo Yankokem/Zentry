@@ -97,7 +97,6 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       final imageUrl = await _cloudinaryService.uploadImage(
         _selectedImage!,
         uploadType: CloudinaryUploadType.wishlistImage,
-        publicId: 'wishlist_${DateTime.now().millisecondsSinceEpoch}',
       );
       return imageUrl;
     } catch (e) {
