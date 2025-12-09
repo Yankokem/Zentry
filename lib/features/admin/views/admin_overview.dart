@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import 'package:zentry/features/admin/admin.dart';
+
 class AdminOverviewPage extends StatefulWidget {
   const AdminOverviewPage({super.key});
 
@@ -31,6 +33,10 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Support Stats Section
+            _buildSupportStats(context, isTablet),
+            const SizedBox(height: 24),
+
             // User Activity Chart (Projects, Journal, Wishlist)
             _buildUserActivityChart(context, isTablet),
             const SizedBox(height: 24),
@@ -49,6 +55,138 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
           ],
         ),
       ),
+    );
+  }
+
+  // Support Stats - Shows Bug Reports and Account Appeals
+  Widget _buildSupportStats(BuildContext context, bool isTablet) {
+    final bugReportService = BugReportService();
+    final appealService = AccountAppealService();
+
+    return Row(
+      children: [
+        Expanded(
+          child: StreamBuilder<List<BugReportModel>>(
+            stream: bugReportService.getBugReportsStream(),
+            builder: (context, snapshot) {
+              final count = snapshot.data?.length ?? 0;
+              final pending = snapshot.data?.where((r) => r.status == 'Open').length ?? 0;
+              
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.bug_report_rounded, 
+                            color: Colors.red.shade600, size: 18),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Bug Reports',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '$count',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$pending pending',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: StreamBuilder<List<AccountAppealModel>>(
+            stream: appealService.getAppealsStream(),
+            builder: (context, snapshot) {
+              final count = snapshot.data?.length ?? 0;
+              final pending = snapshot.data?.where((a) => a.status == 'Pending').length ?? 0;
+              
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.security_rounded, 
+                            color: Colors.orange.shade600, size: 18),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Appeals',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '$count',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$pending pending',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 

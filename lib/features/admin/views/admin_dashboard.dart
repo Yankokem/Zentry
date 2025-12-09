@@ -18,12 +18,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
     AdminOverviewPage(),
     AdminAccountsPage(),
     AdminBugReportsPage(),
+    AdminAppealsPage(),
   ];
 
   final List<_NavItemData> _navItems = const [
     _NavItemData(icon: Icons.analytics_rounded, label: 'Overview'),
     _NavItemData(icon: Icons.people_rounded, label: 'Accounts'),
     _NavItemData(icon: Icons.bug_report_rounded, label: 'Reports'),
+    _NavItemData(icon: Icons.security_rounded, label: 'Appeals'),
   ];
 
   @override
