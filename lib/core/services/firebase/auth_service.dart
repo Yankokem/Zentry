@@ -5,11 +5,16 @@ import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, Tar
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   
-  // Initialize GoogleSignIn with clientId for web
+  // Initialize GoogleSignIn with clientId
+  // For Android: Use the Web client ID (OAuth 2.0 client ID of type "Web application")
+  // For iOS: Use the iOS client ID
+  // For Web: Use the Web client ID
   late final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: kIsWeb 
       ? '1038744556460-shj37ippgd0ate0nin6hihp8qbonvdee.apps.googleusercontent.com'
-      : null,
+      : (defaultTargetPlatform == TargetPlatform.iOS)
+        ? '1038744556460-lm9d4l2aqo31ojurpd4nq5hmtef2gh9m.apps.googleusercontent.com'
+        : '1038744556460-shj37ippgd0ate0nin6hihp8qbonvdee.apps.googleusercontent.com', // Android uses Web client ID
     scopes: [
       'email',
       'profile',
@@ -55,11 +60,8 @@ class AuthService {
   // Sign in with Google
   Future<UserCredential> signInWithGoogle() async {
     try {
-  // Starting Google sign-in flow
-      
       // For web platform, use Firebase popup
       if (kIsWeb) {
-  // Using Firebase popup for web
         GoogleAuthProvider googleProvider = GoogleAuthProvider();
         
         // Add scopes
@@ -75,19 +77,18 @@ class AuthService {
         final UserCredential userCredential = 
             await _auth.signInWithPopup(googleProvider);
         
-  // Signed in via Firebase popup
-        
         return userCredential;
       }
       
       // For mobile and desktop platforms, use google_sign_in package
-  // Using google_sign_in package for mobile/desktop
+      
+      // First, sign out to ensure clean state
+      await _googleSignIn.signOut();
       
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
-  // User cancelled the sign-in
         throw Exception('Google sign-in was cancelled');
       }
 
