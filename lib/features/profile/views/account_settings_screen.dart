@@ -70,13 +70,17 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         final userData = await _firestoreService.getUserData(user.uid);
 
         if (userData != null && mounted) {
+          final storedPhoneNumber = userData['phoneNumber'] as String? ?? '';
+          final storedCountryCode = userData['countryCode'] as String? ?? '';
+          
           setState(() {
             _firstNameController.text = userData['firstName'] as String? ?? '';
             _lastNameController.text = userData['lastName'] as String? ?? '';
             _emailController.text = user.email ?? '';
-            _phoneNumber = userData['phoneNumber'] as String? ?? '';
+            _phoneNumber = storedPhoneNumber;
             _profileImageUrl = userData['profileImageUrl'] as String?;
-            _countryCode = userData['countryCode'] as String? ?? '';
+            // If no country code saved, default to PH
+            _countryCode = storedCountryCode.isNotEmpty ? storedCountryCode : 'PH';
 
             // Load location fields
             _selectedCountry = userData['country'] as String?;
@@ -216,8 +220,17 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
       // Handle password update
       if (_newPasswordController.text.trim().isNotEmpty) {
+        // Validate password match
+        if (_newPasswordController.text.trim() != _confirmPasswordController.text.trim()) {
+          throw Exception('New passwords do not match');
+        }
+        
+        if (_newPasswordController.text.trim().length < 6) {
+          throw Exception('Password must be at least 6 characters');
+        }
+        
         if (_hasPassword) {
-          // Verify current password first
+          // User already has a password - need to verify current password
           if (_currentPasswordController.text.trim().isEmpty) {
             throw Exception('Please enter your current password');
           }
@@ -228,23 +241,24 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             password: _currentPasswordController.text.trim(),
           );
           await user.reauthenticateWithCredential(credential);
+        } else if (_isGoogleUser) {
+          // Google user setting password for the first time
+          // Need to re-authenticate with Google before adding password
+          final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+          await user.reauthenticateWithProvider(googleProvider);
         }
         
         // Update to new password
-        if (_newPasswordController.text.trim() != _confirmPasswordController.text.trim()) {
-          throw Exception('New passwords do not match');
-        }
-        
-        if (_newPasswordController.text.trim().length < 6) {
-          throw Exception('Password must be at least 6 characters');
-        }
-        
         await user.updatePassword(_newPasswordController.text.trim());
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Password updated successfully')),
           );
+          // Update _hasPassword flag
+          setState(() {
+            _hasPassword = true;
+          });
         }
       }
 
@@ -546,12 +560,14 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           BorderRadius.circular(AppConstants.radiusMedium),
                     ),
                   ),
-                  initialCountryCode:
-                      _countryCode.isNotEmpty ? _countryCode : 'PH',
+                  initialCountryCode: _countryCode,
+                  initialValue: _phoneNumber.isNotEmpty
+                      ? _phoneNumber.replaceAll(RegExp(r'^\+\d+\s*'), '').trim()
+                      : null,
                   onChanged: (phone) {
                     setState(() {
                       _phoneNumber = phone.completeNumber;
-                      _countryCode = phone.countryCode;
+                      _countryCode = phone.countryISOCode;
                     });
                   },
                 ),
