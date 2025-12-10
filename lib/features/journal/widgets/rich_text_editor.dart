@@ -69,8 +69,15 @@ class _RichTextEditorState extends State<RichTextEditor> {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
-                  child: quill.QuillEditor.basic(
-                    controller: widget.controller._quillController,
+                  child: Theme(
+                    data: Theme.of(context).copyWith(
+                      textSelectionTheme: TextSelectionThemeData(
+                        cursorColor: Colors.black,
+                      ),
+                    ),
+                    child: quill.QuillEditor.basic(
+                      controller: widget.controller._quillController,
+                    ),
                   ),
                 ),
               ),
@@ -91,42 +98,48 @@ class _RichTextEditorState extends State<RichTextEditor> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildToolbarButton(
+                        _ToolbarButton(
                           icon: Icons.format_bold,
                           onPressed: () => _formatText(quill.Attribute.bold),
                           tooltip: 'Bold',
-                          isActive: _isFormatActive(quill.Attribute.bold),
+                          controller: widget.controller._quillController,
+                          attribute: quill.Attribute.bold,
                         ),
-                        _buildToolbarButton(
+                        _ToolbarButton(
                           icon: Icons.format_italic,
                           onPressed: () => _formatText(quill.Attribute.italic),
                           tooltip: 'Italic',
-                          isActive: _isFormatActive(quill.Attribute.italic),
+                          controller: widget.controller._quillController,
+                          attribute: quill.Attribute.italic,
                         ),
-                        _buildToolbarButton(
+                        _ToolbarButton(
                           icon: Icons.format_underline,
                           onPressed: () => _formatText(quill.Attribute.underline),
                           tooltip: 'Underline',
-                          isActive: _isFormatActive(quill.Attribute.underline),
+                          controller: widget.controller._quillController,
+                          attribute: quill.Attribute.underline,
                         ),
-                        _buildToolbarButton(
+                        _ToolbarButton(
                           icon: Icons.format_strikethrough,
                           onPressed: () => _formatText(quill.Attribute.strikeThrough),
                           tooltip: 'Strikethrough',
-                          isActive: _isFormatActive(quill.Attribute.strikeThrough),
+                          controller: widget.controller._quillController,
+                          attribute: quill.Attribute.strikeThrough,
                         ),
                         const SizedBox(width: 8),
-                        _buildToolbarButton(
+                        _ToolbarButton(
                           icon: Icons.format_list_bulleted,
                           onPressed: () => _formatText(quill.Attribute.ul),
                           tooltip: 'Bullet List',
-                          isActive: _isFormatActive(quill.Attribute.ul),
+                          controller: widget.controller._quillController,
+                          attribute: quill.Attribute.ul,
                         ),
-                        _buildToolbarButton(
+                        _ToolbarButton(
                           icon: Icons.check_box_outlined,
                           onPressed: () => _formatText(quill.Attribute.unchecked),
                           tooltip: 'Checkbox',
-                          isActive: _isFormatActive(quill.Attribute.unchecked),
+                          controller: widget.controller._quillController,
+                          attribute: quill.Attribute.unchecked,
                         ),
                         const SizedBox(width: 8),
                         _buildToolbarButton(
@@ -182,21 +195,227 @@ class _RichTextEditorState extends State<RichTextEditor> {
   }
 
   bool _isFormatActive(quill.Attribute attribute) {
-    final controller = widget.controller._quillController;
-    return controller.getSelectionStyle().attributes.containsKey(attribute.key);
+    try {
+      final controller = widget.controller._quillController;
+      final selection = controller.selection;
+      
+      if (!selection.isValid || selection.start < 0) return false;
+      
+      // For list formats, we need to check the block style at the current line
+      if (attribute.key == quill.Attribute.ul.key || 
+          attribute.key == quill.Attribute.unchecked.key) {
+        
+        // Get the block (line) at the current cursor position
+        final block = controller.document.queryChild(selection.start).node;
+        
+        if (block != null && block.style.attributes.isNotEmpty) {
+          final listAttr = block.style.attributes['list'];
+          
+          if (attribute.key == quill.Attribute.ul.key) {
+            // Only active if it's specifically a bullet list
+            return listAttr?.value == 'bullet';
+          } else if (attribute.key == quill.Attribute.unchecked.key) {
+            // Only active if it's specifically a checklist (not bullet)
+            return listAttr?.value == 'unchecked' || listAttr?.value == 'checked';
+          }
+        }
+        return false;
+      }
+      
+      // For inline attributes (bold, italic, etc.)
+      final style = controller.getSelectionStyle();
+      return style.attributes.containsKey(attribute.key);
+    } catch (e) {
+      return false;
+    }
   }
 
   void _formatText(quill.Attribute attribute) {
     final controller = widget.controller._quillController;
     final selection = controller.selection;
     
-    if (selection.isCollapsed) {
-      // If no selection, toggle the attribute for future typing
+    if (!selection.isValid || selection.start < 0) return;
+    
+    // Handle inline attributes (bold, italic, etc.)
+    if (attribute.key == quill.Attribute.bold.key ||
+        attribute.key == quill.Attribute.italic.key ||
+        attribute.key == quill.Attribute.underline.key ||
+        attribute.key == quill.Attribute.strikeThrough.key) {
+      final isActive = _isFormatActive(attribute);
+      if (isActive) {
+        final unsetAttribute = quill.Attribute.fromKeyValue(attribute.key, null);
+        controller.formatSelection(unsetAttribute);
+      } else {
+        controller.formatSelection(attribute);
+      }
+      return;
+    }
+    
+    // Handle list attributes (bullet and checklist)
+    if (attribute.key == quill.Attribute.ul.key || 
+        attribute.key == quill.Attribute.unchecked.key) {
+      
+      final block = controller.document.queryChild(selection.start).node;
+      if (block != null && block.style.attributes.isNotEmpty) {
+        final listAttr = block.style.attributes['list'];
+        
+        // Determine what list type is currently applied
+        final isBulletActive = listAttr?.value == 'bullet';
+        final isChecklistActive = listAttr?.value == 'unchecked' || listAttr?.value == 'checked';
+        
+        if (attribute.key == quill.Attribute.ul.key) {
+          // Bullet list button clicked
+          if (isBulletActive) {
+            // Bullet is active, turn it off
+            controller.formatSelection(
+              quill.Attribute.fromKeyValue('list', null)
+            );
+          } else {
+            // Bullet is not active, turn it on (and clear checklist if present)
+            if (isChecklistActive) {
+              // Clear checklist first
+              controller.formatSelection(
+                quill.Attribute.fromKeyValue('list', null)
+              );
+            }
+            // Apply bullet list
+            controller.formatSelection(quill.Attribute.ul);
+          }
+        } else if (attribute.key == quill.Attribute.unchecked.key) {
+          // Checklist button clicked
+          if (isChecklistActive) {
+            // Checklist is active, turn it off
+            controller.formatSelection(
+              quill.Attribute.fromKeyValue('list', null)
+            );
+          } else {
+            // Checklist is not active, turn it on (and clear bullet if present)
+            if (isBulletActive) {
+              // Clear bullet first
+              controller.formatSelection(
+                quill.Attribute.fromKeyValue('list', null)
+              );
+            }
+            // Apply checklist
+            controller.formatSelection(quill.Attribute.unchecked);
+          }
+        }
+      } else {
+        // No list currently applied, just apply the requested list type
+        controller.formatSelection(attribute);
+      }
+      return;
+    }
+    
+    // For any other attributes, toggle normally
+    final isActive = _isFormatActive(attribute);
+    if (isActive) {
       controller.formatSelection(attribute);
     } else {
-      // Apply to selected text
       controller.formatSelection(attribute);
     }
+  }
+}
+
+/// A stateful toolbar button that updates its active state independently
+class _ToolbarButton extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+  final String tooltip;
+  final quill.QuillController controller;
+  final quill.Attribute attribute;
+
+  const _ToolbarButton({
+    required this.icon,
+    required this.onPressed,
+    required this.tooltip,
+    required this.controller,
+    required this.attribute,
+  });
+
+  @override
+  State<_ToolbarButton> createState() => _ToolbarButtonState();
+}
+
+class _ToolbarButtonState extends State<_ToolbarButton> {
+  bool _isActive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_updateState);
+    _updateState();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_updateState);
+    super.dispose();
+  }
+
+  void _updateState() {
+    if (!mounted) return;
+    
+    try {
+      bool isActive = false;
+      final selection = widget.controller.selection;
+      
+      if (selection.isValid && selection.start >= 0) {
+        // For list formats (block attributes), check the block style
+        if (widget.attribute.key == quill.Attribute.ul.key || 
+            widget.attribute.key == quill.Attribute.unchecked.key) {
+          
+          final block = widget.controller.document.queryChild(selection.start).node;
+          
+          if (block != null && block.style.attributes.isNotEmpty) {
+            final listAttr = block.style.attributes['list'];
+            
+            if (widget.attribute.key == quill.Attribute.ul.key) {
+              // Only active if it's specifically a bullet list
+              isActive = listAttr?.value == 'bullet';
+            } else if (widget.attribute.key == quill.Attribute.unchecked.key) {
+              // Only active if it's specifically a checklist (not bullet)
+              isActive = listAttr?.value == 'unchecked' || listAttr?.value == 'checked';
+            }
+          }
+        } else {
+          // For inline attributes
+          final style = widget.controller.getSelectionStyle();
+          isActive = style.attributes.containsKey(widget.attribute.key);
+        }
+      }
+      
+      if (_isActive != isActive) {
+        setState(() {
+          _isActive = isActive;
+        });
+      }
+    } catch (e) {
+      // Ignore errors during state updates
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: widget.tooltip,
+      child: InkWell(
+        onTap: widget.onPressed,
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _isActive ? Colors.blue.shade100 : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Icon(
+            widget.icon,
+            size: 20,
+            color: _isActive ? Colors.blue.shade700 : Colors.grey.shade700,
+          ),
+        ),
+      ),
+    );
   }
 }
 

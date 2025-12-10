@@ -40,14 +40,13 @@ dependencies:
   fl_chart: ^0.69.0
 
   # Notifications
-  firebase_messaging: 16.0.4
+  firebase_messaging: ^16.0.4
   flutter_local_notifications: ^17.2.2
   timezone: ^0.9.4
 
   # Form Fields
   intl_phone_field: ^3.2.0
   country_picker: ^2.0.26
-  google_places_flutter: ^2.0.9
   
   # Image Picker & Storage
   image_picker: ^1.0.7

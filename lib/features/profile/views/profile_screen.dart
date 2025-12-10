@@ -138,8 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         fit: BoxFit.cover,
                         onError: (exception, stackTrace) {
                           // Image failed to load, fallback to gradient
-                          debugPrint(
-                              'Failed to load profile image: $exception');
+                          debugPrint('Failed to load profile image: $exception');
                         },
                       )
                     : null,
@@ -257,8 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     subtitle: 'Update your profile and credentials',
                     onTap: () async {
                       // Navigate to account settings and refresh profile when returning
-                      await Navigator.pushNamed(
-                          context, AppRoutes.accountSettings);
+                      await Navigator.pushNamed(context, AppRoutes.accountSettings);
                       // Reload user data when returning to profile
                       await _loadUser();
                     },

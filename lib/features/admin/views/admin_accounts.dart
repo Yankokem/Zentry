@@ -13,7 +13,7 @@ class AdminAccountsPage extends StatefulWidget {
 class _AdminAccountsPageState extends State<AdminAccountsPage> {
   final AdminService _adminService = AdminService();
   final TextEditingController _searchController = TextEditingController();
-
+  
   String _selectedFilter = 'active'; // active, suspended, banned
   List<Map<String, dynamic>> _allUsers = [];
   bool _isLoading = true;
@@ -57,19 +57,19 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
 
   List<Map<String, dynamic>> _getFilteredUsers() {
     final searchQuery = _searchController.text.toLowerCase();
-
+    
     return _allUsers.where((user) {
       // Filter by status
       final status = (user['status'] ?? 'active').toString().toLowerCase();
       if (status != _selectedFilter) return false;
-
+      
       // Filter by search query
       if (searchQuery.isNotEmpty) {
         final name = (user['name'] ?? '').toString().toLowerCase();
         final email = (user['email'] ?? '').toString().toLowerCase();
         return name.contains(searchQuery) || email.contains(searchQuery);
       }
-
+      
       return true;
     }).toList();
   }
@@ -130,8 +130,7 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
                       ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF9ED69).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -148,7 +147,7 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
               ],
             ),
             const SizedBox(height: 20),
-
+            
             // Filter Tabs
             Container(
               decoration: BoxDecoration(
@@ -164,9 +163,9 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
                 ],
               ),
             ),
-
+            
             const SizedBox(height: 16),
-
+            
             // Search Bar
             TextField(
               controller: _searchController,
@@ -189,18 +188,17 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
             ),
-
+            
             const SizedBox(height: 16),
-
+            
             Expanded(
               child: Builder(
                 builder: (context) {
                   final filteredUsers = _getFilteredUsers();
-
+                
                   if (filteredUsers.isEmpty) {
                     return Center(
                       child: Column(
@@ -226,30 +224,24 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
                       ),
                     );
                   }
-
+                  
                   return ListView.builder(
                     padding: const EdgeInsets.only(bottom: 80),
                     itemCount: filteredUsers.length,
                     itemBuilder: (context, i) {
                       final u = filteredUsers[i];
                       final name = (u['name'] ?? '').toString();
-                      final initials = name
-                          .split(' ')
-                          .map((s) => s.isNotEmpty ? s[0] : '')
-                          .take(2)
-                          .join();
+                      final initials = name.split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join();
                       final role = (u['role'] ?? '').toString();
-                      final status =
-                          (u['status'] ?? 'active').toString().toLowerCase();
+                      final status = (u['status'] ?? 'active').toString().toLowerCase();
                       final isAdmin = role == 'admin';
-
+                      
                       return GestureDetector(
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  UserDetailScreen(userId: u['id']),
+                              builder: (context) => UserDetailScreen(userId: u['id']),
                             ),
                           ).then((_) => _loadUsers());
                         },
@@ -280,8 +272,7 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
                                         end: Alignment.bottomRight,
                                         colors: [
                                           const Color(0xFFF9ED69),
-                                          const Color(0xFFF9ED69)
-                                              .withOpacity(0.7),
+                                          const Color(0xFFF9ED69).withOpacity(0.7),
                                         ],
                                       ),
                                       borderRadius: BorderRadius.circular(15),
@@ -335,12 +326,10 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
                                         ),
                                         if (isAdmin)
                                           Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 4),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                             decoration: BoxDecoration(
                                               color: const Color(0xFFF9ED69),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
+                                              borderRadius: BorderRadius.circular(8),
                                             ),
                                             child: const Text(
                                               'ADMIN',
@@ -384,7 +373,7 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
   Widget _buildFilterTab(String value, String label) {
     final isSelected = _selectedFilter == value;
     Color statusColor;
-
+    
     switch (value) {
       case 'active':
         statusColor = Colors.green;
@@ -398,7 +387,7 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
       default:
         statusColor = Colors.grey;
     }
-
+    
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -463,8 +452,7 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
     }
   }
 
-  Widget _buildActionButtons(
-      Map<String, dynamic> user, bool isAdmin, String status) {
+  Widget _buildActionButtons(Map<String, dynamic> user, bool isAdmin, String status) {
     return PopupMenuButton<String>(
       icon: Icon(Icons.more_vert, color: Colors.grey[700]),
       shape: RoundedRectangleBorder(
@@ -479,8 +467,7 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
             value: 'suspend',
             child: Row(
               children: [
-                Icon(Icons.pause_circle_outline,
-                    color: Colors.orange, size: 20),
+                Icon(Icons.pause_circle_outline, color: Colors.orange, size: 20),
                 SizedBox(width: 12),
                 Text('Suspend'),
               ],
@@ -549,6 +536,8 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
         break;
     }
   }
+
+
 
   void _showActivateConfirmation(Map<String, dynamic> user) {
     showDialog(
@@ -635,8 +624,7 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content:
-                                    Text('${user['name']} has been activated'),
+                                content: Text('${user['name']} has been activated'),
                                 behavior: SnackBarBehavior.floating,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),

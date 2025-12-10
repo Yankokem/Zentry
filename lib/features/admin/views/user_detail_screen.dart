@@ -68,8 +68,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     value: 'suspend',
                     child: Row(
                       children: [
-                        Icon(Icons.pause_circle_outline,
-                            color: Colors.orange, size: 20),
+                        Icon(Icons.pause_circle_outline, color: Colors.orange, size: 20),
                         SizedBox(width: 12),
                         Text('Suspend User'),
                       ],
@@ -91,8 +90,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     value: 'activate',
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle_outline,
-                            color: Colors.green, size: 20),
+                        Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
                         SizedBox(width: 12),
                         Text('Activate'),
                       ],
@@ -114,8 +112,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     value: 'activate',
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle_outline,
-                            color: Colors.green, size: 20),
+                        Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
                         SizedBox(width: 12),
                         Text('Activate'),
                       ],
@@ -137,8 +134,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     value: 'demote',
                     child: Row(
                       children: [
-                        Icon(Icons.arrow_downward,
-                            color: Colors.grey, size: 20),
+                        Icon(Icons.arrow_downward, color: Colors.grey, size: 20),
                         SizedBox(width: 12),
                         Text('Demote to Member'),
                       ],
@@ -155,8 +151,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline,
-                          size: 64, color: Colors.red[300]),
+                      Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
                       const SizedBox(height: 16),
                       Text(
                         'Error loading user data',
@@ -168,10 +163,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         child: Text(
                           _error!,
                           textAlign: TextAlign.center,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.grey[600],
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[600],
+                              ),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -199,10 +193,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                             // Statistics Cards
                             Text(
                               'Activity Statistics',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                             ),
@@ -213,10 +204,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                             // Account Information
                             Text(
                               'Account Information',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                             ),
@@ -235,8 +223,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     final role = _userData!['role'] ?? 'member';
     final status = _userData!['status'] ?? 'active';
     final profileImageUrl = _userData!['profileImageUrl'];
-    final initials =
-        name.split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join();
+    final initials = name.split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join();
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -337,8 +324,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               if (role == 'admin') ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF9ED69),
                     borderRadius: BorderRadius.circular(8),
@@ -397,8 +383,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           ),
 
           // Suspension/Ban Info
-          if (status == 'suspended' &&
-              _userData!['suspensionReason'] != null) ...[
+          if (status == 'suspended' && _userData!['suspensionReason'] != null) ...[
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
@@ -509,8 +494,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     );
   }
 
-  Widget _buildStatCard(
-      String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -579,12 +563,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       ),
       child: Column(
         children: [
-          _buildInfoRow(
-              Icons.calendar_today,
-              'Member Since',
-              createdAt != null
-                  ? DateFormat('MMM d, yyyy').format(createdAt)
-                  : 'Unknown'),
+          _buildInfoRow(Icons.calendar_today, 'Member Since',
+              createdAt != null ? DateFormat('MMM d, yyyy').format(createdAt) : 'Unknown'),
           const Divider(height: 24),
           _buildInfoRow(Icons.access_time, 'Last Active', lastActive),
           const Divider(height: 24),
@@ -695,8 +675,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Activate User'),
-        content:
-            Text('Are you sure you want to activate ${_userData!['name']}?'),
+        content: Text('Are you sure you want to activate ${_userData!['name']}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -712,8 +691,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                 );
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('User activated successfully')),
+                    const SnackBar(content: Text('User activated successfully')),
                   );
                   _loadUserData();
                 }

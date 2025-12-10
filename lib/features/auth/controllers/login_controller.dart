@@ -53,7 +53,7 @@ class LoginController {
             fullName: 'User',
             email: email,
           );
-
+          
           // Initialize user metadata for admin tracking
           final adminService = AdminService();
           await adminService.initializeUserMetadata(userId);
@@ -69,7 +69,7 @@ class LoginController {
       // If user is suspended or banned, sign them out and show dialog
       if (status == 'suspended' || status == 'banned') {
         await _authService.signOut();
-
+        
         // Get metadata for details
         final metadata = await adminService.getUserMetadata(userId);
         final reason = status == 'suspended'
@@ -78,7 +78,7 @@ class LoginController {
         final duration = metadata?['suspensionDuration'] ?? '';
 
         _isLoading = false;
-
+        
         // Show status dialog with appeal option
         if (context.mounted) {
           await _showAccountStatusDialog(
@@ -90,7 +90,7 @@ class LoginController {
             userEmail: email,
           );
         }
-
+        
         return false;
       }
 
@@ -117,14 +117,12 @@ class LoginController {
     final color = isSuspended ? Colors.orange : Colors.red;
     final icon = isSuspended ? Icons.pause_circle_outline : Icons.block;
     final title = isSuspended ? 'Account Suspended' : 'Account Banned';
-
+    
     String message;
     if (isSuspended) {
-      message =
-          'Your account is suspended for $duration.\n\nReason: $reason\n\nPlease contact zentry_admin@zentry.app.com for account appeals.';
+      message = 'Your account is suspended for $duration.\n\nReason: $reason\n\nPlease contact zentry_admin@zentry.app.com for account appeals.';
     } else {
-      message =
-          'Your account is banned.\n\nReason: $reason\n\nPlease contact zentry_admin@zentry.app.com for account appeals.';
+      message = 'Your account is banned.\n\nReason: $reason\n\nPlease contact zentry_admin@zentry.app.com for account appeals.';
     }
 
     return showDialog(

@@ -4,11 +4,12 @@ import 'package:zentry/features/admin/admin.dart';
 
 class BugReportService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static const String _collection = 'bug_reports';
 
   /// Submit a bug report to Firestore
   Future<void> submitBugReport(BugReportModel bugReport) async {
     try {
-      await _firestore.collection('bug_reports').add(bugReport.toMap());
+      await _firestore.collection(_collection).add(bugReport.toMap());
     } catch (e) {
       throw Exception('Failed to submit bug report: $e');
     }
@@ -18,7 +19,7 @@ class BugReportService {
   Future<List<BugReportModel>> getAllBugReports() async {
     try {
       final querySnapshot = await _firestore
-          .collection('bug_reports')
+          .collection(_collection)
           .orderBy('createdAt', descending: true)
           .get();
 
@@ -34,7 +35,7 @@ class BugReportService {
   Future<List<BugReportModel>> getBugReportsByUser(String userId) async {
     try {
       final querySnapshot = await _firestore
-          .collection('bug_reports')
+          .collection(_collection)
           .where('userId', isEqualTo: userId)
           .orderBy('createdAt', descending: true)
           .get();
@@ -50,7 +51,7 @@ class BugReportService {
   /// Update bug report status (for admin use)
   Future<void> updateBugReportStatus(String bugReportId, String status) async {
     try {
-      await _firestore.collection('bug_reports').doc(bugReportId).update({
+      await _firestore.collection(_collection).doc(bugReportId).update({
         'status': status,
         'updatedAt': Timestamp.now(),
       });
@@ -58,4 +59,32 @@ class BugReportService {
       throw Exception('Failed to update bug report status: $e');
     }
   }
+
+  /// Stream all bug reports
+  Stream<List<BugReportModel>> getBugReportsStream() {
+    return _firestore
+        .collection(_collection)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => BugReportModel.fromMap(doc.id, doc.data()))
+          .toList();
+    });
+  }
+
+  /// Stream bug reports by status
+  Stream<List<BugReportModel>> getBugReportsByStatusStream(String status) {
+    return _firestore
+        .collection(_collection)
+        .where('status', isEqualTo: status)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => BugReportModel.fromMap(doc.id, doc.data()))
+          .toList();
+    });
+  }
 }
+

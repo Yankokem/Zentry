@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:google_places_flutter/google_places_flutter.dart';
-import 'package:google_places_flutter/model/prediction.dart';
+import 'package:country_picker/country_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:zentry/core/core.dart';
 
@@ -24,7 +24,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
+  final TextEditingController _zipCodeController = TextEditingController();
 
   String? _profileImageUrl;
   File? _selectedImage;
@@ -32,6 +32,15 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   bool _isSaving = false;
   String _phoneNumber = '';
   String _countryCode = '';
+  String? _selectedCountry;
+  
+  // Password fields
+  final TextEditingController _currentPasswordController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  bool _isGoogleUser = false;
+  bool _hasPassword = false;
+  bool _showPasswordSection = false;
 
   @override
   void initState() {
@@ -45,7 +54,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _locationController.dispose();
+    _zipCodeController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -58,13 +70,41 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         final userData = await _firestoreService.getUserData(user.uid);
 
         if (userData != null && mounted) {
-          _firstNameController.text = userData['firstName'] as String? ?? '';
-          _lastNameController.text = userData['lastName'] as String? ?? '';
-          _emailController.text = user.email ?? '';
-          _phoneNumber = userData['phoneNumber'] as String? ?? '';
-          _locationController.text = userData['location'] as String? ?? '';
-          _profileImageUrl = userData['profileImageUrl'] as String?;
-          _countryCode = userData['countryCode'] as String? ?? '';
+          final storedPhoneNumber = userData['phoneNumber'] as String? ?? '';
+          final storedCountryCode = userData['countryCode'] as String? ?? '';
+          
+          // Extract local phone number (remove country code prefix)
+          String localPhoneNumber = '';
+          if (storedPhoneNumber.isNotEmpty) {
+            // Remove any + and spaces, then extract the local part
+            final cleanNumber = storedPhoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+            // Common country code lengths are 1-3 digits
+            // For PH (+63), it's 2 digits
+            if (cleanNumber.length > 10) {
+              localPhoneNumber = cleanNumber.substring(cleanNumber.length - 10);
+            } else {
+              localPhoneNumber = cleanNumber;
+            }
+          }
+          
+          setState(() {
+            _firstNameController.text = userData['firstName'] as String? ?? '';
+            _lastNameController.text = userData['lastName'] as String? ?? '';
+            _emailController.text = user.email ?? '';
+            _phoneNumber = storedPhoneNumber;
+            _phoneController.text = localPhoneNumber;
+            _profileImageUrl = userData['profileImageUrl'] as String?;
+            // If no country code saved, default to PH
+            _countryCode = storedCountryCode.isNotEmpty ? storedCountryCode : 'PH';
+
+            // Load location fields
+            _selectedCountry = userData['country'] as String?;
+
+            // Check if user is Google sign-in and if they have a password
+            final providerData = user.providerData;
+            _isGoogleUser = providerData.any((info) => info.providerId == 'google.com');
+            _hasPassword = providerData.any((info) => info.providerId == 'password');
+          });
         }
       }
     } catch (e) {
@@ -94,9 +134,23 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         });
       }
     } catch (e) {
+      debugPrint('Error picking image: $e');
       if (mounted) {
+        String errorMessage = 'Error picking image';
+        if (e.toString().contains('MissingPluginException')) {
+          errorMessage = 'Image picker plugin not initialized. Please restart the app.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
         );
       }
     }
@@ -107,19 +161,51 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
     try {
       // Upload to Cloudinary using the account photo preset
+      // Note: publicId removed because unsigned presets don't support it
       final imageUrl = await _cloudinaryService.uploadImage(
         _selectedImage!,
         uploadType: CloudinaryUploadType.accountPhoto,
-        publicId: userId,
       );
-      return imageUrl;
-    } catch (e) {
+      
+      // Update the preview immediately after successful upload
       if (mounted) {
+        debugPrint('Image URL from Cloudinary: $imageUrl');
+        setState(() {
+          _profileImageUrl = imageUrl;
+          _selectedImage = null; // Clear selected image since upload succeeded
+        });
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
+          const SnackBar(
+            content: Text('Profile photo uploaded successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
-      return null;
+      
+      return imageUrl;
+    } catch (e) {
+      // Extract the actual error message
+      String errorMsg = e.toString();
+      if (errorMsg.contains('Exception:')) {
+        errorMsg = errorMsg.replaceAll('Exception: ', '');
+      }
+      if (errorMsg.contains('Failed to upload image to Cloudinary:')) {
+        errorMsg = errorMsg.replaceAll('Failed to upload image to Cloudinary: ', '');
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: $errorMsg'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+      
+      // Re-throw so _saveChanges can handle it
+      rethrow;
     }
   }
 
@@ -133,7 +219,14 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       if (user == null) throw Exception('No user logged in');
 
       // Upload profile image if changed
-      final imageUrl = await _uploadProfileImage(user.uid);
+      String? imageUrl;
+      try {
+        imageUrl = await _uploadProfileImage(user.uid);
+      } catch (e) {
+        // If image upload fails, continue with other updates
+        // Error message already shown in _uploadProfileImage
+        imageUrl = null;
+      }
 
       // Update display name in Firebase Auth
       final fullName =
@@ -154,6 +247,50 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         }
       }
 
+      // Handle password update
+      if (_newPasswordController.text.trim().isNotEmpty) {
+        // Validate password match
+        if (_newPasswordController.text.trim() != _confirmPasswordController.text.trim()) {
+          throw Exception('New passwords do not match');
+        }
+        
+        if (_newPasswordController.text.trim().length < 6) {
+          throw Exception('Password must be at least 6 characters');
+        }
+        
+        if (_hasPassword) {
+          // User already has a password - need to verify current password
+          if (_currentPasswordController.text.trim().isEmpty) {
+            throw Exception('Please enter your current password');
+          }
+          
+          // Re-authenticate with current password
+          final credential = EmailAuthProvider.credential(
+            email: user.email!,
+            password: _currentPasswordController.text.trim(),
+          );
+          await user.reauthenticateWithCredential(credential);
+        } else if (_isGoogleUser) {
+          // Google user setting password for the first time
+          // Need to re-authenticate with Google before adding password
+          final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+          await user.reauthenticateWithProvider(googleProvider);
+        }
+        
+        // Update to new password
+        await user.updatePassword(_newPasswordController.text.trim());
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password updated successfully')),
+          );
+          // Update _hasPassword flag
+          setState(() {
+            _hasPassword = true;
+          });
+        }
+      }
+
       // Update Firestore data
       await _firestoreService.updateUserData(user.uid, {
         'firstName': _firstNameController.text.trim(),
@@ -161,10 +298,16 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         'fullName': fullName,
         'phoneNumber': _phoneNumber,
         'countryCode': _countryCode,
-        'location': _locationController.text.trim(),
+        'country': _selectedCountry ?? '',
         if (imageUrl != null) 'profileImageUrl': imageUrl,
         'updatedAt': DateTime.now().toIso8601String(),
       });
+
+      // Clear password fields after successful save
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
+      _showPasswordSection = false;
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -181,12 +324,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
-  }
-
-  void _onPlaceSelected(Prediction prediction) {
-    setState(() {
-      _locationController.text = prediction.description ?? '';
-    });
   }
 
   @override
@@ -253,49 +390,71 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                         onTap: _pickImage,
                         child: Stack(
                           children: [
-                            Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 3,
-                                ),
-                                image: _selectedImage != null
-                                    ? DecorationImage(
-                                        image: FileImage(_selectedImage!),
-                                        fit: BoxFit.cover,
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(60),
+                              child: Container(
+                                width: 120,
+                                height: 120,
+                                color: Colors.grey[300],
+                                child: _selectedImage != null
+                                    ? Container(
+                                        color: Colors.grey[300],
+                                        child: Center(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              const Icon(
+                                                Icons.image_outlined,
+                                                size: 40,
+                                                color: Colors.grey,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Ready to upload',
+                                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       )
                                     : _profileImageUrl != null
-                                        ? DecorationImage(
-                                            image:
-                                                NetworkImage(_profileImageUrl!),
+                                        ? Image.network(
+                                            _profileImageUrl!,
                                             fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              debugPrint('Error loading network image in account settings: $error');
+                                              return Container(
+                                                color: Colors.grey[300],
+                                                child: const Icon(
+                                                  Icons.person,
+                                                  size: 60,
+                                                  color: Colors.grey,
+                                                ),
+                                              );
+                                            },
+                                            loadingBuilder: (context, child, loadingProgress) {
+                                              if (loadingProgress == null) return child;
+                                              return Center(
+                                                child: CircularProgressIndicator(
+                                                  value: loadingProgress.expectedTotalBytes != null
+                                                      ? loadingProgress.cumulativeBytesLoaded /
+                                                          loadingProgress.expectedTotalBytes!
+                                                      : null,
+                                                ),
+                                              );
+                                            },
                                           )
-                                        : null,
-                                gradient: _selectedImage == null &&
-                                        _profileImageUrl == null
-                                    ? LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Theme.of(context).primaryColor,
-                                          Theme.of(context)
-                                              .colorScheme
-                                              .secondary,
-                                        ],
-                                      )
-                                    : null,
+                                        : Container(
+                                            color: Colors.grey[300],
+                                            child: const Icon(
+                                              Icons.person,
+                                              size: 60,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
                               ),
-                              child: _selectedImage == null &&
-                                      _profileImageUrl == null
-                                  ? const Icon(
-                                      Icons.person,
-                                      size: 60,
-                                      color: Colors.white,
-                                    )
-                                  : null,
                             ),
                             Positioned(
                               bottom: 0,
@@ -423,6 +582,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
                 // Phone Number
                 IntlPhoneField(
+                  controller: _phoneController,
                   decoration: InputDecoration(
                     labelText: 'Phone Number',
                     border: OutlineInputBorder(
@@ -430,67 +590,187 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           BorderRadius.circular(AppConstants.radiusMedium),
                     ),
                   ),
-                  initialCountryCode:
-                      _countryCode.isNotEmpty ? _countryCode : 'PH',
+                  initialCountryCode: _countryCode,
                   onChanged: (phone) {
                     setState(() {
                       _phoneNumber = phone.completeNumber;
-                      _countryCode = phone.countryCode;
+                      _countryCode = phone.countryISOCode;
                     });
                   },
                 ),
 
                 const SizedBox(height: 16),
 
-                // Location - Google Places Autocomplete
-                GooglePlaceAutoCompleteTextField(
-                  textEditingController: _locationController,
-                  googleAPIKey:
-                      'YOUR_GOOGLE_PLACES_API_KEY', // TODO: Replace with your actual API key
-                  inputDecoration: InputDecoration(
-                    labelText: 'Location',
-                    hintText: 'Search for your complete address',
-                    prefixIcon: const Icon(Icons.location_on_outlined),
-                    border: OutlineInputBorder(
+                // Country Selector
+                InkWell(
+                  onTap: () {
+                    showCountryPicker(
+                      context: context,
+                      showPhoneCode: false,
+                      onSelect: (Country country) {
+                        setState(() {
+                          _selectedCountry = country.name;
+                        });
+                      },
+                    );
+                  },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Country',
+                      prefixIcon: const Icon(Icons.public),
+                      suffixIcon: const Icon(Icons.arrow_drop_down),
+                      border: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusMedium),
+                      ),
+                    ),
+                    child: Text(
+                      _selectedCountry ?? 'Select Country',
+                      style: TextStyle(
+                        color: _selectedCountry != null
+                            ? Theme.of(context).textTheme.bodyLarge?.color
+                            : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Security Section
+                Text(
+                  'Security',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[600],
+                      ),
+                ),
+                const SizedBox(height: 16),
+
+                // Password Section
+                if (_isGoogleUser && !_hasPassword)
+                  Container(
+                    padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius:
+                          BorderRadius.circular(AppConstants.radiusLarge),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.security,
+                          color: Colors.orange[700],
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'You signed in with Google. Add a password to enable email sign-in.',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.orange[700],
+                                    ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                
+                if (_isGoogleUser && !_hasPassword) const SizedBox(height: 16),
+
+                // Toggle password section
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _showPasswordSection = !_showPasswordSection;
+                      if (!_showPasswordSection) {
+                        _currentPasswordController.clear();
+                        _newPasswordController.clear();
+                        _confirmPasswordController.clear();
+                      }
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
                       borderRadius:
                           BorderRadius.circular(AppConstants.radiusMedium),
                     ),
-                  ),
-                  debounceTime: 800,
-                  countries: const [
-                    'ph'
-                  ], // Prioritize Philippines but allow all countries
-                  isLatLngRequired: false,
-                  getPlaceDetailWithLatLng: (Prediction prediction) {
-                    _onPlaceSelected(prediction);
-                  },
-                  itemClick: (Prediction prediction) {
-                    _locationController.text = prediction.description ?? '';
-                    _locationController.selection = TextSelection.fromPosition(
-                      TextPosition(offset: prediction.description?.length ?? 0),
-                    );
-                  },
-                  seperatedBuilder: const Divider(height: 1),
-                  containerHorizontalPadding: 10,
-                  itemBuilder: (context, index, Prediction prediction) {
-                    return Container(
-                      padding: const EdgeInsets.all(10),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 20),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              prediction.description ?? '',
-                              style: const TextStyle(fontSize: 14),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.lock_outline),
+                            const SizedBox(width: 12),
+                            Text(
+                              _hasPassword ? 'Change Password' : 'Set Password',
+                              style: Theme.of(context).textTheme.bodyLarge,
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  isCrossBtnShown: true,
+                          ],
+                        ),
+                        Icon(_showPasswordSection
+                            ? Icons.expand_less
+                            : Icons.expand_more),
+                      ],
+                    ),
+                  ),
                 ),
+
+                // Password fields (shown when expanded)
+                if (_showPasswordSection) ...[
+                  const SizedBox(height: 16),
+                  
+                  if (_hasPassword) ...[
+                    TextFormField(
+                      controller: _currentPasswordController,
+                      decoration: InputDecoration(
+                        labelText: 'Current Password',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppConstants.radiusMedium),
+                        ),
+                      ),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  TextFormField(
+                    controller: _newPasswordController,
+                    decoration: InputDecoration(
+                      labelText: 'New Password',
+                      hintText: 'At least 6 characters',
+                      prefixIcon: const Icon(Icons.lock),
+                      border: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusMedium),
+                      ),
+                    ),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm New Password',
+                      prefixIcon: const Icon(Icons.lock),
+                      border: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusMedium),
+                      ),
+                    ),
+                    obscureText: true,
+                  ),
+                ],
 
                 const SizedBox(height: 32),
 
@@ -498,11 +778,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 Container(
                   padding: const EdgeInsets.all(AppConstants.paddingMedium),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius:
                         BorderRadius.circular(AppConstants.radiusLarge),
                     border: Border.all(
-                      color: Colors.blue.withOpacity(0.3),
+                      color: Colors.blue.withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),

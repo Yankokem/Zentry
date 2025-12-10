@@ -16,6 +16,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String profile = '/profile';
   static const String accountSettings = '/account-settings';
+  static const String accountAppeal = '/account-appeal';
   static const String appearance = '/appearance';
   static const String about = '/about';
   static const String helpSupport = '/help-support';
@@ -38,6 +39,7 @@ class AppRoutes {
   // Admin
   static const String adminBugReportDetails = '/admin/bug-report-details';
   static const String adminAccountAction = '/admin/account-action';
+  static const String adminUserDetail = '/admin/user-detail';
 
   // Route Generator
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -127,9 +129,27 @@ class AppRoutes {
           ),
         );
 
+      case adminUserDetail:
+        final userId = settings.arguments as String;
+        return MaterialPageRoute(
+          builder: (_) => AdminGuard(
+            child: UserDetailScreen(userId: userId),
+          ),
+        );
+
       case notifications:
         return MaterialPageRoute(
           builder: (_) => const NotificationsScreen(),
+        );
+
+      case accountAppeal:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => AccountAppealScreen(
+            userId: args?['userId'],
+            userEmail: args?['userEmail'],
+            status: args?['status'],
+          ),
         );
 
       default:

@@ -308,7 +308,6 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
       final imageUrl = await _cloudinaryService.uploadImage(
         _selectedImage!,
         uploadType: CloudinaryUploadType.journalImage,
-        publicId: 'journal_${DateTime.now().millisecondsSinceEpoch}',
       );
       return imageUrl;
     } catch (e) {
