@@ -17,8 +17,10 @@ class AdminAccountActionPage extends StatefulWidget {
 }
 
 class _AdminAccountActionPageState extends State<AdminAccountActionPage> {
+  final AdminService _adminService = AdminService();
   final reasonController = TextEditingController();
   String selectedDuration = '7 days';
+  bool _isProcessing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -358,33 +360,75 @@ class _AdminAccountActionPageState extends State<AdminAccountActionPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () {
-                            if (isSuspend) {
-                              AdminTestData.suspendUser(widget.user['id'], reasonController.text, selectedDuration);
+                          onPressed: _isProcessing ? null : () async {
+                            if (reasonController.text.trim().isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${widget.user['name']} suspended for $selectedDuration'),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  backgroundColor: Colors.orange,
-                                ),
-                              );
-                            } else {
-                              AdminTestData.banUser(widget.user['id'], reasonController.text);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${widget.user['name']} has been banned'),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
+                                const SnackBar(
+                                  content: Text('Please provide a reason'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
+                              return;
                             }
-                            Navigator.pop(context);
+
+                            setState(() => _isProcessing = true);
+
+                            try {
+                              if (isSuspend) {
+                                await _adminService.updateUserStatus(
+                                  userId: widget.user['id'],
+                                  status: 'suspended',
+                                  reason: reasonController.text.trim(),
+                                  duration: selectedDuration,
+                                );
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('${widget.user['name']} suspended for $selectedDuration'),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                }
+                              } else {
+                                await _adminService.updateUserStatus(
+                                  userId: widget.user['id'],
+                                  status: 'banned',
+                                  reason: reasonController.text.trim(),
+                                );
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('${widget.user['name']} has been banned'),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                              if (mounted) {
+                                Navigator.pop(context);
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isProcessing = false);
+                              }
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: actionColor,
@@ -395,9 +439,18 @@ class _AdminAccountActionPageState extends State<AdminAccountActionPage> {
                             ),
                             elevation: 0,
                           ),
-                          child: Text(
-                            isSuspend ? 'Suspend User' : 'Ban User',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          child: _isProcessing
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : Text(
+                                  isSuspend ? 'Suspend User' : 'Ban User',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),

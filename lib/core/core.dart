@@ -28,6 +28,7 @@ export 'utils/helpers.dart';
 export 'utils/validators.dart';
 export 'utils/admin_mode.dart';
 export 'utils/admin_test_data.dart';
+export 'utils/user_metadata_initializer.dart';
 
 // Widgets
 export 'widgets/floating_nav_bar.dart';

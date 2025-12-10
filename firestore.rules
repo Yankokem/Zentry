@@ -1,9 +1,22 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read and write their own user documents
+    // User Metadata - admin only for management
+    match /user_metadata/{userId} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || 
+         request.auth.token.email == 'zentry_admin@zentry.app.com');
+      allow write: if request.auth != null && 
+        request.auth.token.email == 'zentry_admin@zentry.app.com';
+      allow create: if request.auth != null;
+    }
+
+    // Users collection - allow admin to read all users
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || 
+         request.auth.token.email == 'zentry_admin@zentry.app.com');
+      allow write: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null;
     }
 
@@ -83,10 +96,15 @@ service cloud.firestore {
         request.auth.token.email == 'zentry_admin@zentry.app.com';
     }
 
-    // Allow authenticated users to list/read all collections for their data
+    // Allow authenticated users to list/read and write their own collections
     match /{document=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if request.auth != null && 
+        (request.resource == null || 
+         request.resource.data.userId == request.auth.uid ||
+         request.auth.token.email == 'zentry_admin@zentry.app.com');
+      allow write: if request.auth != null && 
+        (request.resource.data.userId == request.auth.uid ||
+         request.auth.token.email == 'zentry_admin@zentry.app.com');
     }
   }
 }

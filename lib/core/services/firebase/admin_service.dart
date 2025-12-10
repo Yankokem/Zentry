@@ -132,4 +132,321 @@ class AdminService {
     }
     return isAdminUser;
   }
+
+  // ===== USER MANAGEMENT METHODS =====
+
+  static const String userMetadataCollection = 'user_metadata';
+  static const String journalCollection = 'journal_entries';
+  static const String wishlistCollection = 'wishlists';
+  static const String projectsCollection = 'projects';
+  static const String usersCollection = 'users';
+
+  /// Get all users with their metadata
+  Future<List<Map<String, dynamic>>> getAllUsers() async {
+    try {
+      final usersSnapshot = await _firestore.collection(usersCollection).get();
+      
+      final users = <Map<String, dynamic>>[];
+      
+      for (final userDoc in usersSnapshot.docs) {
+        final userData = userDoc.data();
+        
+        // Get metadata for this user
+        final metadataDoc = await _firestore
+            .collection(userMetadataCollection)
+            .doc(userDoc.id)
+            .get();
+        
+        final metadata = metadataDoc.exists ? metadataDoc.data()! : {};
+        
+        // Combine user data with metadata
+        users.add({
+          'id': userDoc.id,
+          'uid': userData['uid'] ?? userDoc.id,
+          'name': userData['fullName'] ?? 'Unknown User',
+          'firstName': userData['firstName'] ?? '',
+          'lastName': userData['lastName'] ?? '',
+          'email': userData['email'] ?? '',
+          'profileImageUrl': userData['profileImageUrl'],
+          'phoneNumber': userData['phoneNumber'],
+          'country': userData['country'],
+          'role': userData['role'] ?? 'member',
+          'status': metadata['status'] ?? 'active',
+          'lastActive': metadata['lastActive'] != null
+              ? _formatLastActive((metadata['lastActive'] as Timestamp).toDate())
+              : 'Never',
+          'suspensionReason': metadata['suspensionReason'],
+          'suspensionDuration': metadata['suspensionDuration'],
+          'suspensionStartDate': metadata['suspensionStartDate'],
+          'banReason': metadata['banReason'],
+          'createdAt': userData['createdAt'],
+        });
+      }
+      
+      return users;
+    } catch (e) {
+      throw Exception('Failed to fetch users: $e');
+    }
+  }
+
+  /// Get user statistics for detail view
+  Future<Map<String, dynamic>> getUserStatistics(String userId) async {
+    try {
+      // Get user data
+      final userDoc = await _firestore.collection(usersCollection).doc(userId).get();
+      final userData = userDoc.data() ?? {};
+      
+      // Get metadata
+      final metadataDoc = await _firestore.collection(userMetadataCollection).doc(userId).get();
+      final metadata = metadataDoc.exists ? metadataDoc.data()! : {};
+      
+      // Count journal entries
+      final journalSnapshot = await _firestore
+          .collection(journalCollection)
+          .where('userId', isEqualTo: userId)
+          .get();
+      
+      // Count wishlists
+      final wishlistSnapshot = await _firestore
+          .collection(wishlistCollection)
+          .where('userId', isEqualTo: userId)
+          .get();
+      
+      // Count shared wishlists
+      final sharedWishlistSnapshot = await _firestore
+          .collection(wishlistCollection)
+          .where('sharedWith', arrayContains: userData['email'] ?? '')
+          .get();
+      
+      // Count projects (owned)
+      final projectsSnapshot = await _firestore
+          .collection(projectsCollection)
+          .where('userId', isEqualTo: userId)
+          .get();
+      
+      // Count shared projects
+      final sharedProjectsSnapshot = await _firestore
+          .collection(projectsCollection)
+          .where('teamMembers', arrayContains: userData['email'] ?? '')
+          .get();
+      
+      // Count tickets across all projects
+      int totalTickets = 0;
+      for (final projectDoc in projectsSnapshot.docs) {
+        final ticketsSnapshot = await _firestore
+            .collection(projectsCollection)
+            .doc(projectDoc.id)
+            .collection('tickets')
+            .get();
+        totalTickets += ticketsSnapshot.docs.length;
+      }
+      
+      return {
+        'id': userId,
+        'uid': userData['uid'] ?? userId,
+        'name': userData['fullName'] ?? 'Unknown User',
+        'firstName': userData['firstName'] ?? '',
+        'lastName': userData['lastName'] ?? '',
+        'email': userData['email'] ?? '',
+        'profileImageUrl': userData['profileImageUrl'],
+        'phoneNumber': userData['phoneNumber'],
+        'country': userData['country'],
+        'role': userData['role'] ?? 'member',
+        'status': metadata['status'] ?? 'active',
+        'lastActive': metadata['lastActive'] != null
+            ? (metadata['lastActive'] as Timestamp).toDate()
+            : null,
+        'lastActiveFormatted': metadata['lastActive'] != null
+            ? _formatLastActive((metadata['lastActive'] as Timestamp).toDate())
+            : 'Never',
+        'createdAt': userData['createdAt'] != null
+            ? (userData['createdAt'] as Timestamp).toDate()
+            : null,
+        'suspensionReason': metadata['suspensionReason'],
+        'suspensionDuration': metadata['suspensionDuration'],
+        'suspensionStartDate': metadata['suspensionStartDate'] != null
+            ? (metadata['suspensionStartDate'] as Timestamp).toDate()
+            : null,
+        'banReason': metadata['banReason'],
+        // Statistics
+        'journalCount': journalSnapshot.docs.length,
+        'wishlists': wishlistSnapshot.docs.length,
+        'sharedWishlists': sharedWishlistSnapshot.docs.length,
+        'projects': projectsSnapshot.docs.length,
+        'sharedProjects': sharedProjectsSnapshot.docs.length,
+        'tickets': totalTickets,
+      };
+    } catch (e) {
+      throw Exception('Failed to fetch user statistics: $e');
+    }
+  }
+
+  /// Update user account status
+  Future<void> updateUserStatus({
+    required String userId,
+    required String status,
+    String? reason,
+    String? duration,
+  }) async {
+    try {
+      final metadataRef = _firestore.collection(userMetadataCollection).doc(userId);
+      
+      final data = <String, dynamic>{
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      
+      if (status == 'suspended') {
+        data['suspensionReason'] = reason;
+        data['suspensionDuration'] = duration;
+        data['suspensionStartDate'] = FieldValue.serverTimestamp();
+      } else if (status == 'banned') {
+        data['banReason'] = reason;
+      } else if (status == 'active') {
+        // Remove suspension/ban data when activating
+        data['suspensionReason'] = FieldValue.delete();
+        data['suspensionDuration'] = FieldValue.delete();
+        data['suspensionStartDate'] = FieldValue.delete();
+        data['banReason'] = FieldValue.delete();
+      }
+      
+      await metadataRef.set(data, SetOptions(merge: true));
+    } catch (e) {
+      throw Exception('Failed to update user status: $e');
+    }
+  }
+
+  /// Update user role (stored in users collection, not metadata)
+  Future<void> updateUserRole({
+    required String userId,
+    required String role,
+  }) async {
+    try {
+      await _firestore.collection(usersCollection).doc(userId).set({
+        'role': role,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      throw Exception('Failed to update user role: $e');
+    }
+  }
+
+  /// Update last active timestamp
+  Future<void> updateLastActive(String userId) async {
+    try {
+      await _firestore.collection(userMetadataCollection).doc(userId).set({
+        'lastActive': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      // Don't throw error for last active update
+      print('Failed to update last active: $e');
+    }
+  }
+
+  /// Initialize user metadata when user signs up
+  Future<void> initializeUserMetadata(String userId) async {
+    try {
+      await _firestore.collection(userMetadataCollection).doc(userId).set({
+        'status': 'active',
+        'lastActive': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Failed to initialize user metadata: $e');
+    }
+  }
+
+  /// Check if specific user is admin
+  Future<bool> isUserAdmin(String userId) async {
+    try {
+      final userDoc = await _firestore
+          .collection(usersCollection)
+          .doc(userId)
+          .get();
+      
+      if (!userDoc.exists) return false;
+      
+      final role = userDoc.data()?['role'] ?? 'member';
+      return role == 'admin';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Get user metadata
+  Future<Map<String, dynamic>?> getUserMetadata(String userId) async {
+    try {
+      final doc = await _firestore.collection(userMetadataCollection).doc(userId).get();
+      return doc.data();
+    } catch (e) {
+      throw Exception('Failed to get user metadata: $e');
+    }
+  }
+
+  /// Check if suspension has expired and auto-reactivate if needed
+  /// Returns the current status after checking
+  Future<String> checkAndUpdateSuspensionStatus(String userId) async {
+    try {
+      final metadata = await getUserMetadata(userId);
+      if (metadata == null) return 'active';
+
+      final status = metadata['status'] ?? 'active';
+      if (status != 'suspended') return status;
+
+      // Check if suspension has expired
+      final suspensionStartDate = metadata['suspensionStartDate'] as Timestamp?;
+      final suspensionDuration = metadata['suspensionDuration'] as String?;
+
+      if (suspensionStartDate == null || suspensionDuration == null) {
+        return status;
+      }
+
+      // Parse duration (e.g., "7 days" -> 7)
+      final durationDays = int.tryParse(suspensionDuration.split(' ').first) ?? 0;
+      final startDate = suspensionStartDate.toDate();
+      final expiryDate = startDate.add(Duration(days: durationDays));
+      final now = DateTime.now();
+
+      // If suspension has expired, reactivate user
+      if (now.isAfter(expiryDate)) {
+        await updateUserStatus(
+          userId: userId,
+          status: 'active',
+        );
+        return 'active';
+      }
+
+      return 'suspended';
+    } catch (e) {
+      print('Error checking suspension status: $e');
+      return 'active'; // Default to active on error to avoid blocking users
+    }
+  }
+
+  // ===== HELPER METHODS =====
+
+  String _formatLastActive(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inDays < 30) {
+      final weeks = (difference.inDays / 7).floor();
+      return '${weeks}w ago';
+    } else if (difference.inDays < 365) {
+      final months = (difference.inDays / 30).floor();
+      return '${months}mo ago';
+    } else {
+      final years = (difference.inDays / 365).floor();
+      return '${years}y ago';
+    }
+  }
 }

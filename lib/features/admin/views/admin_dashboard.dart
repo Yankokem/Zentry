@@ -54,8 +54,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   children: [
                     Image.asset(
                       'assets/images/bgremove.png',
-                      height: 50,
-                      width: 50,
+                      height: 40,
+                      width: 40,
                       fit: BoxFit.contain,
                     ),
                     const SizedBox(width: 12),

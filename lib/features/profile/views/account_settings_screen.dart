@@ -73,11 +73,26 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           final storedPhoneNumber = userData['phoneNumber'] as String? ?? '';
           final storedCountryCode = userData['countryCode'] as String? ?? '';
           
+          // Extract local phone number (remove country code prefix)
+          String localPhoneNumber = '';
+          if (storedPhoneNumber.isNotEmpty) {
+            // Remove any + and spaces, then extract the local part
+            final cleanNumber = storedPhoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+            // Common country code lengths are 1-3 digits
+            // For PH (+63), it's 2 digits
+            if (cleanNumber.length > 10) {
+              localPhoneNumber = cleanNumber.substring(cleanNumber.length - 10);
+            } else {
+              localPhoneNumber = cleanNumber;
+            }
+          }
+          
           setState(() {
             _firstNameController.text = userData['firstName'] as String? ?? '';
             _lastNameController.text = userData['lastName'] as String? ?? '';
             _emailController.text = user.email ?? '';
             _phoneNumber = storedPhoneNumber;
+            _phoneController.text = localPhoneNumber;
             _profileImageUrl = userData['profileImageUrl'] as String?;
             // If no country code saved, default to PH
             _countryCode = storedCountryCode.isNotEmpty ? storedCountryCode : 'PH';
@@ -119,9 +134,23 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         });
       }
     } catch (e) {
+      debugPrint('Error picking image: $e');
       if (mounted) {
+        String errorMessage = 'Error picking image';
+        if (e.toString().contains('MissingPluginException')) {
+          errorMessage = 'Image picker plugin not initialized. Please restart the app.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
         );
       }
     }
@@ -553,6 +582,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
                 // Phone Number
                 IntlPhoneField(
+                  controller: _phoneController,
                   decoration: InputDecoration(
                     labelText: 'Phone Number',
                     border: OutlineInputBorder(
@@ -561,9 +591,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     ),
                   ),
                   initialCountryCode: _countryCode,
-                  initialValue: _phoneNumber.isNotEmpty
-                      ? _phoneNumber.replaceAll(RegExp(r'^\+\d+\s*'), '').trim()
-                      : null,
                   onChanged: (phone) {
                     setState(() {
                       _phoneNumber = phone.completeNumber;

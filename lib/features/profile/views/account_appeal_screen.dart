@@ -7,7 +7,16 @@ import 'package:zentry/features/admin/admin.dart';
 import 'package:zentry/features/journal/journal.dart';
 
 class AccountAppealScreen extends StatefulWidget {
-  const AccountAppealScreen({super.key});
+  final String? userId;
+  final String? userEmail;
+  final String? status;
+
+  const AccountAppealScreen({
+    super.key,
+    this.userId,
+    this.userEmail,
+    this.status,
+  });
 
   @override
   State<AccountAppealScreen> createState() => _AccountAppealScreenState();
@@ -35,6 +44,10 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
   void initState() {
     super.initState();
     _contentEditorController.clear();
+    // Set reason based on passed status
+    if (widget.status != null) {
+      _selectedReason = widget.status == 'banned' ? 'ban' : 'suspension';
+    }
   }
 
   @override
@@ -75,12 +88,20 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final user = _authService.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to submit an appeal')),
-        );
-        return;
+      // Use passed userId/userEmail if available (from login dialog), otherwise use current auth user
+      String? userId = widget.userId;
+      String? userEmail = widget.userEmail;
+      
+      if (userId == null || userEmail == null) {
+        final user = _authService.currentUser;
+        if (user == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please log in to submit an appeal')),
+          );
+          return;
+        }
+        userId = user.uid;
+        userEmail = user.email ?? '';
       }
 
       // Upload images to Cloudinary
@@ -105,8 +126,8 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
       final content = _contentEditorController.getJsonContent();
 
       final appeal = AccountAppealModel.create(
-        userId: user.uid,
-        userEmail: user.email ?? '',
+        userId: userId,
+        userEmail: userEmail,
         reason: _selectedReason,
         title: _titleController.text.trim(),
         content: content,
