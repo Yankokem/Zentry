@@ -1,131 +1,143 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Check if the user has the 'admin' role in their user profile
+    // Uses exists() check to prevent rule evaluation errors if user doc missing
+    function hasAdminRole() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'member') == 'admin';
+    }
+
+    // Check if the user is the hardcoded system admin (fallback)
+    function isSystemAdmin() {
+      return request.auth != null && 
+        request.auth.token.email == 'zentry_admin@zentry.app.com';
+    }
+
+    // Combined admin check
+    function isAdmin() {
+      return isSystemAdmin() || hasAdminRole();
+    }
+
+    // Helper to check project access
+    function canAccessProject(projectId) {
+      let projectPath = /databases/$(database)/documents/projects/$(projectId);
+      return request.auth != null && 
+             exists(projectPath) && (
+               get(projectPath).data.userId == request.auth.uid ||
+               request.auth.token.email in get(projectPath).data.get('teamMembers', [])
+             );
+    }
+
     // User Metadata - admin only for management
     match /user_metadata/{userId} {
-      allow read: if request.auth != null && 
-        (request.auth.uid == userId || 
-         request.auth.token.email == 'zentry_admin@zentry.app.com');
-      allow write: if request.auth != null && 
-        request.auth.token.email == 'zentry_admin@zentry.app.com';
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      allow write: if isAdmin();
       allow create: if request.auth != null;
     }
 
     // Users collection
     match /users/{userId} {
-      // Merged: Keep permissive read from HEAD to support assignee display,
-      // but keep Master's write/create/list structure.
       allow read: if request.auth != null; 
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      allow list: if request.auth != null;
       allow create: if request.auth != null;
-      allow list: if request.auth != null;  // Allow querying users collection
     }
 
     // Wishlist items
     match /wishlists/{wishId} {
-      // Allow getting a single document if user owns it or it's shared with them
-      allow get: if request.auth != null &&
-        (resource.data.userId == request.auth.uid ||
-         request.auth.token.email in resource.data.get('sharedWith', []));
+      allow get: if isAdmin() || (
+        request.auth != null && (
+          resource.data.userId == request.auth.uid ||
+          request.auth.token.email in resource.data.get('sharedWith', [])
+        )
+      );
       
-      // Allow listing if query filters by userId matching auth token
-      allow list: if request.auth != null && (
-        resource.data.userId == request.auth.uid ||
-        request.auth.token.email in resource.data.get('sharedWith', [])
+      allow list: if isAdmin() || (
+        request.auth != null && (
+          resource.data.userId == request.auth.uid ||
+          request.auth.token.email in resource.data.get('sharedWith', [])
+        )
       );
 
-      allow write: if request.auth != null &&
-        (resource.data.userId == request.auth.uid ||
-         request.auth.token.email in resource.data.get('sharedWith', []));
+      allow write: if isAdmin() || (
+        request.auth != null && (
+          resource.data.userId == request.auth.uid ||
+          request.auth.token.email in resource.data.get('sharedWith', [])
+        )
+      );
       allow create: if request.auth != null;
     }
 
     // Categories
     match /wishlist_categories/{categoryId} {
       allow read: if request.auth != null;
-      allow write, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write, delete: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
       allow create: if request.auth != null;
     }
 
     // Journal entries
     match /journal_entries/{entryId} {
-      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read, write: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
       allow create: if request.auth != null;
     }
 
     // Projects
     match /projects/{projectId} {
-      allow read, write: if request.auth != null &&
-        (resource.data.userId == request.auth.uid ||
-         request.auth.token.email in resource.data.get('teamMembers', []));
+      allow read, write: if isAdmin() || (
+        request.auth != null && (
+          resource.data.userId == request.auth.uid ||
+          request.auth.token.email in resource.data.get('teamMembers', [])
+        )
+      );
       allow create: if request.auth != null;
       
       // Tickets subcollection
       match /tickets/{ticketId} {
-        // Use separate rule for list to ensure parent project check works
-        allow list: if request.auth != null && (
-          get(/databases/$(database)/documents/projects/$(projectId)).data.userId == request.auth.uid ||
-          request.auth.token.email in get(/databases/$(database)/documents/projects/$(projectId)).data.get('teamMembers', [])
-        );
-        allow get: if request.auth != null && (
-          get(/databases/$(database)/documents/projects/$(projectId)).data.userId == request.auth.uid ||
-          request.auth.token.email in get(/databases/$(database)/documents/projects/$(projectId)).data.get('teamMembers', [])
-        );
-        allow write, delete: if request.auth != null && (
-          get(/databases/$(database)/documents/projects/$(projectId)).data.userId == request.auth.uid ||
-          request.auth.token.email in get(/databases/$(database)/documents/projects/$(projectId)).data.get('teamMembers', [])
-        );
+        allow list: if isAdmin() || canAccessProject(projectId);
+        allow get: if isAdmin() || canAccessProject(projectId);
+        allow write, delete: if isAdmin() || canAccessProject(projectId);
         allow create: if request.auth != null;
       }
     }
 
-    // Bug reports - users can read/write their own
+    // Bug reports
     match /bug_reports/{reportId} {
-      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read, write: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
       allow create: if request.auth != null;
     }
 
-    // Notifications - users can read their own notifications in subcollection
-    // Structure: notifications/users/{userId}/notifications/{notificationId}
+    // Notifications
     match /notifications/users/{userId}/{document=**} {
-      allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+      allow read, write, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
       allow create: if request.auth != null;
     }
 
-    // Moods - users can read/write their own moods
+    // Moods
     match /moods/{moodId} {
-      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read, write: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
       allow create: if request.auth != null;
-      allow list: if request.auth != null;  // Allow querying moods by userId
+      allow list: if request.auth != null;
     }
 
-    // Admin collection - Only accessible by the admin user
-    // This allows the admin initialization to work on app startup
+    // Admin collection - Only accessible by the system admin email user
     match /admins/{adminId} {
-      allow read, write: if request.auth != null && 
-        request.auth.token.email == 'zentry_admin@zentry.app.com';
+      allow read, write: if isSystemAdmin();
     }
 
-    // Admin-related collections - only accessible by verified admin users
-    match /bug_reports/{reportId} {
-      allow read: if request.auth != null && 
-        (resource.data.userId == request.auth.uid || 
-         request.auth.token.email == 'zentry_admin@zentry.app.com');
-      allow write: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null;
-      allow delete: if request.auth != null && 
-        request.auth.token.email == 'zentry_admin@zentry.app.com';
-    }
-
-    // Allow authenticated users to list/read and write their own collections
+    // Default fallback rules
     match /{document=**} {
-      allow read: if request.auth != null && 
+      allow read: if isAdmin() || (
+        request.auth != null && 
         (request.resource == null || 
-         request.resource.data.userId == request.auth.uid ||
-         request.auth.token.email == 'zentry_admin@zentry.app.com');
-      allow write: if request.auth != null && 
-        (request.resource.data.userId == request.auth.uid ||
-         request.auth.token.email == 'zentry_admin@zentry.app.com');
+         request.resource.data.userId == request.auth.uid)
+      );
+      allow write: if isAdmin() || (
+        request.auth != null && 
+        request.resource.data.userId == request.auth.uid
+      );
     }
   }
 }

@@ -65,10 +65,6 @@ class GoogleSignInController with ChangeNotifier {
 
       // Create new user document in Firestore (user doesn't exist)
       await _firestoreService.createGoogleUserDocument(user);
-      
-      // Initialize user metadata for admin tracking
-      final adminService = AdminService();
-      await adminService.initializeUserMetadata(user.uid);
 
       // Initialize user metadata for admin tracking
       final adminService = AdminService();
