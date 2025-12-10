@@ -8,6 +8,7 @@ class Ticket {
   final String priority;
   final String status; // 'todo', 'in_progress', 'in_review', 'done'
   final List<String> assignedTo;
+  final List<String> membersDone; // Track which assigned members have marked as done
   final String projectId;
   final DateTime? deadline;
   final DateTime createdAt;
@@ -21,6 +22,7 @@ class Ticket {
     required this.priority,
     required this.status,
     required this.assignedTo,
+    this.membersDone = const [],
     required this.projectId,
     required this.deadline,
     DateTime? createdAt,
@@ -37,6 +39,7 @@ class Ticket {
       'priority': priority,
       'status': status,
       'assignedTo': assignedTo,
+      'membersDone': membersDone,
       'projectId': projectId,
       'deadline': deadline?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
@@ -54,6 +57,13 @@ class Ticket {
       }
     }
 
+    List<String> membersDone = [];
+    if (map['membersDone'] != null) {
+      if (map['membersDone'] is List) {
+        membersDone = List<String>.from(map['membersDone']);
+      }
+    }
+
     return Ticket(
       ticketNumber: map['ticketNumber'] ?? 'Unknown',
       userId: map['userId'],
@@ -62,6 +72,7 @@ class Ticket {
       priority: map['priority'],
       status: map['status'],
       assignedTo: assignedTo,
+      membersDone: membersDone,
       projectId: map['projectId'],
       deadline: map['deadline'] != null
           ? DateTime.parse(map['deadline'])
@@ -87,6 +98,7 @@ class Ticket {
     String? priority,
     String? status,
     List<String>? assignedTo,
+    List<String>? membersDone,
     String? projectId,
     DateTime? deadline,
     DateTime? createdAt,
@@ -100,6 +112,7 @@ class Ticket {
       priority: priority ?? this.priority,
       status: status ?? this.status,
       assignedTo: assignedTo ?? this.assignedTo,
+      membersDone: membersDone ?? this.membersDone,
       projectId: projectId ?? this.projectId,
       deadline: deadline ?? this.deadline,
       createdAt: createdAt ?? this.createdAt,

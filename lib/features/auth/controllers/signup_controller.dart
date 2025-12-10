@@ -10,7 +10,8 @@ class SignupController {
   final TextEditingController lastNameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -51,27 +52,36 @@ class SignupController {
 
     try {
       final email = emailController.text.trim().toLowerCase();
-      
+      final password = passwordController.text.trim(); // Trim password too!
+
       // Try to create user in Firebase Auth
       await _authService.signUpWithEmailAndPassword(
         email,
-        passwordController.text,
+        password,
       );
-      
+
       // Save user data to Firestore
-      final fullName = '${firstNameController.text.trim()} ${lastNameController.text.trim()}';
+      final fullName =
+          '${firstNameController.text.trim()} ${lastNameController.text.trim()}';
+      final userId = _authService.currentUser!.uid;
+
       await _firestoreService.createUserDocument(
-        uid: _authService.currentUser!.uid,
+        uid: userId,
         firstName: firstNameController.text.trim(),
         lastName: lastNameController.text.trim(),
         fullName: fullName,
         email: email,
       );
-      
+
+      // Initialize user metadata for admin tracking
+      final adminService = AdminService();
+      await adminService.initializeUserMetadata(userId);
+
       _isLoading = false;
       return true;
     } catch (e) {
       _isLoading = false;
+      debugPrint('Signup error: $e');
       _errorMessage = _parseAuthError(e.toString());
       return false;
     }

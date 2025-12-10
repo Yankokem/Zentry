@@ -29,6 +29,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
   bool _isSearching = false;
   List<ProjectRole> _roles = [];
   String? _selectedRoleForAssignment;
+  bool _isSaving = false; // Prevent double-tap
 
   final List<String> _statusOptions = [
     'Planning',
@@ -52,20 +53,23 @@ class _AddProjectPageState extends State<AddProjectPage> {
   @override
   void initState() {
     super.initState();
+    final currentUser = FirebaseAuth.instance.currentUser;
+
     if (widget.projectToEdit != null) {
       _titleController.text = widget.projectToEdit!.title;
       _descriptionController.text = widget.projectToEdit!.description;
-      _teamMembers = List.from(widget.projectToEdit!.teamMembers);
+      // Load team members but remove the creator's email if present
+      _teamMembers = (widget.projectToEdit!.teamMembers)
+          .where((email) => email != currentUser?.email)
+          .toList();
       _selectedStatus = widget.projectToEdit!.status;
       _selectedColor = widget.projectToEdit!.color;
       _selectedType = widget.projectToEdit!.category;
       _roles = List.from(widget.projectToEdit!.roles);
     } else {
-      // For new projects, automatically add the current user as a team member
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null && currentUser.email != null) {
-        _teamMembers.add(currentUser.email!);
-      }
+      // For new projects, don't add the creator to team members
+      // The creator is separate from team members
+      _teamMembers = [];
     }
   }
 
@@ -81,6 +85,22 @@ class _AddProjectPageState extends State<AddProjectPage> {
   Future<void> _addTeamMember() async {
     final member = _newMemberController.text.trim();
     if (member.isEmpty) return;
+
+    // Prevent adding the project creator as a member
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && currentUser.email == member) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'You are the project creator and cannot be added as a member'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
 
     if (_teamMembers.contains(member)) {
       if (mounted) {
@@ -149,10 +169,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
     try {
       final suggestions = await _userService.searchUsers(query);
+      final currentUser = FirebaseAuth.instance.currentUser;
       if (mounted) {
         setState(() {
           _suggestedEmails = suggestions
-              .where((email) => !_teamMembers.contains(email))
+              .where((email) =>
+                  !_teamMembers.contains(email) &&
+                  email != currentUser?.email) // Filter out current user
               .toList();
           _isSearching = false;
         });
@@ -168,6 +191,26 @@ class _AddProjectPageState extends State<AddProjectPage> {
   }
 
   void _selectSuggestedEmail(String email) async {
+    // Prevent adding the project creator as a member
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && currentUser.email == email) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'You are the project creator and cannot be added as a member'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      setState(() {
+        _newMemberController.clear();
+        _suggestedEmails.clear();
+      });
+      return;
+    }
+
     // Add immediately when email is selected from suggestions
     if (_teamMembers.contains(email)) {
       if (mounted) {
@@ -317,6 +360,17 @@ class _AddProjectPageState extends State<AddProjectPage> {
     return null;
   }
 
+  /// Clean roles to ensure only the creator is in the Project Manager role
+  List<ProjectRole> _cleanRoles(String creatorEmail) {
+    return _roles.map((role) {
+      if (role.name == 'Project Manager') {
+        // Project Manager role should only contain the creator
+        return role.copyWith(members: []);
+      }
+      return role;
+    }).toList();
+  }
+
   // Helper method to create teamMemberDetails from teamMembers
   List<TeamMember> _buildTeamMemberDetails(String currentUserEmail) {
     return _teamMembers.map((email) {
@@ -334,220 +388,262 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
   void _saveProject() async {
     if (_formKey.currentState!.validate()) {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return;
+      // Prevent double-tap
+      if (_isSaving) return;
 
-      if (widget.projectToEdit != null) {
-        // Track which members were added/removed
-        final oldMembers = widget.projectToEdit!.teamMembers.toSet();
-        final newMembers = _teamMembers.toSet();
-        final addedMembers = newMembers.difference(oldMembers);
-        final removedMembers = oldMembers.difference(newMembers);
-
-        // Build updated teamMemberDetails
-        final teamMemberDetails = _buildTeamMemberDetails(currentUser.email!);
-        
-        // Update existing project
-        final updatedProject = widget.projectToEdit!.copyWith(
-          title: _titleController.text.trim(),
-          description: _descriptionController.text.trim(),
-          teamMembers: _teamMembers,
-          teamMemberDetails: teamMemberDetails,
-          status: _selectedStatus,
-          color: _selectedColor,
-          roles: _roles,
+      // Validate that workspace projects have at least one team member
+      if (_selectedType == 'workspace' && _teamMembers.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Workspace projects require at least one team member'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
-        await _projectManager.updateProject(updatedProject);
+        return;
+      }
 
-        // Send notifications for added members
-        if (addedMembers.isNotEmpty) {
-          try {
-            final currentUserData =
-                await _firestoreService.getUserData(currentUser.uid);
-            final currentUserName =
-                currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
+      setState(() {
+        _isSaving = true;
+      });
 
-            for (final memberEmail in addedMembers) {
-              if (memberEmail != currentUser.email) {
-                final memberDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .where('email', isEqualTo: memberEmail)
-                    .limit(1)
-                    .get();
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser == null) return;
 
-                if (memberDoc.docs.isNotEmpty) {
-                  final memberId = memberDoc.docs.first.id;
-                  final memberRole = _getMemberRole(memberEmail);
-                  await NotificationManager().notifyProjectInvitation(
-                    recipientUserId: memberId,
-                    projectTitle: _titleController.text.trim(),
-                    projectId: widget.projectToEdit!.id,
-                    inviterName: currentUserName,
-                    role: memberRole,
-                  );
+        // Ensure creator is not in team members
+        final cleanTeamMembers =
+            _teamMembers.where((email) => email != currentUser.email).toList();
+
+        // Clean roles - ensure only creator is Project Manager
+        final cleanedRoles = _cleanRoles(currentUser.email!);
+
+        if (widget.projectToEdit != null) {
+          // Track which members were added/removed
+          final oldMembers = widget.projectToEdit!.teamMembers.toSet();
+          final newMembers = cleanTeamMembers.toSet();
+          final addedMembers = newMembers.difference(oldMembers);
+          final removedMembers = oldMembers.difference(newMembers);
+
+          // Build updated teamMemberDetails
+          final teamMemberDetails = _buildTeamMemberDetails(currentUser.email!);
+
+          // Update existing project
+          final updatedProject = widget.projectToEdit!.copyWith(
+            title: _titleController.text.trim(),
+            description: _descriptionController.text.trim(),
+            teamMembers: cleanTeamMembers,
+            teamMemberDetails: teamMemberDetails,
+            status: _selectedStatus,
+            color: _selectedColor,
+            roles: cleanedRoles,
+          );
+          await _projectManager.updateProject(updatedProject);
+
+          // Send notifications for added members
+          if (addedMembers.isNotEmpty) {
+            try {
+              final currentUserData =
+                  await _firestoreService.getUserData(currentUser.uid);
+              final currentUserName = currentUserData?['firstName'] ??
+                  currentUser.email ??
+                  'Someone';
+
+              for (final memberEmail in addedMembers) {
+                if (memberEmail != currentUser.email) {
+                  final memberDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .where('email', isEqualTo: memberEmail)
+                      .limit(1)
+                      .get();
+
+                  if (memberDoc.docs.isNotEmpty) {
+                    final memberId = memberDoc.docs.first.id;
+                    final memberRole = _getMemberRole(memberEmail);
+                    await NotificationManager().notifyProjectInvitation(
+                      recipientUserId: memberId,
+                      projectTitle: _titleController.text.trim(),
+                      projectId: widget.projectToEdit!.id,
+                      inviterName: currentUserName,
+                      role: memberRole,
+                    );
+                  }
                 }
               }
+            } catch (e) {
+              print('Error sending project invitation notifications: $e');
             }
-          } catch (e) {
-            print('Error sending project invitation notifications: $e');
           }
-        }
 
-        // Send notifications for removed members
-        if (removedMembers.isNotEmpty) {
-          try {
-            final currentUserData =
-                await _firestoreService.getUserData(currentUser.uid);
-            final currentUserName =
-                currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
+          // Send notifications for removed members
+          if (removedMembers.isNotEmpty) {
+            try {
+              final currentUserData =
+                  await _firestoreService.getUserData(currentUser.uid);
+              final currentUserName = currentUserData?['firstName'] ??
+                  currentUser.email ??
+                  'Someone';
 
-            for (final memberEmail in removedMembers) {
-              if (memberEmail != currentUser.email) {
-                final memberDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .where('email', isEqualTo: memberEmail)
-                    .limit(1)
-                    .get();
+              for (final memberEmail in removedMembers) {
+                if (memberEmail != currentUser.email) {
+                  final memberDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .where('email', isEqualTo: memberEmail)
+                      .limit(1)
+                      .get();
 
-                if (memberDoc.docs.isNotEmpty) {
-                  final memberId = memberDoc.docs.first.id;
-                  await NotificationManager().notifyProjectRemoval(
-                    recipientUserId: memberId,
-                    projectTitle: widget.projectToEdit!.title,
-                    projectId: widget.projectToEdit!.id,
-                    removerName: currentUserName,
-                  );
+                  if (memberDoc.docs.isNotEmpty) {
+                    final memberId = memberDoc.docs.first.id;
+                    await NotificationManager().notifyProjectRemoval(
+                      recipientUserId: memberId,
+                      projectTitle: widget.projectToEdit!.title,
+                      projectId: widget.projectToEdit!.id,
+                      removerName: currentUserName,
+                    );
+                  }
                 }
               }
+            } catch (e) {
+              print('Error sending project removal notifications: $e');
             }
-          } catch (e) {
-            print('Error sending project removal notifications: $e');
           }
-        }
 
-        // Check for status change and notify team members
-        if (widget.projectToEdit!.status != _selectedStatus) {
-          try {
-            final currentUserData =
-                await _firestoreService.getUserData(currentUser.uid);
-            final currentUserName =
-                currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
+          // Check for status change and notify team members
+          if (widget.projectToEdit!.status != _selectedStatus) {
+            try {
+              final currentUserData =
+                  await _firestoreService.getUserData(currentUser.uid);
+              final currentUserName = currentUserData?['firstName'] ??
+                  currentUser.email ??
+                  'Someone';
 
-            for (final memberEmail in _teamMembers) {
-              if (memberEmail != currentUser.email) {
-                final memberDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .where('email', isEqualTo: memberEmail)
-                    .limit(1)
-                    .get();
-
-                if (memberDoc.docs.isNotEmpty) {
-                  final memberId = memberDoc.docs.first.id;
-                  await NotificationManager().notifyProjectStatusChanged(
-                    recipientUserId: memberId,
-                    projectTitle: _titleController.text.trim(),
-                    projectId: widget.projectToEdit!.id,
-                    newStatus: _selectedStatus,
-                    changedByName: currentUserName,
-                  );
-                }
-              }
-            }
-          } catch (e) {
-            print('Error sending project status change notifications: $e');
-          }
-        }
-
-        // Check for project milestone
-        if (_selectedStatus == 'Completed') {
-          try {
-            final project = await _firestoreService
-                .getProjectById(widget.projectToEdit!.id);
-            if (project != null && project.totalTickets > 0) {
-              final percentage =
-                  (project.completedTickets / project.totalTickets * 100)
-                      .round();
-
-              // Notify all team members about completion
               for (final memberEmail in _teamMembers) {
-                final memberDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .where('email', isEqualTo: memberEmail)
-                    .limit(1)
-                    .get();
+                if (memberEmail != currentUser.email) {
+                  final memberDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .where('email', isEqualTo: memberEmail)
+                      .limit(1)
+                      .get();
 
-                if (memberDoc.docs.isNotEmpty) {
-                  final memberId = memberDoc.docs.first.id;
-                  await NotificationManager().notifyProjectMilestone(
-                    userId: memberId,
-                    projectTitle: _titleController.text.trim(),
-                    projectId: widget.projectToEdit!.id,
-                    milestoneType: 'completed',
-                    percentage: 100,
-                  );
+                  if (memberDoc.docs.isNotEmpty) {
+                    final memberId = memberDoc.docs.first.id;
+                    await NotificationManager().notifyProjectStatusChanged(
+                      recipientUserId: memberId,
+                      projectTitle: _titleController.text.trim(),
+                      projectId: widget.projectToEdit!.id,
+                      newStatus: _selectedStatus,
+                      changedByName: currentUserName,
+                    );
+                  }
                 }
               }
+            } catch (e) {
+              print('Error sending project status change notifications: $e');
             }
-          } catch (e) {
-            print('Error sending project milestone notifications: $e');
+          }
+
+          // Check for project milestone
+          if (_selectedStatus == 'Completed') {
+            try {
+              final project = await _firestoreService
+                  .getProjectById(widget.projectToEdit!.id);
+              if (project != null && project.totalTickets > 0) {
+                final percentage =
+                    (project.completedTickets / project.totalTickets * 100)
+                        .round();
+
+                // Notify all team members about completion
+                for (final memberEmail in _teamMembers) {
+                  final memberDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .where('email', isEqualTo: memberEmail)
+                      .limit(1)
+                      .get();
+
+                  if (memberDoc.docs.isNotEmpty) {
+                    final memberId = memberDoc.docs.first.id;
+                    await NotificationManager().notifyProjectMilestone(
+                      userId: memberId,
+                      projectTitle: _titleController.text.trim(),
+                      projectId: widget.projectToEdit!.id,
+                      milestoneType: 'completed',
+                      percentage: 100,
+                    );
+                  }
+                }
+              }
+            } catch (e) {
+              print('Error sending project milestone notifications: $e');
+            }
+          }
+        } else {
+          // Build teamMemberDetails for new project
+          final teamMemberDetails = _buildTeamMemberDetails(currentUser.email!);
+
+          // Create new project
+          final newProject = Project(
+            id: 'proj_${DateTime.now().millisecondsSinceEpoch}',
+            userId: '', // This will be set by ProjectManager
+            title: _titleController.text.trim(),
+            description: _descriptionController.text.trim(),
+            teamMembers: cleanTeamMembers,
+            teamMemberDetails: teamMemberDetails,
+            status: _selectedStatus,
+            totalTickets: 0,
+            completedTickets: 0,
+            color: _selectedColor,
+            category: _selectedType,
+            roles: cleanedRoles,
+          );
+          await _projectManager.addProject(newProject);
+
+          // Send project invitation notifications to all team members except creator
+          if (cleanTeamMembers.isNotEmpty) {
+            try {
+              final currentUserData =
+                  await _firestoreService.getUserData(currentUser.uid);
+              final currentUserName = currentUserData?['firstName'] ??
+                  currentUser.email ??
+                  'Someone';
+
+              for (final memberEmail in cleanTeamMembers) {
+                if (memberEmail != currentUser.email) {
+                  final memberDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .where('email', isEqualTo: memberEmail)
+                      .limit(1)
+                      .get();
+
+                  if (memberDoc.docs.isNotEmpty) {
+                    final memberId = memberDoc.docs.first.id;
+                    final memberRole = _getMemberRole(memberEmail);
+                    await NotificationManager().notifyProjectInvitation(
+                      recipientUserId: memberId,
+                      projectTitle: _titleController.text.trim(),
+                      projectId: newProject.id,
+                      inviterName: currentUserName,
+                      role: memberRole,
+                    );
+                  }
+                }
+              }
+            } catch (e) {
+              print('Error sending project invitation notifications: $e');
+            }
           }
         }
-      } else {
-        // Build teamMemberDetails for new project
-        final teamMemberDetails = _buildTeamMemberDetails(currentUser.email!);
-        
-        // Create new project
-        final newProject = Project(
-          id: 'proj_${DateTime.now().millisecondsSinceEpoch}',
-          userId: '', // This will be set by ProjectManager
-          title: _titleController.text.trim(),
-          description: _descriptionController.text.trim(),
-          teamMembers: _teamMembers,
-          teamMemberDetails: teamMemberDetails,
-          status: _selectedStatus,
-          totalTickets: 0,
-          completedTickets: 0,
-          color: _selectedColor,
-          category: _selectedType,
-          roles: _roles,
-        );
-        await _projectManager.addProject(newProject);
 
-        // Send project invitation notifications to all team members except creator
-        if (_teamMembers.length > 1) {
-          try {
-            final currentUserData =
-                await _firestoreService.getUserData(currentUser.uid);
-            final currentUserName =
-                currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
-
-            for (final memberEmail in _teamMembers) {
-              if (memberEmail != currentUser.email) {
-                final memberDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .where('email', isEqualTo: memberEmail)
-                    .limit(1)
-                    .get();
-
-                if (memberDoc.docs.isNotEmpty) {
-                  final memberId = memberDoc.docs.first.id;
-                  final memberRole = _getMemberRole(memberEmail);
-                  await NotificationManager().notifyProjectInvitation(
-                    recipientUserId: memberId,
-                    projectTitle: _titleController.text.trim(),
-                    projectId: newProject.id,
-                    inviterName: currentUserName,
-                    role: memberRole,
-                  );
-                }
-              }
-            }
-          } catch (e) {
-            print('Error sending project invitation notifications: $e');
-          }
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSaving = false;
+          });
         }
       }
-      Navigator.pop(context);
     }
   }
 
@@ -756,10 +852,27 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Team Members (emails, optional)',
+                      'Team Members',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Text(
+                      'Required',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red.shade600,
+                      ),
                     ),
                   ),
                 ],

@@ -1,6 +1,6 @@
- import 'package:flutter/material.dart';
+ import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
-import 'package:zentry/core/core.dart';
 import 'package:zentry/features/projects/projects.dart';
 
 class MultiSelectDialog extends StatefulWidget {
@@ -432,11 +432,17 @@ class TicketDialogs {
                               const SizedBox(height: 4),
                               InkWell(
                                 onTap: () {
+                                  // Get team members excluding the project creator
+                                  final currentUser = FirebaseAuth.instance.currentUser;
+                                  final assignableMembers = project.acceptedMemberEmails
+                                      .where((email) => email != currentUser?.email)
+                                      .toList();
+                                  
                                   showDialog(
                                     context: context,
                                     builder: (context) => MultiSelectDialog(
                                       title: 'Assign To',
-                                      items: project.acceptedMemberEmails,
+                                      items: assignableMembers,
                                       selectedItems: selectedAssignees,
                                       onSelectionChanged: (selected) {
                                         setDialogState(() {
@@ -955,11 +961,17 @@ class TicketDialogs {
                           const SizedBox(height: 4),
                           InkWell(
                             onTap: () {
+                              // Get team members excluding the project creator
+                              final currentUser = FirebaseAuth.instance.currentUser;
+                              final assignableMembers = project.acceptedMemberEmails
+                                  .where((email) => email != currentUser?.email)
+                                  .toList();
+                              
                               showDialog(
                                 context: context,
                                 builder: (context) => MultiSelectDialog(
                                   title: 'Assign To',
-                                  items: project.acceptedMemberEmails,
+                                  items: assignableMembers,
                                   selectedItems: selectedAssignees,
                                   onSelectionChanged: (selected) {
                                     setDialogState(() {

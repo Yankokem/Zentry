@@ -48,8 +48,13 @@ class _ProjectCardState extends State<ProjectCard> {
   }
 
   Future<void> _loadUserDetails() async {
-    if (widget.project.teamMembers.isNotEmpty) {
-      final details = await _userService.getUsersDetailsByEmails(widget.project.teamMembers);
+    // For shared projects, include creator; for workspace, use only teamMembers
+    final membersToLoad = widget.project.category == 'shared'
+        ? [...widget.project.teamMembers, widget.project.userId]
+        : widget.project.teamMembers;
+
+    if (membersToLoad.isNotEmpty) {
+      final details = await _userService.getUsersDetailsByEmails(membersToLoad);
       if (mounted) {
         setState(() {
           _userDetails = details;
@@ -57,9 +62,11 @@ class _ProjectCardState extends State<ProjectCard> {
         });
       }
     } else {
-      setState(() {
-        _isLoadingUsers = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingUsers = false;
+        });
+      }
     }
   }
 
@@ -109,21 +116,37 @@ class _ProjectCardState extends State<ProjectCard> {
   }
 
   double _calculateStackWidth() {
-    final count = widget.project.teamMembers.length > 10 ? 10 : widget.project.teamMembers.length;
+    // Filter out the project creator for workspace projects
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final displayMembers = widget.project.category == 'workspace'
+        ? widget.project.teamMembers
+            .where((email) => email != currentUser?.email)
+            .toList()
+        : widget.project.teamMembers;
+
+    final count = displayMembers.length > 10 ? 10 : displayMembers.length;
     // Each avatar overlaps by 8px (18px spacing on 26px diameter)
     return count > 0 ? (count - 1) * 18.0 + 28.0 : 28.0;
   }
 
   List<Widget> _buildAvatarStack() {
     final avatarWidgets = <Widget>[];
-    final count = widget.project.teamMembers.length > 10 ? 10 : widget.project.teamMembers.length;
-    
+
+    // For shared projects, include creator; for workspace, exclude it
+    final displayMembers = widget.project.category == 'shared'
+        ? [...widget.project.teamMembers, widget.project.userId]
+        : widget.project.teamMembers
+            .where((email) => email != widget.project.userId)
+            .toList();
+
+    final count = displayMembers.length > 10 ? 10 : displayMembers.length;
+
     for (int i = 0; i < count; i++) {
-      final email = widget.project.teamMembers[i];
+      final email = displayMembers[i];
       final details = _userDetails[email] ?? {};
       final displayName = _userService.getDisplayName(details, email);
       final profileUrl = details['profilePictureUrl'] ?? '';
-      
+
       avatarWidgets.add(
         Positioned(
           left: i * 18.0,
@@ -136,9 +159,8 @@ class _ProjectCardState extends State<ProjectCard> {
               ),
               child: CircleAvatar(
                 radius: 12,
-                backgroundImage: profileUrl.isNotEmpty
-                    ? NetworkImage(profileUrl)
-                    : null,
+                backgroundImage:
+                    profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
                 backgroundColor: Colors.grey.shade300,
                 child: profileUrl.isEmpty
                     ? Text(
@@ -157,29 +179,45 @@ class _ProjectCardState extends State<ProjectCard> {
         ),
       );
     }
-    
+
     return avatarWidgets;
   }
 
   void _showMembersModal() async {
     // Get project creator details
     Map<String, String>? creatorDetails;
+    String? creatorEmail;
     final currentUser = FirebaseAuth.instance.currentUser;
     final isCreator = currentUser?.uid == widget.project.userId;
-    
+
     if (isCreator && currentUser?.email != null) {
       // If current user is the creator, use their details
-      creatorDetails = await _userService.getUserDetailsByEmail(currentUser!.email!);
+      creatorDetails =
+          await _userService.getUserDetailsByEmail(currentUser!.email!);
+      creatorEmail = currentUser.email;
     } else {
-      // Find creator from team members or fetch by userId
-      for (final email in widget.project.teamMembers) {
+      // Find creator's email by checking which team member's UID matches project.userId
+      // First, try to find from already loaded user details
+      for (final email in [...widget.project.teamMembers]) {
         final userDetails = _userDetails[email];
-        if (userDetails != null) {
-          // Check if this user is the creator by getting their UID
-          // For now, we'll show the first member as placeholder
-          // In production, you'd need to store creator email in the project model
+        if (userDetails != null &&
+            userDetails['uid'] == widget.project.userId) {
           creatorDetails = userDetails;
+          creatorEmail = email;
           break;
+        }
+      }
+
+      // If not found in team members, fetch creator details by UID
+      if (creatorDetails == null) {
+        try {
+          creatorDetails =
+              await _userService.getUserDetailsByUid(widget.project.userId);
+          if (creatorDetails != null) {
+            creatorEmail = creatorDetails['email'];
+          }
+        } catch (e) {
+          debugPrint('Error fetching creator details: $e');
         }
       }
     }
@@ -219,10 +257,12 @@ class _ProjectCardState extends State<ProjectCard> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (creatorDetails != null)
+                  if (creatorDetails != null && creatorEmail != null)
                     _buildMemberTile(
-                      creatorDetails['fullName'] ?? creatorDetails['email'] ?? 'Unknown',
-                      currentUser?.email ?? '',
+                      creatorDetails['fullName'] ??
+                          creatorDetails['email'] ??
+                          'Unknown',
+                      creatorEmail,
                       creatorDetails['profilePictureUrl'] ?? '',
                     ),
                   const SizedBox(height: 16),
@@ -244,11 +284,13 @@ class _ProjectCardState extends State<ProjectCard> {
                         const SizedBox(height: 8),
                         ...role.members.map((email) {
                           final details = _userDetails[email] ?? {};
-                          final displayName = _userService.getDisplayName(details, email);
+                          final displayName =
+                              _userService.getDisplayName(details, email);
                           final profileUrl = details['profilePictureUrl'] ?? '';
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: _buildMemberTile(displayName, email, profileUrl),
+                            child: _buildMemberTile(
+                                displayName, email, profileUrl),
                           );
                         }),
                         const SizedBox(height: 16),
@@ -266,12 +308,14 @@ class _ProjectCardState extends State<ProjectCard> {
                             .toSet();
                         final creatorEmail = currentUser?.email;
                         final membersWithoutRoles = widget.project.teamMembers
-                            .where((email) => 
-                                email != creatorEmail && 
+                            .where((email) =>
+                                email != creatorEmail &&
                                 !membersInRoles.contains(email))
                             .toList();
 
-                        if (membersWithoutRoles.isEmpty) return const SizedBox.shrink();
+                        if (membersWithoutRoles.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,11 +332,14 @@ class _ProjectCardState extends State<ProjectCard> {
                             const SizedBox(height: 8),
                             ...membersWithoutRoles.map((email) {
                               final details = _userDetails[email] ?? {};
-                              final displayName = _userService.getDisplayName(details, email);
-                              final profileUrl = details['profilePictureUrl'] ?? '';
+                              final displayName =
+                                  _userService.getDisplayName(details, email);
+                              final profileUrl =
+                                  details['profilePictureUrl'] ?? '';
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 8),
-                                child: _buildMemberTile(displayName, email, profileUrl),
+                                child: _buildMemberTile(
+                                    displayName, email, profileUrl),
                               );
                             }),
                           ],
@@ -305,7 +352,8 @@ class _ProjectCardState extends State<ProjectCard> {
                         .where((email) => email != currentUser?.email)
                         .map((email) {
                       final details = _userDetails[email] ?? {};
-                      final displayName = _userService.getDisplayName(details, email);
+                      final displayName =
+                          _userService.getDisplayName(details, email);
                       final profileUrl = details['profilePictureUrl'] ?? '';
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -327,15 +375,12 @@ class _ProjectCardState extends State<ProjectCard> {
       children: [
         CircleAvatar(
           radius: 20,
-          backgroundImage: profileUrl.isNotEmpty
-              ? NetworkImage(profileUrl)
-              : null,
+          backgroundImage:
+              profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
           backgroundColor: Colors.grey.shade300,
           child: profileUrl.isEmpty
               ? Text(
-                  displayName.isNotEmpty
-                      ? displayName[0].toUpperCase()
-                      : '?',
+                  displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -377,7 +422,8 @@ class _ProjectCardState extends State<ProjectCard> {
 
     if (!isProjectCreator) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only project creators can change status')),
+        const SnackBar(
+            content: Text('Only project creators can change status')),
       );
       return;
     }
@@ -404,14 +450,17 @@ class _ProjectCardState extends State<ProjectCard> {
             const SizedBox(height: 16),
             ...statuses.map((status) => ListTile(
                   leading: Icon(
-                    status == 'Completed' ? Icons.check_circle :
-                    status == 'In Progress' ? Icons.play_circle :
-                    Icons.schedule,
+                    status == 'Completed'
+                        ? Icons.check_circle
+                        : status == 'In Progress'
+                            ? Icons.play_circle
+                            : Icons.schedule,
                     color: _getStatusColorForStatus(status),
                   ),
                   title: Text(status),
                   trailing: widget.project.status == status
-                      ? Icon(Icons.check, color: _getStatusColorForStatus(status))
+                      ? Icon(Icons.check,
+                          color: _getStatusColorForStatus(status))
                       : null,
                   onTap: () async {
                     if (widget.project.status == status) {
@@ -421,12 +470,14 @@ class _ProjectCardState extends State<ProjectCard> {
 
                     try {
                       final projectManager = ProjectManager();
-                      final updatedProject = widget.project.copyWith(status: status);
+                      final updatedProject =
+                          widget.project.copyWith(status: status);
                       await projectManager.updateProject(updatedProject);
                       Navigator.of(context).pop();
                       widget.onStatusChanged?.call();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Project status changed to $status')),
+                        SnackBar(
+                            content: Text('Project status changed to $status')),
                       );
                     } catch (e) {
                       Navigator.of(context).pop();
@@ -554,16 +605,23 @@ class _ProjectCardState extends State<ProjectCard> {
                         },
                         itemBuilder: (BuildContext context) {
                           final currentUser = FirebaseAuth.instance.currentUser;
-                          final isProjectCreator = currentUser?.uid == widget.project.userId;
-                          
+                          final isProjectCreator =
+                              currentUser?.uid == widget.project.userId;
+
                           return [
                             PopupMenuItem<String>(
                               value: 'pin',
                               child: Row(
                                 children: [
-                                  Icon(widget.project.isPinned ? Icons.push_pin : Icons.push_pin_outlined, size: 18),
+                                  Icon(
+                                      widget.project.isPinned
+                                          ? Icons.push_pin
+                                          : Icons.push_pin_outlined,
+                                      size: 18),
                                   const SizedBox(width: 8),
-                                  Text(widget.project.isPinned ? 'Unpin' : 'Pin'),
+                                  Text(widget.project.isPinned
+                                      ? 'Unpin'
+                                      : 'Pin'),
                                 ],
                               ),
                             ),
@@ -642,25 +700,40 @@ class _ProjectCardState extends State<ProjectCard> {
                                 ),
                                 const SizedBox(width: 8),
                                 // Show badge for additional members when > 10
-                                if (widget.project.teamMembers.length > 10)
-                                  Container(
-                                    width: 28,
-                                    height: 28,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade200,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 2),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        '+${widget.project.teamMembers.length - 10}',
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
+                                Builder(builder: (context) {
+                                  final currentUser =
+                                      FirebaseAuth.instance.currentUser;
+                                  final displayMembers =
+                                      widget.project.category == 'workspace'
+                                          ? widget.project.teamMembers
+                                              .where((email) =>
+                                                  email != currentUser?.email)
+                                              .toList()
+                                          : widget.project.teamMembers;
+
+                                  if (displayMembers.length > 10) {
+                                    return Container(
+                                      width: 28,
+                                      height: 28,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                            color: Colors.white, width: 2),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '+${displayMembers.length - 10}',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                }),
                               ],
                             ),
                           ),
@@ -702,7 +775,8 @@ class _ProjectCardState extends State<ProjectCard> {
                         borderRadius: BorderRadius.circular(8),
                         child: LinearProgressIndicator(
                           value: widget.project.totalTickets > 0
-                              ? widget.project.completedTickets / widget.project.totalTickets
+                              ? widget.project.completedTickets /
+                                  widget.project.totalTickets
                               : 0,
                           backgroundColor: Colors.grey.shade200,
                           valueColor: AlwaysStoppedAnimation<Color>(

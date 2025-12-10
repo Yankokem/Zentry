@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/core/services/firebase/notification_manager.dart';
-import 'package:zentry/core/widgets/test_notification_button.dart';
 import 'package:zentry/features/projects/projects.dart';
 import 'package:zentry/features/journal/journal.dart';
 import 'package:zentry/features/wishlist/wishlist.dart';
@@ -491,7 +490,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildCompactSharedProjectCard(Project project) {
-    Color _getProjectColor() {
+    Color getProjectColor() {
       switch (project.color) {
         case 'yellow':
           return const Color(0xFFF9ED69);
@@ -511,7 +510,7 @@ class _HomePageState extends State<HomePage> {
     final progress = project.totalTickets > 0
         ? project.completedTickets / project.totalTickets
         : 0.0;
-    final projectColor = _getProjectColor();
+    final projectColor = getProjectColor();
 
     // Determine project type
     String projectType = 'Personal';
@@ -613,7 +612,7 @@ class _HomePageState extends State<HomePage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: _getProjectColor().withOpacity(0.15),
+                    color: getProjectColor().withOpacity(0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -621,7 +620,7 @@ class _HomePageState extends State<HomePage> {
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
-                      color: _getProjectColor(),
+                      color: getProjectColor(),
                     ),
                   ),
                 ),
@@ -635,7 +634,7 @@ class _HomePageState extends State<HomePage> {
                     value: progress,
                     backgroundColor: Colors.grey.shade200,
                     valueColor:
-                        AlwaysStoppedAnimation<Color>(_getProjectColor()),
+                        AlwaysStoppedAnimation<Color>(getProjectColor()),
                     minHeight: 3,
                   ),
                 ),
@@ -796,7 +795,7 @@ class _HomePageState extends State<HomePage> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.paddingMedium),
                 child: _isLoading
-                    ? Row(
+                    ? const Row(
                         children: [
                           Expanded(child: SkeletonQuickInsights()),
                         ],
@@ -912,8 +911,8 @@ class _HomePageState extends State<HomePage> {
                         horizontal: AppConstants.paddingMedium),
                     itemCount: 4,
                     itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 12),
+                      return const Padding(
+                        padding: EdgeInsets.only(right: 12),
                         child: SkeletonProjectCard(),
                       );
                     },
@@ -1033,8 +1032,8 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 10),
 
               if (_isLoading)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
+                const Padding(
+                  padding: EdgeInsets.symmetric(
                       horizontal: AppConstants.paddingMedium),
                   child: SkeletonJournalCard(),
                 )
@@ -1215,7 +1214,7 @@ class _HomePageState extends State<HomePage> {
                                     backgroundColor: categoryColor,
                                   ),
                                 );
-                              }).toList(),
+                              }),
                               // View All card
                               GestureDetector(
                                 onTap: () {

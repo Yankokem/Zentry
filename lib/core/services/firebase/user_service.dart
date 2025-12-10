@@ -28,13 +28,14 @@ class UserService {
       if (snapshot.docs.isNotEmpty) {
         final data = snapshot.docs.first.data();
         var profilePictureUrl = data['profilePictureUrl'] ?? '';
-        
+
         // If no profile picture, try to get Google profile picture
         if (profilePictureUrl.isEmpty) {
           profilePictureUrl = _getGoogleProfilePictureUrl(email);
         }
-        
+
         return {
+          'uid': snapshot.docs.first.id,
           'fullName': data['fullName'] ?? '',
           'email': data['email'] ?? email,
           'profilePictureUrl': profilePictureUrl,
@@ -52,6 +53,34 @@ class UserService {
     };
   }
 
+  Future<Map<String, String>?> getUserDetailsByUid(String uid) async {
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        final email = data['email'] ?? '';
+        var profilePictureUrl = data['profilePictureUrl'] ?? '';
+
+        // If no profile picture, try to get Google profile picture
+        if (profilePictureUrl.isEmpty && email.isNotEmpty) {
+          profilePictureUrl = _getGoogleProfilePictureUrl(email);
+        }
+
+        return {
+          'uid': uid,
+          'fullName': data['fullName'] ?? '',
+          'email': email,
+          'profilePictureUrl': profilePictureUrl,
+        };
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+
+    return null;
+  }
+
   /// Generate Google profile picture URL for an email
   /// Uses Google's public API: https://lh3.googleusercontent.com/a/[hash]
   /// For fallback, we use: https://www.gravatar.com/avatar/[md5_hash]?d=initials
@@ -64,7 +93,8 @@ class UserService {
     return '';
   }
 
-  Future<Map<String, Map<String, String>>> getUsersDetailsByEmails(List<String> emails) async {
+  Future<Map<String, Map<String, String>>> getUsersDetailsByEmails(
+      List<String> emails) async {
     final Map<String, Map<String, String>> result = {};
 
     for (final email in emails) {
@@ -82,7 +112,11 @@ class UserService {
 
     // Generate name from email
     final parts = email.split('@').first.split('.');
-    final nameParts = parts.map((part) => part.isNotEmpty ? part[0].toUpperCase() + part.substring(1).toLowerCase() : '').toList();
+    final nameParts = parts
+        .map((part) => part.isNotEmpty
+            ? part[0].toUpperCase() + part.substring(1).toLowerCase()
+            : '')
+        .toList();
     final generatedName = nameParts.join(' ');
     if (generatedName.isNotEmpty) {
       return generatedName;

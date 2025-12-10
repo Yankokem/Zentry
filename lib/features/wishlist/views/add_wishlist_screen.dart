@@ -6,7 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:zentry/core/core.dart';
 import 'package:zentry/core/services/firebase/notification_manager.dart';
 import 'package:zentry/features/wishlist/wishlist.dart';
-import 'package:zentry/features/wishlist/models/shared_with_detail_model.dart';
 
 class AddWishlistScreen extends StatefulWidget {
   final WishlistController controller;

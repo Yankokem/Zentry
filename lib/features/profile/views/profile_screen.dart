@@ -17,6 +17,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _firstName = '';
   String _fullName = '';
   String _email = '';
+  String? _profileImageUrl;
 
   @override
   void initState() {
@@ -28,25 +29,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final user = _authService.currentUser;
       if (user != null) {
+        String newFirstName = '';
+        String newFullName = '';
+        String newEmail = user.email ?? '';
+        String? newProfileImageUrl;
+
         final displayName = user.displayName ?? '';
         if (displayName.isNotEmpty) {
-          _fullName = displayName;
-          _firstName = displayName.split(' ').first;
+          newFullName = displayName;
+          newFirstName = displayName.split(' ').first;
         }
-        _email = user.email ?? '';
 
-        // Try to get Firestore-stored names if displayName not present
-        if (_firstName.isEmpty) {
-          final data = await _firestoreService.getUserData(user.uid);
-          if (data != null) {
-            _firstName = (data['firstName'] ?? '') as String;
-            _fullName = (data['fullName'] ?? '') as String;
+        // Try to get Firestore-stored data
+        final data = await _firestoreService.getUserData(user.uid);
+        if (data != null) {
+          if (newFirstName.isEmpty) {
+            newFirstName = (data['firstName'] ?? '') as String;
           }
+          if (newFullName.isEmpty) {
+            newFullName = (data['fullName'] ?? '') as String;
+          }
+          // Load profile image URL from Firestore
+          newProfileImageUrl = (data['profileImageUrl'] as String?);
+        }
+
+        // Update state with all values at once
+        if (mounted) {
+          setState(() {
+            _firstName = newFirstName;
+            _fullName = newFullName;
+            _email = newEmail;
+            _profileImageUrl = newProfileImageUrl;
+            if (newProfileImageUrl != null) {
+              debugPrint('Loaded profile image URL: $newProfileImageUrl');
+            } else {
+              debugPrint('No profile image URL found');
+            }
+          });
         }
       }
     } catch (_) {
       // ignore and fallback to defaults
-    } finally {
       if (mounted) setState(() {});
     }
   }
@@ -109,14 +132,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Theme.of(context).primaryColor,
-                    Theme.of(context).colorScheme.secondary,
-                  ],
-                ),
+                image: _profileImageUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(_profileImageUrl!),
+                        fit: BoxFit.cover,
+                        onError: (exception, stackTrace) {
+                          // Image failed to load, fallback to gradient
+                          debugPrint(
+                              'Failed to load profile image: $exception');
+                        },
+                      )
+                    : null,
+                gradient: _profileImageUrl == null
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Theme.of(context).primaryColor,
+                          Theme.of(context).colorScheme.secondary,
+                        ],
+                      )
+                    : null,
                 boxShadow: [
                   BoxShadow(
                     color: Theme.of(context).primaryColor.withOpacity(0.3),
@@ -125,11 +161,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.person,
-                size: 60,
-                color: Color(0xFF1E1E1E),
-              ),
+              child: _profileImageUrl == null
+                  ? const Icon(
+                      Icons.person,
+                      size: 60,
+                      color: Color(0xFF1E1E1E),
+                    )
+                  : null,
             ),
 
             const SizedBox(height: 24),
@@ -217,8 +255,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: Icons.manage_accounts_rounded,
                     title: 'Account Settings',
                     subtitle: 'Update your profile and credentials',
-                    onTap: () {
-                      Navigator.pushNamed(context, AppRoutes.accountSettings);
+                    onTap: () async {
+                      // Navigate to account settings and refresh profile when returning
+                      await Navigator.pushNamed(
+                          context, AppRoutes.accountSettings);
+                      // Reload user data when returning to profile
+                      await _loadUser();
                     },
                   ),
 

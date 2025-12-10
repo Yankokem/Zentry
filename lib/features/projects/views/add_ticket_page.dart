@@ -28,12 +28,23 @@ class _AddTicketPageState extends State<AddTicketPage> {
   String selectedStatus = 'todo';
   List<String> selectedAssignees = [];
   DateTime? selectedDeadline;
+  bool _isSaving = false; // Prevent double-tap
 
   @override
   void initState() {
     super.initState();
-    if (widget.project.acceptedMemberEmails.isNotEmpty) {
-      selectedAssignees = [widget.project.acceptedMemberEmails.first];
+    // Get team members
+    // For workspace projects, include the creator as they can assign to themselves
+    // For shared projects, exclude the creator from assignees
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final assignableMembers = widget.project.category == 'workspace'
+        ? widget.project.acceptedMemberEmails
+        : widget.project.acceptedMemberEmails
+            .where((email) => email != currentUser?.email)
+            .toList();
+
+    if (assignableMembers.isNotEmpty) {
+      selectedAssignees = [assignableMembers.first];
     }
   }
 
@@ -521,6 +532,9 @@ class _AddTicketPageState extends State<AddTicketPage> {
 
   void _saveTicket() async {
     if (_formKey.currentState!.validate()) {
+      // Prevent double-tap
+      if (_isSaving) return;
+
       if (selectedDeadline == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -537,9 +551,10 @@ class _AddTicketPageState extends State<AddTicketPage> {
 
       // Validate all assignees are accepted members
       final pendingAssignees = selectedAssignees
-          .where((email) => !widget.project.acceptedMemberEmails.contains(email))
+          .where(
+              (email) => !widget.project.acceptedMemberEmails.contains(email))
           .toList();
-      
+
       if (pendingAssignees.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -557,74 +572,90 @@ class _AddTicketPageState extends State<AddTicketPage> {
         return;
       }
 
-      // Generate ticket number
-      final ticketNumber =
-          'TICK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      setState(() {
+        _isSaving = true;
+      });
 
-      final newTicket = Ticket(
-        ticketNumber: ticketNumber,
-        userId: '', // This will be set by ProjectManager
-        title: titleController.text,
-        description: descController.text,
-        priority: selectedPriority,
-        status: selectedStatus,
-        assignedTo: selectedAssignees,
-        projectId: widget.project.id,
-        deadline: selectedDeadline!,
-      );
+      try {
+        // Generate ticket number
+        final ticketNumber =
+            'TICK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
-      await ProjectManager().addTicket(newTicket);
+        final newTicket = Ticket(
+          ticketNumber: ticketNumber,
+          userId: '', // This will be set by ProjectManager
+          title: titleController.text,
+          description: descController.text,
+          priority: selectedPriority,
+          status: selectedStatus,
+          assignedTo: selectedAssignees,
+          projectId: widget.project.id,
+          deadline: selectedDeadline!,
+        );
 
-      // Send notifications to assigned users
-      final currentUser = FirebaseAuth.instance.currentUser;
-      final firestoreService = FirestoreService();
+        await ProjectManager().addTicket(newTicket);
 
-      if (currentUser != null) {
-        try {
-          final currentUserData =
-              await firestoreService.getUserData(currentUser.uid);
-          final currentUserName = currentUserData?['fullName'] ?? 'Someone';
+        // Send notifications to assigned users
+        final currentUser = FirebaseAuth.instance.currentUser;
+        final firestoreService = FirestoreService();
 
-          // Notify each assigned user (except current user)
-          for (final assigneeEmail in selectedAssignees) {
-            if (assigneeEmail != currentUser.email) {
-              // Query Firestore to get user ID from email
-              final assigneeUserDoc = await FirebaseFirestore.instance
-                  .collection('users')
-                  .where('email', isEqualTo: assigneeEmail.toLowerCase())
-                  .limit(1)
-                  .get();
+        if (currentUser != null) {
+          try {
+            final currentUserData =
+                await firestoreService.getUserData(currentUser.uid);
+            final currentUserName = currentUserData?['fullName'] ?? 'Someone';
 
-              if (assigneeUserDoc.docs.isNotEmpty) {
-                final assigneeUserId = assigneeUserDoc.docs.first.id;
-                await NotificationManager().notifyTaskAssigned(
-                  recipientUserId: assigneeUserId,
-                  taskTitle: titleController.text,
-                  projectTitle: widget.project.title,
-                  taskId: ticketNumber,
-                  projectId: widget.project.id,
-                  assignerName: currentUserName,
-                );
+            // Notify each assigned user (except current user)
+            for (final assigneeEmail in selectedAssignees) {
+              if (assigneeEmail != currentUser.email) {
+                // Query Firestore to get user ID from email
+                final assigneeUserDoc = await FirebaseFirestore.instance
+                    .collection('users')
+                    .where('email', isEqualTo: assigneeEmail.toLowerCase())
+                    .limit(1)
+                    .get();
+
+                if (assigneeUserDoc.docs.isNotEmpty) {
+                  final assigneeUserId = assigneeUserDoc.docs.first.id;
+                  await NotificationManager().notifyTaskAssigned(
+                    recipientUserId: assigneeUserId,
+                    taskTitle: titleController.text,
+                    projectTitle: widget.project.title,
+                    taskId: ticketNumber,
+                    projectId: widget.project.id,
+                    assignerName: currentUserName,
+                  );
+                }
               }
             }
+          } catch (e) {
+            print('Error sending notifications: $e');
           }
-        } catch (e) {
-          print('Error sending notifications: $e');
+        }
+
+        widget.refreshTickets();
+
+        // Show success message BEFORE popping
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ticket $ticketNumber created'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSaving = false;
+          });
         }
       }
-      widget.refreshTickets();
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ticket $ticketNumber created'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      );
     }
   }
 
@@ -692,8 +723,14 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
 
   Future<void> _loadUserDetails() async {
     try {
-      _userDetails = await _userService
-          .getUsersDetailsByEmails(widget.project.acceptedMemberEmails);
+      // Get team members excluding the project creator
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final assignableMembers = widget.project.assignableMemberEmails
+          .where((email) => email != currentUser?.email)
+          .toList();
+
+      _userDetails =
+          await _userService.getUsersDetailsByEmails(assignableMembers);
     } catch (e) {
       _userDetails = {};
     }
@@ -789,10 +826,14 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
 
     // Build role-based list
     final roleWidgets = <Widget>[];
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final assignableMembers = widget.project.assignableMemberEmails
+        .where((email) => email != currentUser?.email)
+        .toList();
 
     for (final role in widget.project.roles) {
       final roleMembers = role.members
-          .where((email) => widget.project.acceptedMemberEmails.contains(email))
+          .where((email) => assignableMembers.contains(email))
           .toList();
 
       if (roleMembers.isNotEmpty) {
@@ -900,7 +941,7 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
     }
 
     // Add "Other Members" section for users not in any role
-    final unassignedMembers = widget.project.acceptedMemberEmails
+    final unassignedMembers = assignableMembers
         .where((email) =>
             !widget.project.roles.any((role) => role.members.contains(email)))
         .toList();
@@ -1053,9 +1094,11 @@ class _MultiSelectDialogState extends State<MultiSelectDialog> {
     } catch (e) {
       _userDetails = {};
     }
-    setState(() {
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   String _getDisplayName(String email) {

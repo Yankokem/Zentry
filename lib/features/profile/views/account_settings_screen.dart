@@ -446,7 +446,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 GooglePlaceAutoCompleteTextField(
                   textEditingController: _locationController,
                   googleAPIKey:
-                      "YOUR_GOOGLE_PLACES_API_KEY", // TODO: Replace with your actual API key
+                      'YOUR_GOOGLE_PLACES_API_KEY', // TODO: Replace with your actual API key
                   inputDecoration: InputDecoration(
                     labelText: 'Location',
                     hintText: 'Search for your complete address',
@@ -458,7 +458,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   ),
                   debounceTime: 800,
                   countries: const [
-                    "ph"
+                    'ph'
                   ], // Prioritize Philippines but allow all countries
                   isLatLngRequired: false,
                   getPlaceDetailWithLatLng: (Prediction prediction) {
@@ -481,7 +481,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              prediction.description ?? "",
+                              prediction.description ?? '',
                               style: const TextStyle(fontSize: 14),
                             ),
                           ),

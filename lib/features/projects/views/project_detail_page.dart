@@ -44,16 +44,33 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Future<void> _loadUserDetails() async {
+    // Load team members
     if (widget.project.teamMembers.isNotEmpty) {
       final details = await _userService
           .getUsersDetailsByEmails(widget.project.teamMembers);
       if (mounted) {
         setState(() {
           _userDetails = details;
-          _isLoadingUsers = false;
         });
       }
-    } else {
+    }
+
+    // For shared projects, also load creator details by UID
+    if (widget.project.category == 'shared') {
+      try {
+        final creatorDetails =
+            await _userService.getUserDetailsByUid(widget.project.userId);
+        if (creatorDetails != null && mounted) {
+          setState(() {
+            _userDetails[creatorDetails['email']!] = creatorDetails;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading creator details: $e');
+      }
+    }
+
+    if (mounted) {
       setState(() {
         _isLoadingUsers = false;
       });
@@ -100,10 +117,36 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   List<Widget> _buildDetailAvatarStack() {
     final avatarWidgets = <Widget>[];
 
-    for (int i = 0; i < widget.project.teamMembers.length; i++) {
-      final member = widget.project.teamMembers[i];
-      final details = _userDetails[member] ?? {};
-      final displayName = _userService.getDisplayName(details, member);
+    // Get list of emails to display
+    List<String> displayEmails = [];
+
+    if (widget.project.category == 'shared') {
+      // For shared projects, include all team members
+      displayEmails = [...widget.project.teamMembers];
+
+      // Add creator email if we have it loaded
+      final creatorEmail = _userDetails.entries
+          .firstWhere(
+            (entry) => entry.value['uid'] == widget.project.userId,
+            orElse: () => const MapEntry('', {}),
+          )
+          .key;
+
+      if (creatorEmail.isNotEmpty && !displayEmails.contains(creatorEmail)) {
+        displayEmails.add(creatorEmail);
+      }
+    } else {
+      // For workspace, exclude creator
+      displayEmails = widget.project.teamMembers
+          .where(
+              (email) => _userDetails[email]?['uid'] != widget.project.userId)
+          .toList();
+    }
+
+    for (int i = 0; i < displayEmails.length; i++) {
+      final email = displayEmails[i];
+      final details = _userDetails[email] ?? {};
+      final displayName = _userService.getDisplayName(details, email);
       final profileUrl = details['profilePictureUrl'] ?? '';
 
       avatarWidgets.add(
@@ -146,6 +189,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   void _showMembersModal() async {
     // Get project creator details
     Map<String, String>? creatorDetails;
+    String? creatorEmail;
     final currentUser = FirebaseAuth.instance.currentUser;
     final isCreator = currentUser?.uid == widget.project.userId;
 
@@ -153,13 +197,30 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       // If current user is the creator, use their details
       creatorDetails =
           await _userService.getUserDetailsByEmail(currentUser!.email!);
+      creatorEmail = currentUser.email;
     } else {
-      // Find creator from team members or fetch by userId
+      // Find creator's email by checking which team member's UID matches project.userId
+      // First, try to find from already loaded user details
       for (final email in widget.project.teamMembers) {
         final userDetails = _userDetails[email];
-        if (userDetails != null) {
+        if (userDetails != null &&
+            userDetails['uid'] == widget.project.userId) {
           creatorDetails = userDetails;
+          creatorEmail = email;
           break;
+        }
+      }
+
+      // If not found in team members, fetch creator details by UID
+      if (creatorDetails == null) {
+        try {
+          creatorDetails =
+              await _userService.getUserDetailsByUid(widget.project.userId);
+          if (creatorDetails != null) {
+            creatorEmail = creatorDetails['email'];
+          }
+        } catch (e) {
+          debugPrint('Error fetching creator details: $e');
         }
       }
     }
@@ -178,7 +239,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Team Members',
+              'Project Members',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -188,9 +249,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               child: ListView(
                 shrinkWrap: true,
                 children: [
-                  // Project Manager Section
+                  // Members Section Header
                   Text(
-                    'Project Manager',
+                    'Members',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -199,135 +260,37 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (creatorDetails != null)
-                    _buildMemberTile(
-                      creatorDetails['fullName'] ??
-                          creatorDetails['email'] ??
-                          'Unknown',
-                      currentUser?.email ?? '',
-                      creatorDetails['profilePictureUrl'] ?? '',
-                    ),
-                  const SizedBox(height: 16),
 
-                  // Roles and their members
-                  ...widget.project.roles.map((role) {
-                    // Filter out rejected members from the role
-                    final acceptedMembers = role.members.where((email) {
-                      final memberIndex = widget.project.teamMemberDetails
-                          .indexWhere((m) => m.email == email);
-                      if (memberIndex == -1) return false;
-                      return !widget.project.teamMemberDetails[memberIndex].isRejected;
-                    }).toList();
-                    
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          role.name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        if (acceptedMembers.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              'No Members',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontStyle: FontStyle.italic,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          )
-                        else
-                          ...acceptedMembers.map((email) {
-                            final details = _userDetails[email] ?? {};
-                            final displayName =
-                                _userService.getDisplayName(details, email);
-                            final profileUrl = details['profilePictureUrl'] ?? '';
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: _buildMemberTile(
-                                  displayName, email, profileUrl),
-                            );
-                          }),
-                        const SizedBox(height: 16),
-                      ],
+                  // Project Manager (Creator) - show for all projects
+                  if (creatorDetails != null && creatorEmail != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildMemberTileWithRole(
+                        creatorDetails['fullName'] ??
+                            creatorDetails['email'] ??
+                            'Unknown',
+                        creatorEmail,
+                        creatorDetails['profilePictureUrl'] ?? '',
+                        'Project Manager',
+                      ),
+                    ),
+
+                  // All other team members (excluding the creator)
+                  ...widget.project.teamMemberDetails
+                      .where((member) =>
+                          member.email != creatorEmail && !member.isRejected)
+                      .map((member) {
+                    final email = member.email;
+                    final details = _userDetails[email] ?? {};
+                    final displayName =
+                        _userService.getDisplayName(details, email);
+                    final profileUrl = details['profilePictureUrl'] ?? '';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildMemberTileWithRole(
+                          displayName, email, profileUrl, 'Member'),
                     );
                   }),
-
-                  // Members without roles (if any)
-                  if (widget.project.roles.isNotEmpty) ...[
-                    Builder(
-                      builder: (context) {
-                        final membersInRoles = widget.project.roles
-                            .expand((role) => role.members)
-                            .toSet();
-                        final creatorEmail = currentUser?.email;
-                        // Only show members from teamMemberDetails that aren't rejected and don't have roles
-                        final membersWithoutRoles = widget.project.teamMemberDetails
-                            .where((member) =>
-                                member.email != creatorEmail &&
-                                !membersInRoles.contains(member.email) &&
-                                !member.isRejected)
-                            .map((member) => member.email)
-                            .toList();
-
-                        if (membersWithoutRoles.isEmpty)
-                          return const SizedBox.shrink();
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Other Members',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade600,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...membersWithoutRoles.map((email) {
-                              final details = _userDetails[email] ?? {};
-                              final displayName =
-                                  _userService.getDisplayName(details, email);
-                              final profileUrl =
-                                  details['profilePictureUrl'] ?? '';
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: _buildMemberTile(
-                                    displayName, email, profileUrl),
-                              );
-                            }),
-                          ],
-                        );
-                      },
-                    ),
-                  ] else ...[
-                    // No roles defined, show all members from teamMemberDetails (except rejected)
-                    ...widget.project.teamMemberDetails
-                        .where((member) => 
-                            member.email != currentUser?.email &&
-                            !member.isRejected)
-                        .map((member) {
-                      final email = member.email;
-                      final details = _userDetails[email] ?? {};
-                      final displayName =
-                          _userService.getDisplayName(details, email);
-                      final profileUrl = details['profilePictureUrl'] ?? '';
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildMemberTile(displayName, email, profileUrl),
-                      );
-                    }),
-                  ],
                 ],
               ),
             ),
@@ -337,17 +300,120 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
-  Widget _buildMemberTile(String displayName, String email, String profileUrl) {
+  Widget _buildMemberTileWithRole(
+      String displayName, String email, String profileUrl, String role) {
     // Check if member is pending
     final isPending = widget.project.isMemberPending(email);
-    
+
     return Row(
       children: [
         CircleAvatar(
           radius: 20,
           backgroundImage:
               profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
-          backgroundColor: isPending ? Colors.orange.shade100 : Colors.grey.shade300,
+          backgroundColor:
+              isPending ? Colors.orange.shade100 : Colors.grey.shade300,
+          child: profileUrl.isEmpty
+              ? Text(
+                  displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isPending ? Colors.orange : null,
+                  ),
+                )
+              : null,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    displayName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: role == 'Project Manager'
+                          ? Colors.blue.shade100
+                          : Colors.green.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: role == 'Project Manager'
+                            ? Colors.blue.shade300
+                            : Colors.green.shade300,
+                      ),
+                    ),
+                    child: Text(
+                      role,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: role == 'Project Manager'
+                            ? Colors.blue.shade700
+                            : Colors.green.shade700,
+                      ),
+                    ),
+                  ),
+                  if (isPending) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange.shade300),
+                      ),
+                      child: Text(
+                        'Pending',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              Text(
+                email,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMemberTile(String displayName, String email, String profileUrl) {
+    // Check if member is pending
+    final isPending = widget.project.isMemberPending(email);
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundImage:
+              profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+          backgroundColor:
+              isPending ? Colors.orange.shade100 : Colors.grey.shade300,
           child: profileUrl.isEmpty
               ? Text(
                   displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
@@ -376,7 +442,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   if (isPending) ...[
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.orange.shade100,
                         borderRadius: BorderRadius.circular(12),
@@ -732,6 +799,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                 _highlightedTicketId == ticket.ticketNumber;
                             return TicketCard(
                               ticket: ticket,
+                              project: widget.project,
                               isHighlighted: isHighlighted,
                               onTap: () {
                                 _showTicketDetailsSheet(ticket);
@@ -821,14 +889,18 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 Icons.flag_outlined, 'Priority', ticket.priority.toUpperCase()),
             const SizedBox(height: 12),
 
-            // Assigned To with Avatar Stack
+            _buildDetailRow(Icons.assignment_outlined, 'Status',
+                _formatStatus(ticket.status)),
+            const SizedBox(height: 12),
+
+            // Status Section
             Row(
               children: [
                 Icon(Icons.person_outline,
                     size: 20, color: Colors.grey.shade600),
                 const SizedBox(width: 12),
                 Text(
-                  'Assigned To: ',
+                  'Assignees',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey.shade600,
@@ -840,83 +912,48 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.only(left: 32),
-              child: _buildAssigneeAvatarStack(
-                ticket.assignedTo,
-                onViewMore: () => _showAssigneesModal(ticket.assignedTo),
+              child: InkWell(
+                onTap: () => _showAssigneesModal(
+                    ticket.assignedTo, ticket.status, ticket),
+                child: _buildAssigneeAvatarStack(
+                  ticket.assignedTo,
+                  onViewMore: () => _showAssigneesModal(
+                      ticket.assignedTo, ticket.status, ticket),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-
-            _buildDetailRow(Icons.assignment_outlined, 'Status',
-                _formatStatus(ticket.status)),
 
             const SizedBox(height: 24),
 
             // Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _navigateToEditTicketPage(ticket);
-                    },
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Edit'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _getProjectColor(),
-                      foregroundColor: const Color(0xFF1E1E1E),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showChangeStatusDialog(ticket);
-                    },
-                    icon: const Icon(Icons.swap_horiz),
-                    label: const Text('Status'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade800,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            _buildActionButtons(ticket),
 
             const SizedBox(height: 12),
 
             // Delete Button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showDeleteConfirmation(ticket);
-                },
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Delete Ticket'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: BorderSide(color: Colors.red.shade300),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // Delete Button - Only for Project Creator
+            if (FirebaseAuth.instance.currentUser?.uid ==
+                widget.project.userId) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showDeleteConfirmation(ticket);
+                  },
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Delete Ticket'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: BorderSide(color: Colors.red.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
 
             SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
           ],
@@ -976,7 +1013,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   Widget _buildAssigneeAvatarStack(List<String> assignees,
       {VoidCallback? onViewMore}) {
-    if (assignees.isEmpty) {
+    // Do not filter out current user - they should see themselves assigned
+    final teamAssignees = assignees;
+
+    if (teamAssignees.isEmpty) {
       return Row(
         children: [
           Icon(Icons.person_outline, size: 18, color: Colors.grey.shade600),
@@ -987,8 +1027,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
 
     // Show max 4 avatars stacked plus a "View" button
-    final visibleCount = assignees.length > 4 ? 4 : assignees.length;
-    final hasMore = assignees.length > 4;
+    final visibleCount = teamAssignees.length > 4 ? 4 : teamAssignees.length;
+    final hasMore = teamAssignees.length > 4;
     final stackWidth =
         hasMore ? (visibleCount * 16.0) + 28 : (visibleCount * 16.0) + 16;
 
@@ -1000,7 +1040,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           child: Stack(
             children: [
               ...List.generate(visibleCount, (index) {
-                final email = assignees[index];
+                final email = teamAssignees[index];
                 final details = _userDetails[email] ?? {};
                 final displayName = _userService.getDisplayName(details, email);
                 final profileUrl = details['profilePictureUrl'] ?? '';
@@ -1042,7 +1082,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 Positioned(
                   left: visibleCount * 16.0,
                   child: Tooltip(
-                    message: '${assignees.length - 4} more',
+                    message: '${teamAssignees.length - 4} more',
                     child: Container(
                       width: 28,
                       height: 28,
@@ -1053,7 +1093,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       ),
                       child: Center(
                         child: Text(
-                          '+${assignees.length - 4}',
+                          '+${teamAssignees.length - 4}',
                           style: const TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
@@ -1079,7 +1119,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 border: Border.all(color: Colors.grey.shade300),
               ),
               child: const Text(
-                'View Assignees',
+                'View All',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -1092,7 +1132,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
-  void _showAssigneesModal(List<String> assignees) {
+  void _showAssigneesModal(
+      List<String> assignees, String ticketStatus, Ticket ticket) {
+    // Do not filter out current user
+    final teamAssignees = assignees;
+
+    // Count how many members have marked as done
+    final doneCount = ticket.membersDone.length;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1106,19 +1153,32 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Assignees (${assignees.length})',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'View Assignees',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '($doneCount/${teamAssignees.length})',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             ListView.builder(
               shrinkWrap: true,
-              itemCount: assignees.length,
+              itemCount: teamAssignees.length,
               itemBuilder: (context, index) {
-                final email = assignees[index];
+                final email = teamAssignees[index];
                 final details = _userDetails[email] ?? {};
                 final displayName = _userService.getDisplayName(details, email);
                 final profileUrl = details['profilePictureUrl'] ?? '';
@@ -1126,8 +1186,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     ? displayName[0].toUpperCase()
                     : email[0].toUpperCase();
 
+                // Check if this member has marked as done
+                final isDone = ticket.membersDone.contains(email);
+                final status = isDone ? 'Done' : 'Ongoing';
+                final statusColor = isDone ? Colors.green : Colors.orange;
+
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Row(
                     children: [
                       Container(
@@ -1146,7 +1211,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                               ? Text(
                                   firstLetter,
                                   style: const TextStyle(
-                                    fontSize: 13,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
                                   ),
@@ -1165,15 +1230,36 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             Text(
                               email,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey.shade600,
+                                color: Colors.grey.shade500,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          border: Border.all(color: statusColor, width: 1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
+                          ),
                         ),
                       ),
                     ],
@@ -1185,6 +1271,48 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ),
       ),
     );
+  }
+
+  String? _getRoleForEmail(String email) {
+    // Check if this email belongs to the project creator
+    // The project.userId contains the UID of the creator
+    // We need to find the creator's email from _userDetails or teamMemberDetails
+
+    // First, find if this email's user is the project creator by checking their UID
+    for (final member in widget.project.teamMemberDetails) {
+      if (member.email == email) {
+        // This person is in the team - check if they're the creator
+        // We'll need to verify by checking if their UID matches project.userId
+        // For now, let's check from user details
+        final details = _userDetails[email] ?? {};
+        // We can't directly compare UID here, so we'll use a different approach
+        break;
+      }
+    }
+
+    // Check if this email is the current user and they are the project creator
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && currentUser.uid == widget.project.userId) {
+      // Current user is the project creator
+      // Check if the email being checked is the current user's email
+      if (currentUser.email == email) {
+        return 'Project Manager';
+      }
+    }
+
+    // Find explicit roles from project roles
+    for (final role in widget.project.roles) {
+      if (role.members.contains(email)) {
+        return role.name;
+      }
+    }
+
+    // If they're in the team but not the creator and no explicit role, they're a member
+    if (widget.project.teamMembers.contains(email)) {
+      return 'Member';
+    }
+
+    return null;
   }
 
   void _showChangeStatusDialog(Ticket ticket) {
@@ -1335,6 +1463,187 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ),
       ],
     );
+  }
+
+  Widget _buildActionButtons(Ticket ticket) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return const SizedBox.shrink();
+
+    final isCreator = currentUser.uid == widget.project.userId;
+    // Check if current user is assigned to this ticket
+    final isAssigned = ticket.assignedTo.contains(currentUser.email);
+
+    if (isCreator) {
+      // Show Edit and Status buttons for project creator
+      // Creator can ALWAYS change status now (as gatekeeper)
+      return Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _navigateToEditTicketPage(ticket);
+              },
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit Ticket'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF1E1E1E),
+                elevation: 0,
+                side: BorderSide(color: Colors.grey.shade300),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _showChangeStatusDialog(ticket);
+              },
+              icon: const Icon(Icons.change_circle_outlined),
+              label: const Text('Change Status'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E1E1E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else if (isAssigned) {
+      // Show workflow buttons based on status
+
+      // Case 1: To Do -> Start Work
+      if (ticket.status == 'todo') {
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              // Move to In Progress
+              final updatedTicket = ticket.copyWith(status: 'in_progress');
+              _projectManager.updateTicket(
+                  ticket.projectId, ticket.ticketNumber, updatedTicket);
+
+              Navigator.pop(context);
+              _refreshTickets();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Started work on ticket'),
+                  backgroundColor: Colors.blue,
+                ),
+              );
+            },
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Start Work'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        );
+      }
+      // Case 2: In Progress -> Submit for Review
+      else if (ticket.status == 'in_progress') {
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              // Add user to membersDone
+              List<String> updatedMembersDone = List.from(ticket.membersDone);
+              if (currentUser.email != null &&
+                  !updatedMembersDone.contains(currentUser.email)) {
+                updatedMembersDone.add(currentUser.email!);
+              }
+
+              // Move to In Review
+              final updatedTicket = ticket.copyWith(
+                status: 'in_review',
+                membersDone: updatedMembersDone,
+              );
+
+              _projectManager.updateTicket(
+                  ticket.projectId, ticket.ticketNumber, updatedTicket);
+
+              Navigator.pop(context);
+              _refreshTickets();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Submitted for review'),
+                  backgroundColor: Colors.purple,
+                ),
+              );
+            },
+            icon: const Icon(Icons.rate_review),
+            label: const Text('Submit for Review'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        );
+      }
+      // Case 3: In Review -> Waiting
+      else if (ticket.status == 'in_review') {
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: null, // Disabled
+            icon: const Icon(Icons.hourglass_empty),
+            label: const Text('Waiting for Review'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey.shade400,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        );
+      }
+      // Case 4: Done -> Completed
+      else if (ticket.status == 'done') {
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: null, // Disabled
+            icon: const Icon(Icons.check_circle),
+            label: const Text('Completed'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade600,
+              disabledBackgroundColor: Colors.green.shade600,
+              disabledForegroundColor: Colors.white,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return const SizedBox.shrink();
   }
 
   String _formatStatus(String status) {

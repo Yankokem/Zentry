@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       setState(() {});
-      bool success = await _controller.login();
+      bool success = await _controller.login(context);
       setState(() {});
       if (success) {
         if (!mounted) return;

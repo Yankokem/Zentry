@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:zentry/core/core.dart';
@@ -5,12 +6,14 @@ import 'package:zentry/features/projects/projects.dart';
 
 class TicketCard extends StatefulWidget {
   final Ticket ticket;
+  final Project? project;
   final VoidCallback? onTap;
   final bool isHighlighted;
 
   const TicketCard({
     super.key,
     required this.ticket,
+    this.project,
     this.onTap,
     this.isHighlighted = false,
   });
@@ -96,7 +99,16 @@ class _TicketCardState extends State<TicketCard> with SingleTickerProviderStateM
 
   Widget _buildAvatarStack() {
     final assignees = widget.ticket.assignedTo;
-    if (assignees.isEmpty) {
+    
+    // Filter out the project creator for workspace projects
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final displayAssignees = widget.project?.category == 'workspace'
+        ? assignees
+            .where((email) => email != currentUser?.email)
+            .toList()
+        : assignees;
+    
+    if (displayAssignees.isEmpty) {
       return Tooltip(
         message: 'Unassigned',
         child: Container(
@@ -117,8 +129,8 @@ class _TicketCardState extends State<TicketCard> with SingleTickerProviderStateM
     }
 
     // Show max 3 avatars stacked
-    final visibleCount = assignees.length > 3 ? 3 : assignees.length;
-    final hasMore = assignees.length > 3;
+    final visibleCount = displayAssignees.length > 3 ? 3 : displayAssignees.length;
+    final hasMore = displayAssignees.length > 3;
     final stackWidth = (visibleCount * 12.0) + 24; // Calculate total width needed
 
     return SizedBox(
@@ -127,7 +139,7 @@ class _TicketCardState extends State<TicketCard> with SingleTickerProviderStateM
       child: Stack(
         children: [
           ...List.generate(visibleCount, (index) {
-            final email = assignees[index];
+            final email = displayAssignees[index];
             final details = _userDetails[email] ?? {};
             final displayName = _userService.getDisplayName(details, email);
             final profileUrl = details['profilePictureUrl'] ?? '';
@@ -165,7 +177,7 @@ class _TicketCardState extends State<TicketCard> with SingleTickerProviderStateM
             Positioned(
               left: visibleCount * 12.0,
               child: Tooltip(
-                message: '${assignees.length - 3} more',
+                message: '${displayAssignees.length - 3} more',
                 child: Container(
                   width: 24,
                   height: 24,
@@ -176,7 +188,7 @@ class _TicketCardState extends State<TicketCard> with SingleTickerProviderStateM
                   ),
                   child: Center(
                     child: Text(
-                      '+${assignees.length - 3}',
+                      '+${displayAssignees.length - 3}',
                       style: const TextStyle(
                         fontSize: 8,
                         fontWeight: FontWeight.bold,

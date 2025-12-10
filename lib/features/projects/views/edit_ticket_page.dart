@@ -1110,14 +1110,24 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
 
   Future<void> _loadUserDetails() async {
     try {
+      // Get team members excluding the project creator for workspace projects
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final assignableMembers = widget.project.category == 'workspace'
+          ? widget.project.teamMembers
+              .where((email) => email != currentUser?.email)
+              .toList()
+          : widget.project.teamMembers;
+      
       _userDetails = await _userService
-          .getUsersDetailsByEmails(widget.project.teamMembers);
+          .getUsersDetailsByEmails(assignableMembers);
     } catch (e) {
       _userDetails = {};
     }
-    setState(() {
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   String _getDisplayName(String email) {
@@ -1205,12 +1215,20 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
       );
     }
 
+    // Get assignable members (exclude creator for workspace projects)
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final assignableMembers = widget.project.category == 'workspace'
+        ? widget.project.teamMembers
+            .where((email) => email != currentUser?.email)
+            .toList()
+        : widget.project.teamMembers;
+
     // Build role-based list
     final roleWidgets = <Widget>[];
 
     for (final role in widget.project.roles) {
       final roleMembers = role.members
-          .where((email) => widget.project.teamMembers.contains(email))
+          .where((email) => assignableMembers.contains(email))
           .toList();
 
       if (roleMembers.isNotEmpty) {
@@ -1318,7 +1336,7 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
     }
 
     // Add "Other Members" section for users not in any role
-    final unassignedMembers = widget.project.teamMembers
+    final unassignedMembers = assignableMembers
         .where((email) =>
             !widget.project.roles.any((role) => role.members.contains(email)))
         .toList();

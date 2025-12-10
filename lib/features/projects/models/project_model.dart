@@ -37,25 +37,31 @@ class Project {
     this.isPinned = false,
     this.category = 'workspace',
     this.roles = const [],
-  }) : createdAt = createdAt ?? DateTime.now(),
-       updatedAt = updatedAt ?? DateTime.now();
-  
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
+
   // Helper getters for team member management
-  List<TeamMember> get acceptedMembers => 
+  List<TeamMember> get acceptedMembers =>
       teamMemberDetails.where((m) => m.isAccepted).toList();
-  
-  List<TeamMember> get pendingMembers => 
+
+  List<TeamMember> get pendingMembers =>
       teamMemberDetails.where((m) => m.isPending).toList();
-  
+
   List<String> get acceptedMemberEmails =>
       acceptedMembers.map((m) => m.email).toList();
-  
+
+  // Get all assignable members (accepted + pending, exclude rejected)
+  List<String> get assignableMemberEmails => teamMemberDetails
+      .where((m) => !m.isRejected)
+      .map((m) => m.email)
+      .toList();
+
   bool isMemberAccepted(String email) =>
       acceptedMembers.any((m) => m.email == email);
-  
+
   bool isMemberPending(String email) =>
       pendingMembers.any((m) => m.email == email);
-  
+
   bool isMemberRejected(String email) =>
       teamMemberDetails.any((m) => m.email == email && m.isRejected);
 
@@ -142,7 +148,7 @@ class Project {
               ))
           .toList();
     }
-    
+
     return Project(
       id: map['id'],
       userId: map['userId'],
@@ -154,7 +160,8 @@ class Project {
       totalTickets: map['totalTickets'],
       completedTickets: map['completedTickets'],
       color: map['color'] ?? 'yellow',
-      deadline: map['deadline'] != null ? DateTime.parse(map['deadline']) : null,
+      deadline:
+          map['deadline'] != null ? DateTime.parse(map['deadline']) : null,
       createdAt: map['createdAt'] != null
           ? (map['createdAt'] is Timestamp
               ? (map['createdAt'] as Timestamp).toDate()
@@ -167,7 +174,10 @@ class Project {
           : null,
       isPinned: map['isPinned'] ?? false,
       category: map['category'] ?? 'workspace',
-      roles: (map['roles'] as List?)?.map((role) => ProjectRole.fromMap(role as Map<String, dynamic>)).toList() ?? [],
+      roles: (map['roles'] as List?)
+              ?.map((role) => ProjectRole.fromMap(role as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 }

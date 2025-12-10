@@ -4,9 +4,6 @@ import 'package:flutter/services.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/features/journal/journal.dart';
-import 'add_journal_screen.dart';
-import 'edit_journal_screen.dart';
-import '../widgets/rich_text_viewer.dart';
 
 class JournalPage extends StatefulWidget {
   const JournalPage({super.key});

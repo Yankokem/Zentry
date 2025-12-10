@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/features/wishlist/wishlist.dart';
-import 'add_wishlist_screen.dart';
 
 class WishlistPage extends StatefulWidget {
   final String? highlightWishId;
@@ -963,7 +962,7 @@ class _WishlistPageState extends State<WishlistPage> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                       const SizedBox(height: 4),
                     ],
                     Text(

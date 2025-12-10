@@ -26,9 +26,13 @@ class AdminService {
 
   /// Initialize admin account - should be called once during app setup
   /// This creates the admin user in Firebase Auth and stores metadata in Firestore
+  ///
+  /// Security Note: This requires Firestore rules to allow the admin email
+  /// to access the 'admins' collection. See firestore.rules for configuration.
   Future<void> initializeAdminAccount() async {
     try {
-      // Check if admin already exists
+      // Check if admin already exists in Firestore
+      // This requires the admin user to be authenticated first
       final adminDoc =
           await _firestore.collection('admins').doc('system_admin').get();
 
@@ -58,7 +62,8 @@ class AdminService {
       }
 
       if (userCredential.user != null) {
-        // Store admin metadata in Firestore (locked collection)
+        // Store admin metadata in Firestore
+        // This requires Firestore rules to allow admin email access
         await _firestore.collection('admins').doc('system_admin').set({
           'uid': userCredential.user!.uid,
           'email': adminEmail,
@@ -91,9 +96,17 @@ class AdminService {
 
         print('Admin account initialized successfully');
       }
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        print('Error initializing admin account: Permission denied. '
+            'Please check Firestore security rules allow admin email access to admins collection.');
+      } else {
+        print('Error initializing admin account: ${e.code} - ${e.message}');
+      }
+      // Don't rethrow - allow app to continue even if admin init fails
     } catch (e) {
       print('Error initializing admin account: $e');
-      rethrow;
+      // Don't rethrow - allow app to continue even if admin init fails
     }
   }
 
