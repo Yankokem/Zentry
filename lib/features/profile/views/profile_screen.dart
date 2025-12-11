@@ -87,42 +87,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
-              // 1. Close confirmation dialog
+              // Close dialog first
               Navigator.pop(dialogContext);
-
-              // 2. Show Loading Dialog
-              if (!mounted) return;
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (ctx) => const Center(
-                  child: CircularProgressIndicator(
-                    color: Colors.purple,
-                  ),
-                ),
-              );
-
-              // 3. Perform cleanup
-              if (mounted) {
-                Provider.of<WishlistProvider>(context, listen: false).cleanup();
-                Provider.of<NotificationProvider>(context, listen: false)
-                    .cleanup();
-              }
-
-              // 4. Artificial delay to let UI settle and providers cleanup
-              await Future.delayed(const Duration(milliseconds: 500));
-
-              // 5. Navigate to Login and Remove All Routes BEFORE signing out
-              // This unmounts the entire app tree, triggering dispose() on HomePage
-              if (mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  AppRoutes.login,
-                  (route) => false,
-                );
-              }
-
-              // 6. Perform sign out in background (UI is already gone/going)
+              // Perform sign out
               await _authService.signOut();
+              if (!mounted) return;
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.login,
+                (route) => false,
+              );
             },
             child: const Text(
               'Logout',
