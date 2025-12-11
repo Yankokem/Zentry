@@ -109,10 +109,10 @@ class _BugReportScreenState extends State<BugReportScreen> {
 
       final bugReport = BugReportModel.create(
         userId: user.uid,
+        userEmail: user.email ?? '',
         title: _titleController.text.trim(),
         content: content,
         category: _selectedCategory,
-        priority: 'Medium', // Default priority set by system
         imageUrls: imageUrls,
       );
 
@@ -157,48 +157,47 @@ class _BugReportScreenState extends State<BugReportScreen> {
           ),
         ),
       ),
-      body: ListView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        children: [
-          Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.bug_report, size: 20, color: AppTheme.textDark),
-                    SizedBox(width: 8),
-                    Text(
-                      'Report a Bug',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textDark,
-                      ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.bug_report, size: 20, color: AppTheme.textDark),
+                  SizedBox(width: 8),
+                  Text(
+                    'Report a Bug',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textDark,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Help us improve by providing detailed information about the issue.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textDark.withOpacity(0.7),
                   ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Help us improve by providing detailed information about the issue.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.textDark.withOpacity(0.7),
                 ),
-                const SizedBox(height: 24),
+              ),
+              const SizedBox(height: 24),
 
-                // Title Field
-                TextFormField(
-                  controller: _titleController,
-                  decoration: InputDecoration(
-                    labelText: 'Bug Title',
-                    hintText: 'Brief description of the issue',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
+              // Title Field
+              TextFormField(
+                controller: _titleController,
+                decoration: InputDecoration(
+                  labelText: 'Bug Title',
+                  hintText: 'Brief description of the issue',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
                     ),
@@ -389,9 +388,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 32),
-        ],
-      ),
-    );
-  }
+        ),
+      );
+    }
 }

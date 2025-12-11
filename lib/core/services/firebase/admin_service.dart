@@ -300,12 +300,15 @@ class AdminService {
     required String status,
     String? reason,
     String? duration,
+    String? userEmail,
   }) async {
     try {
       final metadataRef = _firestore.collection(userMetadataCollection).doc(userId);
       
       final data = <String, dynamic>{
         'status': status,
+        'userId': userId,
+        'userEmail': userEmail,
         'updatedAt': FieldValue.serverTimestamp(),
       };
       

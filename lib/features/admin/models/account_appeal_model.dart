@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class AccountAppealModel {
   final String id;
   final String userId;
@@ -6,7 +8,8 @@ class AccountAppealModel {
   final String title;
   final String content; // Rich text content (Delta JSON)
   final List<String> evidenceUrls;
-  final String status;
+  final String status; // 'Pending' or 'Closed' only
+  final String? decision; // The admin's decision: '1 day', '3 days', 'Lift Suspension', 'Rejected', etc.
   final String? adminResponse;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -21,6 +24,7 @@ class AccountAppealModel {
     required this.content,
     this.evidenceUrls = const [],
     required this.status,
+    this.decision,
     this.adminResponse,
     required this.createdAt,
     this.updatedAt,
@@ -38,10 +42,11 @@ class AccountAppealModel {
       content: data['content'] ?? '',
       evidenceUrls: List<String>.from(data['evidenceUrls'] ?? []),
       status: data['status'] ?? 'Pending',
+      decision: data['decision'],
       adminResponse: data['adminResponse'],
-      createdAt: (data['createdAt'] as DateTime?) ?? DateTime.now(),
-      updatedAt: data['updatedAt'] as DateTime?,
-      resolvedAt: data['resolvedAt'] as DateTime?,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      resolvedAt: (data['resolvedAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -55,10 +60,11 @@ class AccountAppealModel {
       'content': content,
       'evidenceUrls': evidenceUrls,
       'status': status,
+      'decision': decision,
       'adminResponse': adminResponse,
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
-      'resolvedAt': resolvedAt,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
+      'resolvedAt': resolvedAt != null ? Timestamp.fromDate(resolvedAt!) : null,
     };
   }
 

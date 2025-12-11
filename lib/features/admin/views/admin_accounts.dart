@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/features/admin/admin.dart';
+import 'package:zentry/features/admin/widgets/skeleton_loader.dart';
 
 class AdminAccountsPage extends StatefulWidget {
   const AdminAccountsPage({super.key});
@@ -10,7 +11,11 @@ class AdminAccountsPage extends StatefulWidget {
   State<AdminAccountsPage> createState() => _AdminAccountsPageState();
 }
 
-class _AdminAccountsPageState extends State<AdminAccountsPage> {
+class _AdminAccountsPageState extends State<AdminAccountsPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final AdminService _adminService = AdminService();
   final TextEditingController _searchController = TextEditingController();
   
@@ -75,9 +80,31 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SkeletonLoader(width: 200, height: 28, borderRadius: BorderRadius.circular(4)),
+            const SizedBox(height: 20),
+            SkeletonLoader(width: double.infinity, height: 50, borderRadius: BorderRadius.circular(8)),
+            const SizedBox(height: 16),
+            SkeletonLoader(width: double.infinity, height: 48, borderRadius: BorderRadius.circular(8)),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                itemCount: 6,
+                itemBuilder: (context, index) => const SkeletonListItem(),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     if (_error != null) {
@@ -119,32 +146,21 @@ class _AdminAccountsPageState extends State<AdminAccountsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Account Management',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1E1E1E),
-                      ),
+            // User count badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9ED69).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${_allUsers.length} users',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E1E1E),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF9ED69).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${_allUsers.length} users',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E1E1E),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
             const SizedBox(height: 20),
             

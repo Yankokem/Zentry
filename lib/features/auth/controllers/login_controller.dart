@@ -66,11 +66,9 @@ class LoginController {
       final adminService = AdminService();
       final status = await adminService.checkAndUpdateSuspensionStatus(userId);
 
-      // If user is suspended or banned, sign them out and show dialog
+      // If user is suspended or banned, show dialog with appeal option
       if (status == 'suspended' || status == 'banned') {
-        await _authService.signOut();
-        
-        // Get metadata for details
+        // Get metadata for details BEFORE signing out (requires auth)
         final metadata = await adminService.getUserMetadata(userId);
         final reason = status == 'suspended'
             ? (metadata?['suspensionReason'] ?? 'Account suspended')
@@ -79,7 +77,8 @@ class LoginController {
 
         _isLoading = false;
         
-        // Show status dialog with appeal option
+        // Show status dialog with appeal option (BEFORE signing out so user can submit appeal)
+        // Keep user authenticated - they will be signed out from the appeal screen
         if (context.mounted) {
           await _showAccountStatusDialog(
             context,

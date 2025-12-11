@@ -9,6 +9,7 @@ export 'views/admin_account_action.dart';
 export 'views/admin_bug_reports.dart';
 export 'views/admin_bug_report_details.dart';
 export 'views/admin_appeals.dart';
+export 'views/admin_appeal_details.dart';
 export 'views/user_detail_screen.dart';
 
 // Models

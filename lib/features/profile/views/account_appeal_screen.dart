@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -92,6 +93,12 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
       String? userId = widget.userId;
       String? userEmail = widget.userEmail;
 
+      if (kDebugMode) {
+        print('🔍 Starting appeal submission...');
+        print('  Widget userId: $userId');
+        print('  Widget userEmail: $userEmail');
+      }
+
       if (userId == null || userEmail == null) {
         final user = _authService.currentUser;
         if (user == null) {
@@ -102,6 +109,12 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
         }
         userId = user.uid;
         userEmail = user.email ?? '';
+        
+        if (kDebugMode) {
+          print('  Using current user:');
+          print('    userId: $userId');
+          print('    userEmail: $userEmail');
+        }
       }
 
       // Upload images to Cloudinary
@@ -125,6 +138,14 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
       // Get rich text content as JSON
       final content = _contentEditorController.getJsonContent();
 
+      if (kDebugMode) {
+        print('  Appeal details:');
+        print('    Title: ${_titleController.text.trim()}');
+        print('    Reason: $_selectedReason');
+        print('    Evidence count: ${_selectedImages.length}');
+        print('    Evidence URLs: $evidenceUrls');
+      }
+
       final appeal = AccountAppealModel.create(
         userId: userId,
         userEmail: userEmail,
@@ -134,13 +155,29 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
         evidenceUrls: evidenceUrls,
       );
 
+      if (kDebugMode) {
+        print('  Creating appeal object:');
+        print('    appeal.userId: ${appeal.userId}');
+        print('    appeal.userEmail: ${appeal.userEmail}');
+        print('    appeal.status: ${appeal.status}');
+        print('    appeal.createdAt: ${appeal.createdAt}');
+      }
+
+      if (kDebugMode) {
+        print('📤 Calling _appealService.submitAppeal()...');
+      }
+
       await _appealService.submitAppeal(appeal);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Appeal submitted successfully!')),
         );
-        Navigator.pop(context);
+        // Sign out the user after appeal submission is complete
+        await _authService.signOut();
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -164,7 +201,13 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Color(0xFF1E1E1E)),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () async {
+            // Sign out user when closing appeal screen
+            await _authService.signOut();
+            if (context.mounted) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          },
         ),
         title: const Text(
           'Appeal Suspension or Ban',
@@ -175,48 +218,47 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
           ),
         ),
       ),
-      body: ListView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        children: [
-          Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.security_rounded,
-                        size: 20, color: AppTheme.textDark),
-                    SizedBox(width: 8),
-                    Text(
-                      'Appeal Your Account',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textDark,
-                      ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.security_rounded,
+                      size: 20, color: AppTheme.textDark),
+                  SizedBox(width: 8),
+                  Text(
+                    'Appeal Your Account',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textDark,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Provide detailed information about why you believe your account restriction should be lifted.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textDark.withOpacity(0.7),
                   ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Provide detailed information about why you believe your account restriction should be lifted.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.textDark.withOpacity(0.7),
                 ),
-                const SizedBox(height: 24),
+              ),
+              const SizedBox(height: 24),
 
-                // Reason Dropdown
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedReason,
-                  decoration: InputDecoration(
-                    labelText: 'Restriction Type',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
+              // Reason Dropdown
+              DropdownButtonFormField<String>(
+                initialValue: _selectedReason,
+                decoration: InputDecoration(
+                  labelText: 'Restriction Type',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
                     ),
@@ -409,9 +451,7 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 32),
-        ],
-      ),
-    );
-  }
+        ),
+      );
+    }
 }

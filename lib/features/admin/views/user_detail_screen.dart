@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:zentry/core/core.dart';
+import 'package:zentry/features/admin/widgets/skeleton_loader.dart';
 
 class UserDetailScreen extends StatefulWidget {
   final String userId;
@@ -145,7 +146,18 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  SkeletonProfileCard(),
+                  const SizedBox(height: 20),
+                  SkeletonStatGrid(itemCount: 4),
+                  const SizedBox(height: 20),
+                  SkeletonDetailCard(rowCount: 5),
+                ],
+              ),
+            )
           : _error != null
               ? Center(
                   child: Column(

@@ -2,87 +2,179 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:zentry/features/admin/admin.dart';
+import 'package:zentry/features/admin/widgets/skeleton_loader.dart';
 
-class AdminBugReportsPage extends StatelessWidget {
+class AdminBugReportsPage extends StatefulWidget {
   const AdminBugReportsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final bugReportService = BugReportService();
+  State<AdminBugReportsPage> createState() => _AdminBugReportsPageState();
+}
 
+class _AdminBugReportsPageState extends State<AdminBugReportsPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  late final BugReportService _bugReportService = BugReportService();
+  String _selectedStatusFilter = ''; // Empty string means show all
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Bug Reports',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1E1E1E),
-                ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Stats Row
-          StreamBuilder<List<BugReportModel>>(
-            stream: bugReportService.getBugReportsStream(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const SizedBox(
-                  height: 60,
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
+          Expanded(
+            child: StreamBuilder<List<BugReportModel>>(
+              stream: _bugReportService.getBugReportsStream(),
+              builder: (context, snapshot) {
+                // Debug logging
+                print('🐛 Bug Reports Stream State:');
+                print('  ConnectionState: ${snapshot.connectionState}');
+                print('  Has Data: ${snapshot.hasData}');
+                print('  Has Error: ${snapshot.hasError}');
+                print('  Data Length: ${snapshot.data?.length ?? 0}');
+                if (snapshot.hasError) {
+                  print('  Error: ${snapshot.error}');
+                }
 
-              final reports = snapshot.data ?? [];
-              final openReports = reports.where((r) => r.status == 'Open').length;
-              final inProgressReports = reports.where((r) => r.status == 'In Progress').length;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatChip(
-                          context,
-                          icon: Icons.error_outline_rounded,
-                          label: 'Open',
-                          count: openReports,
-                          color: Colors.orange,
+                // Error state - check first!
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                        const SizedBox(height: 16),
+                        Text('Failed to load bug reports'),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${snapshot.error}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          textAlign: TextAlign.center,
                         ),
+                      ],
+                    ),
+                  );
+                }
+
+                // Loading state - only when waiting for first data
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: SkeletonStatCard()),
+                          const SizedBox(width: 12),
+                          Expanded(child: SkeletonStatCard()),
+                        ],
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(height: 16),
                       Expanded(
-                        child: _buildStatChip(
-                          context,
-                          icon: Icons.pending_outlined,
-                          label: 'In Progress',
-                          count: inProgressReports,
-                          color: Colors.blue,
+                        child: ListView.builder(
+                          itemCount: 5,
+                          itemBuilder: (context, index) => const SkeletonListItem(),
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: reports.isEmpty
-                        ? const Center(
-                            child: Text('No bug reports yet'),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.only(bottom: 80),
-                            itemCount: reports.length,
-                            itemBuilder: (context, i) {
-                              final report = reports[i];
-                              return _buildReportCard(context, report);
+                  );
+                }
+
+                // Data state
+                final reports = snapshot.data ?? [];
+                final openReports = reports.where((r) => r.status == 'Open').length;
+                final inProgressReports = reports.where((r) => r.status == 'In Progress').length;
+                final closedReports = reports.where((r) => r.status == 'Closed').length;
+
+                // Filter reports based on selected status
+                final filteredReports = _selectedStatusFilter.isEmpty
+                    ? reports
+                    : reports.where((r) => r.status == _selectedStatusFilter).toList();
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Stats Row with 3 cards
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedStatusFilter = _selectedStatusFilter == 'Open' ? '' : 'Open';
+                              });
                             },
+                            child: _buildStatChip(
+                              context,
+                              icon: Icons.error_outline_rounded,
+                              label: 'Open',
+                              count: openReports,
+                              color: Colors.orange,
+                              isSelected: _selectedStatusFilter == 'Open',
+                            ),
                           ),
-                  ),
-                ],
-              );
-            },
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedStatusFilter = _selectedStatusFilter == 'In Progress' ? '' : 'In Progress';
+                              });
+                            },
+                            child: _buildStatChip(
+                              context,
+                              icon: Icons.pending_outlined,
+                              label: 'In Progress',
+                              count: inProgressReports,
+                              color: Colors.blue,
+                              isSelected: _selectedStatusFilter == 'In Progress',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedStatusFilter = _selectedStatusFilter == 'Closed' ? '' : 'Closed';
+                              });
+                            },
+                            child: _buildStatChip(
+                              context,
+                              icon: Icons.check_circle_rounded,
+                              label: 'Closed',
+                              count: closedReports,
+                              color: Colors.green,
+                              isSelected: _selectedStatusFilter == 'Closed',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Reports List
+                    Expanded(
+                      child: filteredReports.isEmpty
+                          ? const Center(
+                              child: Text('No bug reports'),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.only(bottom: 80),
+                              itemCount: filteredReports.length,
+                              itemBuilder: (context, i) {
+                                final report = filteredReports[i];
+                                return _buildReportCard(context, report);
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -90,7 +182,6 @@ class AdminBugReportsPage extends StatelessWidget {
   }
 
   Widget _buildReportCard(BuildContext context, BugReportModel report) {
-    final priorityColor = _getPriorityColor(report.priority);
     final statusColor = _getStatusColor(report.status);
     final dateFormat = DateFormat('MMM d, yyyy');
 
@@ -110,7 +201,12 @@ class AdminBugReportsPage extends StatelessWidget {
       ),
       child: InkWell(
         onTap: () {
-          // Navigate to report details
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AdminBugReportDetailsScreen(report: report),
+            ),
+          );
         },
         borderRadius: BorderRadius.circular(20),
         child: Column(
@@ -118,22 +214,6 @@ class AdminBugReportsPage extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: priorityColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    report.priority.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: priorityColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Text(
                   report.category,
                   style: TextStyle(
@@ -173,14 +253,14 @@ class AdminBugReportsPage extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  Icons.person_outline_rounded,
+                  Icons.email_outlined,
                   size: 14,
                   color: Colors.grey[600],
                 ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    report.userId,
+                    report.userEmail,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -227,48 +307,45 @@ class AdminBugReportsPage extends StatelessWidget {
     required String label,
     required int count,
     required Color color,
+    bool isSelected = false,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
+        color: isSelected ? color.withOpacity(0.15) : color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 1,
+          color: isSelected ? color.withOpacity(0.6) : color.withOpacity(0.3),
+          width: isSelected ? 2 : 1,
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: color.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                count.toString(),
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            count.toString(),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -282,19 +359,6 @@ class AdminBugReportsPage extends StatelessWidget {
       case 'in progress':
         return Colors.blue;
       case 'closed':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  Color _getPriorityColor(String priority) {
-    switch (priority.toLowerCase()) {
-      case 'high':
-        return Colors.red;
-      case 'medium':
-        return Colors.orange;
-      case 'low':
         return Colors.green;
       default:
         return Colors.grey;

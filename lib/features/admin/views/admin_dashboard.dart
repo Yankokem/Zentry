@@ -22,10 +22,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   ];
 
   final List<_NavItemData> _navItems = const [
-    _NavItemData(icon: Icons.analytics_rounded, label: 'Overview'),
-    _NavItemData(icon: Icons.people_rounded, label: 'Accounts'),
-    _NavItemData(icon: Icons.bug_report_rounded, label: 'Reports'),
-    _NavItemData(icon: Icons.security_rounded, label: 'Appeals'),
+    _NavItemData(icon: Icons.analytics_rounded, label: 'Overview', title: 'Overview'),
+    _NavItemData(icon: Icons.people_rounded, label: 'Accounts', title: 'Account Management'),
+    _NavItemData(icon: Icons.bug_report_rounded, label: 'Reports', title: 'Bug Reports'),
+    _NavItemData(icon: Icons.security_rounded, label: 'Appeals', title: 'Account Appeals'),
   ];
 
   @override
@@ -49,25 +49,35 @@ class _AdminDashboardState extends State<AdminDashboard> {
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                padding: const EdgeInsets.fromLTRB(24, 12, 16, 12),
                 child: Row(
                   children: [
                     Image.asset(
                       'assets/images/bgremove.png',
-                      height: 40,
-                      width: 40,
+                      height: 32,
+                      width: 32,
                       fit: BoxFit.contain,
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Admin Dashboard',
-                        style: TextStyle(
-                          fontSize: 25,
+                        _navItems[_currentIndex].title,
+                        style: const TextStyle(
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1E1E1E),
                         ),
                       ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.notifications_none_rounded,
+                        color: Color(0xFF1E1E1E),
+                      ),
+                      tooltip: 'Notifications',
+                      onPressed: () {
+                        // TODO: Implement notification center
+                      },
                     ),
                     IconButton(
                       icon: const Icon(
@@ -116,7 +126,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           // Content
           Expanded(
-            child: _pages[_currentIndex],
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _pages,
+            ),
           ),
         ],
       ),
@@ -161,10 +174,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
 class _NavItemData {
   final IconData icon;
   final String label;
+  final String title;
 
   const _NavItemData({
     required this.icon,
     required this.label,
+    required this.title,
   });
 }
 

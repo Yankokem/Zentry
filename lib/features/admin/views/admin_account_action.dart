@@ -399,6 +399,7 @@ class _AdminAccountActionPageState extends State<AdminAccountActionPage> {
                                         status: 'suspended',
                                         reason: reasonController.text.trim(),
                                         duration: selectedDuration,
+                                        userEmail: widget.user['email'],
                                       );
                                       if (mounted) {
                                         ScaffoldMessenger.of(context)
@@ -420,6 +421,7 @@ class _AdminAccountActionPageState extends State<AdminAccountActionPage> {
                                         userId: widget.user['id'],
                                         status: 'banned',
                                         reason: reasonController.text.trim(),
+                                        userEmail: widget.user['email'],
                                       );
                                       if (mounted) {
                                         ScaffoldMessenger.of(context)

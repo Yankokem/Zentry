@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import 'package:zentry/features/admin/admin.dart';
+import 'package:zentry/features/admin/widgets/skeleton_loader.dart';
 
 class AdminOverviewPage extends StatefulWidget {
   const AdminOverviewPage({super.key});
@@ -10,7 +11,15 @@ class AdminOverviewPage extends StatefulWidget {
   State<AdminOverviewPage> createState() => _AdminOverviewPageState();
 }
 
-class _AdminOverviewPageState extends State<AdminOverviewPage> {
+class _AdminOverviewPageState extends State<AdminOverviewPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  // Services - initialized once
+  late final BugReportService _bugReportService = BugReportService();
+  late final AccountAppealService _appealService = AccountAppealService();
+  
   // Activity chart filters
   String _activityInterval = 'Weekly'; // Daily, Weekly, Monthly
   String _activityType = 'All'; // All, Projects, Journal, Wishlist
@@ -20,6 +29,8 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
 
@@ -60,15 +71,17 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
 
   // Support Stats - Shows Bug Reports and Account Appeals
   Widget _buildSupportStats(BuildContext context, bool isTablet) {
-    final bugReportService = BugReportService();
-    final appealService = AccountAppealService();
-
     return Row(
       children: [
         Expanded(
           child: StreamBuilder<List<BugReportModel>>(
-            stream: bugReportService.getBugReportsStream(),
+            stream: _bugReportService.getBugReportsStream(),
             builder: (context, snapshot) {
+              // Show skeleton while loading or if there's an error
+              if (snapshot.connectionState == ConnectionState.waiting || snapshot.hasError) {
+                return SkeletonStatCard();
+              }
+              
               final count = snapshot.data?.length ?? 0;
               final pending = snapshot.data?.where((r) => r.status == 'Open').length ?? 0;
               
@@ -128,8 +141,13 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
         const SizedBox(width: 12),
         Expanded(
           child: StreamBuilder<List<AccountAppealModel>>(
-            stream: appealService.getAppealsStream(),
+            stream: _appealService.getAppealsStream(),
             builder: (context, snapshot) {
+              // Show skeleton while loading or if there's an error
+              if (snapshot.connectionState == ConnectionState.waiting || snapshot.hasError) {
+                return SkeletonStatCard();
+              }
+              
               final count = snapshot.data?.length ?? 0;
               final pending = snapshot.data?.where((a) => a.status == 'Pending').length ?? 0;
               
@@ -468,7 +486,6 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
       double wishlist = (item['wishlist'] as int).toDouble();
 
       List<BarChartRodStackItem> stackItems = [];
-      double fromY = 0;
 
       if (_activityType == 'All') {
         stackItems = [
@@ -476,7 +493,6 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
           BarChartRodStackItem(projects, projects + journal, const Color(0xFF4FACFE)),
           BarChartRodStackItem(projects + journal, projects + journal + wishlist, const Color(0xFF43E97B)),
         ];
-        fromY = 0;
       } else if (_activityType == 'Projects') {
         stackItems = [BarChartRodStackItem(0, projects, const Color(0xFF667EEA))];
       } else if (_activityType == 'Journal') {

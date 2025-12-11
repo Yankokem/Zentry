@@ -112,8 +112,8 @@ class AppRoutes {
       case adminBugReportDetails:
         return MaterialPageRoute(
           builder: (_) => AdminGuard(
-            child: AdminBugReportDetailsPage(
-              report: settings.arguments as Map<String, dynamic>,
+            child: AdminBugReportDetailsScreen(
+              report: settings.arguments as BugReportModel,
             ),
           ),
         );
