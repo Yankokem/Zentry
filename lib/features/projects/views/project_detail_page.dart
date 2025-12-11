@@ -1189,8 +1189,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     // Add current user to membersDone
                     List<String> updatedMembersDone =
                         List.from(ticket.membersDone);
-                    if (currentUser?.email != null &&
-                        !updatedMembersDone.contains(currentUser!.email)) {
+                    if (currentUser.email != null &&
+                        !updatedMembersDone.contains(currentUser.email)) {
                       updatedMembersDone.add(currentUser.email!);
                     }
 
