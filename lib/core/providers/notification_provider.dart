@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:zentry/core/core.dart';
@@ -9,6 +10,8 @@ class NotificationProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  bool _isSessionActive = false;
+
   List<NotificationModel> get notifications => _notifications;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -16,30 +19,53 @@ class NotificationProvider extends ChangeNotifier {
   int get unreadCount => _notifications.where((n) => !n.isRead).length;
 
   Future<void> initialize() async {
+    _isSessionActive = true;
     await _notificationService.initialize();
-    await loadNotifications();
+    if (_isSessionActive) {
+      await loadNotifications();
+    }
   }
 
+  StreamSubscription? _subscription;
+
   Future<void> loadNotifications() async {
+    if (!_isSessionActive) return;
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
+      // Cancel previous subscription if any
+      await _subscription?.cancel();
+
+      // Check if session is still active after the await
+      if (!_isSessionActive) {
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
       final stream = _notificationService.getNotifications();
-      stream.listen(
+      _subscription = stream.listen(
         (notifications) {
+          if (!_isSessionActive) {
+            _subscription?.cancel();
+            return;
+          }
           _notifications = notifications;
           _isLoading = false;
           notifyListeners();
         },
         onError: (error) {
+          if (!_isSessionActive) return;
           _error = error.toString();
           _isLoading = false;
           notifyListeners();
         },
       );
     } catch (e) {
+      if (!_isSessionActive) return;
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
@@ -74,16 +100,18 @@ class NotificationProvider extends ChangeNotifier {
       for (final notification in _notifications.where((n) => !n.isRead)) {
         await _notificationService.markAsRead(notification.id);
       }
-      _notifications = _notifications.map((n) => NotificationModel(
-        id: n.id,
-        userId: n.userId,
-        title: n.title,
-        body: n.body,
-        type: n.type,
-        data: n.data,
-        createdAt: n.createdAt,
-        isRead: true,
-      )).toList();
+      _notifications = _notifications
+          .map((n) => NotificationModel(
+                id: n.id,
+                userId: n.userId,
+                title: n.title,
+                body: n.body,
+                type: n.type,
+                data: n.data,
+                createdAt: n.createdAt,
+                isRead: true,
+              ))
+          .toList();
       notifyListeners();
     } catch (e) {
       _error = e.toString();
@@ -136,6 +164,16 @@ class NotificationProvider extends ChangeNotifier {
 
   void clearError() {
     _error = null;
+    notifyListeners();
+  }
+
+  void cleanup() {
+    _isSessionActive = false;
+    _subscription?.cancel();
+    _subscription = null;
+    _notifications = [];
+    _error = null;
+    _isLoading = false;
     notifyListeners();
   }
 }

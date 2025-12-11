@@ -22,7 +22,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
 
   String _selectedCategory = 'General';
   bool _isSubmitting = false;
-  List<File> _selectedImages = [];
+  final List<File> _selectedImages = [];
 
   final List<String> _categories = [
     'General',
@@ -163,230 +163,232 @@ class _BugReportScreenState extends State<BugReportScreen> {
           Form(
             key: _formKey,
             child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.bug_report, size: 20, color: AppTheme.textDark),
+                    SizedBox(width: 8),
+                    Text(
+                      'Report a Bug',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Help us improve by providing detailed information about the issue.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppTheme.textDark.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Title Field
+                TextFormField(
+                  controller: _titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Bug Title',
+                    hintText: 'Brief description of the issue',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter a title';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Category Dropdown
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedCategory,
+                  decoration: InputDecoration(
+                    labelText: 'Category',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: _categories.map((category) {
+                    return DropdownMenuItem(
+                      value: category,
+                      child: Text(category),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _selectedCategory = value!);
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Rich Text Editor Label
+                const Text(
+                  'Description',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textDark,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Rich Text Editor
+                RichTextEditor(
+                  controller: _contentEditorController,
+                  hintText: 'Describe the issue in detail...',
+                ),
+                const SizedBox(height: 24),
+
+                // Images Section
+                const Text(
+                  'Screenshots or Evidence',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textDark,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Add images to help us understand the issue better',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Upload Button
+                ElevatedButton.icon(
+                  onPressed: _pickImages,
+                  icon: const Icon(Icons.add_photo_alternate_rounded),
+                  label: const Text('Add Images'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey.shade100,
+                    foregroundColor: AppTheme.textDark,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Image Preview
+                if (_selectedImages.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.bug_report, size: 20, color: AppTheme.textDark),
-                      SizedBox(width: 8),
                       Text(
-                        'Report a Bug',
+                        '${_selectedImages.length} image(s) selected',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textDark,
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 100,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _selectedImages.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    width: 100,
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      image: DecorationImage(
+                                        image:
+                                            FileImage(_selectedImages[index]),
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: GestureDetector(
+                                      onTap: () => _removeImage(index),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.red,
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        padding: const EdgeInsets.all(2),
+                                        child: const Icon(
+                                          Icons.close,
+                                          size: 14,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Help us improve by providing detailed information about the issue.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppTheme.textDark.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
 
-                  // Title Field
-                  TextFormField(
-                    controller: _titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Bug Title',
-                      hintText: 'Brief description of the issue',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter a title';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Category Dropdown
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedCategory,
-                    decoration: InputDecoration(
-                      labelText: 'Category',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    items: _categories.map((category) {
-                      return DropdownMenuItem(
-                        value: category,
-                        child: Text(category),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() => _selectedCategory = value!);
-                    },
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Rich Text Editor Label
-                  const Text(
-                    'Description',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Rich Text Editor
-                  RichTextEditor(
-                    controller: _contentEditorController,
-                    hintText: 'Describe the issue in detail...',
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Images Section
-                  const Text(
-                    'Screenshots or Evidence',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add images to help us understand the issue better',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Upload Button
-                  ElevatedButton.icon(
-                    onPressed: _pickImages,
-                    icon: const Icon(Icons.add_photo_alternate_rounded),
-                    label: const Text('Add Images'),
+                // Submit Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _isSubmitting ? null : _submitBugReport,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade100,
+                      backgroundColor: AppTheme.primary,
                       foregroundColor: AppTheme.textDark,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Image Preview
-                  if (_selectedImages.isNotEmpty)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${_selectedImages.length} image(s) selected',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          height: 100,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _selectedImages.length,
-                            itemBuilder: (context, index) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Stack(
-                                  children: [
-                                    Container(
-                                      width: 100,
-                                      height: 100,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(8),
-                                        image: DecorationImage(
-                                          image: FileImage(_selectedImages[index]),
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      top: 4,
-                                      right: 4,
-                                      child: GestureDetector(
-                                        onTap: () => _removeImage(index),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.red,
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          padding: const EdgeInsets.all(2),
-                                          child: const Icon(
-                                            Icons.close,
-                                            size: 14,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-
-                  // Submit Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submitBugReport,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: AppTheme.textDark,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Text(
-                              'Submit Bug Report',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
-                    ),
+                          )
+                        : const Text(
+                            'Submit Bug Report',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
           const SizedBox(height: 32),
         ],
       ),

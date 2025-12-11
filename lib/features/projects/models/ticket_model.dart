@@ -8,7 +8,8 @@ class Ticket {
   final String priority;
   final String status; // 'todo', 'in_progress', 'in_review', 'done'
   final List<String> assignedTo;
-  final List<String> membersDone; // Track which assigned members have marked as done
+  final List<String>
+      membersDone; // Track which assigned members have marked as done
   final String projectId;
   final DateTime? deadline;
   final DateTime createdAt;
@@ -118,5 +119,15 @@ class Ticket {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
+  }
+
+  // Helper getters for assignee progress tracking
+  int get doneCount => membersDone.length;
+  bool get allAssigneesDone => membersDone.length == assignedTo.length;
+  String get progressDisplay {
+    if (assignedTo.isEmpty) return 'No assignees';
+    return allAssigneesDone
+        ? 'Done ${assignedTo.length}/${assignedTo.length}'
+        : 'Done $doneCount/${assignedTo.length}';
   }
 }

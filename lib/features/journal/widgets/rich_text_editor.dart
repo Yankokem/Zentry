@@ -4,23 +4,23 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:zentry/core/core.dart';
 
 /// A rich text editor widget specifically designed for journal entries.
-/// 
+///
 /// This widget wraps flutter_quill to provide:
 /// - Rich text formatting (bold, italic, underline, strikethrough)
 /// - Bullet lists and checkboxes
 /// - Easy content extraction for storage
-/// 
+///
 /// Usage:
 /// ```dart
 /// final controller = RichTextEditorController();
-/// 
+///
 /// // In your widget:
 /// RichTextEditor(
 ///   controller: controller,
 ///   initialContent: 'Some text',
 ///   hintText: 'Start writing...',
 /// )
-/// 
+///
 /// // To get content:
 /// final plainText = controller.getPlainText();
 /// final jsonContent = controller.getJsonContent();
@@ -71,7 +71,7 @@ class _RichTextEditorState extends State<RichTextEditor> {
                   padding: const EdgeInsets.all(12.0),
                   child: Theme(
                     data: Theme.of(context).copyWith(
-                      textSelectionTheme: TextSelectionThemeData(
+                      textSelectionTheme: const TextSelectionThemeData(
                         cursorColor: Colors.black,
                       ),
                     ),
@@ -85,7 +85,8 @@ class _RichTextEditorState extends State<RichTextEditor> {
                 const Divider(height: 1),
                 // Custom Toolbar at Bottom
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
                     borderRadius: const BorderRadius.only(
@@ -114,14 +115,16 @@ class _RichTextEditorState extends State<RichTextEditor> {
                         ),
                         _ToolbarButton(
                           icon: Icons.format_underline,
-                          onPressed: () => _formatText(quill.Attribute.underline),
+                          onPressed: () =>
+                              _formatText(quill.Attribute.underline),
                           tooltip: 'Underline',
                           controller: widget.controller._quillController,
                           attribute: quill.Attribute.underline,
                         ),
                         _ToolbarButton(
                           icon: Icons.format_strikethrough,
-                          onPressed: () => _formatText(quill.Attribute.strikeThrough),
+                          onPressed: () =>
+                              _formatText(quill.Attribute.strikeThrough),
                           tooltip: 'Strikethrough',
                           controller: widget.controller._quillController,
                           attribute: quill.Attribute.strikeThrough,
@@ -136,7 +139,8 @@ class _RichTextEditorState extends State<RichTextEditor> {
                         ),
                         _ToolbarButton(
                           icon: Icons.check_box_outlined,
-                          onPressed: () => _formatText(quill.Attribute.unchecked),
+                          onPressed: () =>
+                              _formatText(quill.Attribute.unchecked),
                           tooltip: 'Checkbox',
                           controller: widget.controller._quillController,
                           attribute: quill.Attribute.unchecked,
@@ -144,12 +148,14 @@ class _RichTextEditorState extends State<RichTextEditor> {
                         const SizedBox(width: 8),
                         _buildToolbarButton(
                           icon: Icons.undo,
-                          onPressed: () => widget.controller._quillController.undo(),
+                          onPressed: () =>
+                              widget.controller._quillController.undo(),
                           tooltip: 'Undo',
                         ),
                         _buildToolbarButton(
                           icon: Icons.redo,
-                          onPressed: () => widget.controller._quillController.redo(),
+                          onPressed: () =>
+                              widget.controller._quillController.redo(),
                           tooltip: 'Redo',
                         ),
                       ],
@@ -198,30 +204,30 @@ class _RichTextEditorState extends State<RichTextEditor> {
     try {
       final controller = widget.controller._quillController;
       final selection = controller.selection;
-      
+
       if (!selection.isValid || selection.start < 0) return false;
-      
+
       // For list formats, we need to check the block style at the current line
-      if (attribute.key == quill.Attribute.ul.key || 
+      if (attribute.key == quill.Attribute.ul.key ||
           attribute.key == quill.Attribute.unchecked.key) {
-        
         // Get the block (line) at the current cursor position
         final block = controller.document.queryChild(selection.start).node;
-        
+
         if (block != null && block.style.attributes.isNotEmpty) {
           final listAttr = block.style.attributes['list'];
-          
+
           if (attribute.key == quill.Attribute.ul.key) {
             // Only active if it's specifically a bullet list
             return listAttr?.value == 'bullet';
           } else if (attribute.key == quill.Attribute.unchecked.key) {
             // Only active if it's specifically a checklist (not bullet)
-            return listAttr?.value == 'unchecked' || listAttr?.value == 'checked';
+            return listAttr?.value == 'unchecked' ||
+                listAttr?.value == 'checked';
           }
         }
         return false;
       }
-      
+
       // For inline attributes (bold, italic, etc.)
       final style = controller.getSelectionStyle();
       return style.attributes.containsKey(attribute.key);
@@ -233,9 +239,9 @@ class _RichTextEditorState extends State<RichTextEditor> {
   void _formatText(quill.Attribute attribute) {
     final controller = widget.controller._quillController;
     final selection = controller.selection;
-    
+
     if (!selection.isValid || selection.start < 0) return;
-    
+
     // Handle inline attributes (bold, italic, etc.)
     if (attribute.key == quill.Attribute.bold.key ||
         attribute.key == quill.Attribute.italic.key ||
@@ -243,40 +249,39 @@ class _RichTextEditorState extends State<RichTextEditor> {
         attribute.key == quill.Attribute.strikeThrough.key) {
       final isActive = _isFormatActive(attribute);
       if (isActive) {
-        final unsetAttribute = quill.Attribute.fromKeyValue(attribute.key, null);
+        final unsetAttribute =
+            quill.Attribute.fromKeyValue(attribute.key, null);
         controller.formatSelection(unsetAttribute);
       } else {
         controller.formatSelection(attribute);
       }
       return;
     }
-    
+
     // Handle list attributes (bullet and checklist)
-    if (attribute.key == quill.Attribute.ul.key || 
+    if (attribute.key == quill.Attribute.ul.key ||
         attribute.key == quill.Attribute.unchecked.key) {
-      
       final block = controller.document.queryChild(selection.start).node;
       if (block != null && block.style.attributes.isNotEmpty) {
         final listAttr = block.style.attributes['list'];
-        
+
         // Determine what list type is currently applied
         final isBulletActive = listAttr?.value == 'bullet';
-        final isChecklistActive = listAttr?.value == 'unchecked' || listAttr?.value == 'checked';
-        
+        final isChecklistActive =
+            listAttr?.value == 'unchecked' || listAttr?.value == 'checked';
+
         if (attribute.key == quill.Attribute.ul.key) {
           // Bullet list button clicked
           if (isBulletActive) {
             // Bullet is active, turn it off
-            controller.formatSelection(
-              quill.Attribute.fromKeyValue('list', null)
-            );
+            controller
+                .formatSelection(quill.Attribute.fromKeyValue('list', null));
           } else {
             // Bullet is not active, turn it on (and clear checklist if present)
             if (isChecklistActive) {
               // Clear checklist first
-              controller.formatSelection(
-                quill.Attribute.fromKeyValue('list', null)
-              );
+              controller
+                  .formatSelection(quill.Attribute.fromKeyValue('list', null));
             }
             // Apply bullet list
             controller.formatSelection(quill.Attribute.ul);
@@ -285,16 +290,14 @@ class _RichTextEditorState extends State<RichTextEditor> {
           // Checklist button clicked
           if (isChecklistActive) {
             // Checklist is active, turn it off
-            controller.formatSelection(
-              quill.Attribute.fromKeyValue('list', null)
-            );
+            controller
+                .formatSelection(quill.Attribute.fromKeyValue('list', null));
           } else {
             // Checklist is not active, turn it on (and clear bullet if present)
             if (isBulletActive) {
               // Clear bullet first
-              controller.formatSelection(
-                quill.Attribute.fromKeyValue('list', null)
-              );
+              controller
+                  .formatSelection(quill.Attribute.fromKeyValue('list', null));
             }
             // Apply checklist
             controller.formatSelection(quill.Attribute.unchecked);
@@ -306,7 +309,7 @@ class _RichTextEditorState extends State<RichTextEditor> {
       }
       return;
     }
-    
+
     // For any other attributes, toggle normally
     final isActive = _isFormatActive(attribute);
     if (isActive) {
@@ -355,27 +358,28 @@ class _ToolbarButtonState extends State<_ToolbarButton> {
 
   void _updateState() {
     if (!mounted) return;
-    
+
     try {
       bool isActive = false;
       final selection = widget.controller.selection;
-      
+
       if (selection.isValid && selection.start >= 0) {
         // For list formats (block attributes), check the block style
-        if (widget.attribute.key == quill.Attribute.ul.key || 
+        if (widget.attribute.key == quill.Attribute.ul.key ||
             widget.attribute.key == quill.Attribute.unchecked.key) {
-          
-          final block = widget.controller.document.queryChild(selection.start).node;
-          
+          final block =
+              widget.controller.document.queryChild(selection.start).node;
+
           if (block != null && block.style.attributes.isNotEmpty) {
             final listAttr = block.style.attributes['list'];
-            
+
             if (widget.attribute.key == quill.Attribute.ul.key) {
               // Only active if it's specifically a bullet list
               isActive = listAttr?.value == 'bullet';
             } else if (widget.attribute.key == quill.Attribute.unchecked.key) {
               // Only active if it's specifically a checklist (not bullet)
-              isActive = listAttr?.value == 'unchecked' || listAttr?.value == 'checked';
+              isActive = listAttr?.value == 'unchecked' ||
+                  listAttr?.value == 'checked';
             }
           }
         } else {
@@ -384,7 +388,7 @@ class _ToolbarButtonState extends State<_ToolbarButton> {
           isActive = style.attributes.containsKey(widget.attribute.key);
         }
       }
-      
+
       if (_isActive != isActive) {
         setState(() {
           _isActive = isActive;
@@ -420,7 +424,7 @@ class _ToolbarButtonState extends State<_ToolbarButton> {
 }
 
 /// Controller for the RichTextEditor
-/// 
+///
 /// Provides methods to:
 /// - Get plain text content
 /// - Get JSON content (for storage)

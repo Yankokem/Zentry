@@ -11,9 +11,10 @@ service cloud.firestore {
     }
 
     // Check if the user is the hardcoded system admin (fallback)
+    // Uses .get('email', '') to safely access email even if missing from token
     function isSystemAdmin() {
       return request.auth != null && 
-        request.auth.token.email == 'zentry_admin@zentry.app.com';
+        request.auth.token.get('email', '') == 'zentry_admin@zentry.app.com';
     }
 
     // Combined admin check
@@ -21,13 +22,25 @@ service cloud.firestore {
       return isSystemAdmin() || hasAdminRole();
     }
 
+    // Helper to safely get user email from token OR database
+    function getUserEmail() {
+      return request.auth.token.get('email', '') != '' ? 
+             request.auth.token.get('email', '') : 
+             (exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? 
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('email', '') : '');
+    }
+
     // Helper to check project access
+    // Safely accesses email and checks project existence first
     function canAccessProject(projectId) {
       let projectPath = /databases/$(database)/documents/projects/$(projectId);
+      let userEmail = getUserEmail();
+      
       return request.auth != null && 
              exists(projectPath) && (
                get(projectPath).data.userId == request.auth.uid ||
-               request.auth.token.email in get(projectPath).data.get('teamMembers', [])
+               (userEmail != '' && 
+                userEmail in get(projectPath).data.get('teamMembers', []))
              );
     }
 
@@ -51,21 +64,21 @@ service cloud.firestore {
       allow get: if isAdmin() || (
         request.auth != null && (
           resource.data.userId == request.auth.uid ||
-          request.auth.token.email in resource.data.get('sharedWith', [])
+          request.auth.token.get('email', '') in resource.data.get('sharedWith', [])
         )
       );
       
       allow list: if isAdmin() || (
         request.auth != null && (
           resource.data.userId == request.auth.uid ||
-          request.auth.token.email in resource.data.get('sharedWith', [])
+          request.auth.token.get('email', '') in resource.data.get('sharedWith', [])
         )
       );
 
       allow write: if isAdmin() || (
         request.auth != null && (
           resource.data.userId == request.auth.uid ||
-          request.auth.token.email in resource.data.get('sharedWith', [])
+          request.auth.token.get('email', '') in resource.data.get('sharedWith', [])
         )
       );
       allow create: if request.auth != null;
@@ -89,7 +102,8 @@ service cloud.firestore {
       allow read, write: if isAdmin() || (
         request.auth != null && (
           resource.data.userId == request.auth.uid ||
-          request.auth.token.email in resource.data.get('teamMembers', [])
+          (getUserEmail() != '' && 
+           getUserEmail() in resource.data.get('teamMembers', []))
         )
       );
       allow create: if request.auth != null;

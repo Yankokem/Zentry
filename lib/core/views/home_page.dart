@@ -43,37 +43,26 @@ class _HomePageState extends State<HomePage> {
   int _completedTasksThisWeek = 0;
   Map<DateTime, List<DateTicket>> _ticketsByDate = {};
 
+  // Cache for project tickets to avoid constant recalculation
+  final Map<String, List<Ticket>> _projectTicketsCache = {};
+  // Track individual subscriptions to cancel them properly
+  final List<StreamSubscription> _ticketSubscriptions = [];
+  Timer? _debounceTimer;
+
   @override
   void initState() {
     super.initState();
     _loadUserName();
     _loadData();
-    _subscribeToJournalEntries();
-    _subscribeToTickets();
+    _setupAuthListener();
   }
 
-  void _subscribeToJournalEntries() {
-    // If user is already signed in, subscribe immediately
-    if (_authService.currentUser != null) {
-      _journalSubscription =
-          _journalService.getEntriesStream().listen((entries) {
-        if (!mounted) return;
-        setState(() {
-          _recentJournalEntries = entries.take(1).toList();
-        });
-      }, onError: (err) {
-        debugPrint('Journal stream error: $err');
-      });
-      return;
-    }
-
-    // Otherwise wait for auth state to become available, then subscribe
+  void _setupAuthListener() {
+    _authSubscription?.cancel();
     _authSubscription = _authService.authStateChanges.listen((user) {
       if (user != null) {
-        // Cancel auth listener once we have a user
-        _authSubscription?.cancel();
-        _authSubscription = null;
-
+        _subscribeToTicketsStream();
+        _journalSubscription?.cancel();
         _journalSubscription =
             _journalService.getEntriesStream().listen((entries) {
           if (!mounted) return;
@@ -83,27 +72,27 @@ class _HomePageState extends State<HomePage> {
         }, onError: (err) {
           debugPrint('Journal stream error: $err');
         });
-      }
-    }, onError: (err) {
-      debugPrint('Auth state stream error: $err');
-    });
-  }
+      } else {
+        // user logged out
+        _journalSubscription?.cancel();
+        _journalSubscription = null;
+        _projectsSubscription?.cancel();
+        _projectsSubscription = null;
+        _ticketsSubscription?.cancel();
+        _ticketsSubscription = null;
+        _debounceTimer?.cancel();
+        _debounceTimer = null;
 
-  void _subscribeToTickets() {
-    // If user is already signed in, subscribe immediately
-    if (_authService.currentUser != null) {
-      _subscribeToTicketsStream();
-      return;
-    }
-
-    // Otherwise wait for auth state to become available, then subscribe
-    _authSubscription = _authService.authStateChanges.listen((user) {
-      if (user != null && _ticketsSubscription == null) {
-        // Cancel auth listener once we have a user
-        _authSubscription?.cancel();
-        _authSubscription = null;
-
-        _subscribeToTicketsStream();
+        if (mounted) {
+          setState(() {
+            _recentJournalEntries = [];
+            _ticketsByDate = {};
+            _recentProjects = [];
+            _activeProjects = 0;
+            _tasksDueToday = 0;
+            _completedTasksThisWeek = 0;
+          });
+        }
       }
     }, onError: (err) {
       debugPrint('Auth state stream error: $err');
@@ -129,6 +118,18 @@ class _HomePageState extends State<HomePage> {
             .toList()
           ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
+        // Take only the 4 most recent active projects
+        final limitedProjects = activeProjects.take(4).toList();
+
+        // Subscribe to real-time ticket updates for all active projects
+        // Cancel previous subscriptions
+        for (var sub in _ticketSubscriptions) {
+          sub.cancel();
+        }
+        _ticketSubscriptions.clear();
+        _projectTicketsCache.clear();
+
+        // If no active projects, just update state
         if (activeProjects.isEmpty) {
           if (mounted) {
             setState(() {
@@ -143,149 +144,27 @@ class _HomePageState extends State<HomePage> {
           return;
         }
 
-        // Take only the 4 most recent active projects
-        final limitedProjects = activeProjects.take(4).toList();
+        // Subscribe to each project's ticket stream
+        for (var project in activeProjects) {
+          final sub = _firestoreService
+              .listenToProjectTickets(project.id)
+              .listen((tickets) {
+            if (!mounted) return;
 
-        // Subscribe to real-time ticket updates for all active projects
-        // Cancel previous subscription
-        _ticketsSubscription?.cancel();
+            // Update cache for this project
+            _projectTicketsCache[project.id] = tickets;
 
-        // Combine all ticket streams into one
-        final ticketStreams = activeProjects
-            .map((project) => _firestoreService
-                .listenToProjectTickets(project.id)
-                .map((tickets) => {
-                      'projectId': project.id,
-                      'tickets': tickets,
-                    }))
-            .toList();
-
-        if (ticketStreams.isEmpty) {
-          if (mounted) {
-            setState(() {
-              _ticketsByDate = {};
-              _recentProjects = limitedProjects;
-              _activeProjects = activeProjects.length;
-              _tasksDueToday = 0;
-              _completedTasksThisWeek = 0;
-              _isLoading = false;
-            });
-          }
-          return;
-        }
-
-        // Listen to the first stream (we'll update the logic to combine all streams properly)
-        // For now, we'll process tickets whenever any project's tickets change
-        _ticketsSubscription =
-            Stream.periodic(const Duration(seconds: 1)).asyncMap((_) async {
-          // Fetch all tickets from all active projects
-          Map<DateTime, List<DateTicket>> ticketsByDate = {};
-          int tasksDueToday = 0;
-          int completedThisWeek = 0;
-
-          final today = DateTime.now();
-          final todayDate = DateTime(today.year, today.month, today.day);
-          final weekStart = DateTime.now()
-              .subtract(Duration(days: DateTime.now().weekday - 1));
-
-          for (var project in activeProjects) {
-            try {
-              final tickets =
-                  await _firestoreService.getProjectTickets(project.id);
-
-              for (var ticket in tickets) {
-                if (ticket.deadline != null) {
-                  var deadline = ticket.deadline!;
-
-                  // Set default time to 11:59 PM if no time is set (for existing tickets)
-                  if (deadline.hour == 0 &&
-                      deadline.minute == 0 &&
-                      deadline.second == 0) {
-                    deadline = DateTime(
-                      deadline.year,
-                      deadline.month,
-                      deadline.day,
-                      23,
-                      59,
-                    );
-                  }
-
-                  final deadlineDate =
-                      DateTime(deadline.year, deadline.month, deadline.day);
-
-                  // Determine ticket status
-                  TicketStatus ticketStatus;
-                  if (ticket.status == 'done') {
-                    ticketStatus = TicketStatus.done;
-                  } else if (deadlineDate.isBefore(todayDate)) {
-                    ticketStatus = TicketStatus.late;
-                  } else {
-                    ticketStatus = TicketStatus.pending;
-                  }
-
-                  // Add ticket to the map
-                  final dateTicket = DateTicket(
-                    title: ticket.title,
-                    status: ticketStatus,
-                    deadline: deadline,
-                    ticketId: ticket.ticketNumber,
-                    projectName: project.title,
-                    projectId: project.id,
-                  );
-
-                  if (ticketsByDate.containsKey(deadlineDate)) {
-                    ticketsByDate[deadlineDate]!.add(dateTicket);
-                  } else {
-                    ticketsByDate[deadlineDate] = [dateTicket];
-                  }
-
-                  // Count tasks due today
-                  if (deadline.year == today.year &&
-                      deadline.month == today.month &&
-                      deadline.day == today.day &&
-                      ticket.status != 'done') {
-                    tasksDueToday++;
-                  }
-
-                  // Count completed tasks this week
-                  if (ticket.status == 'done' &&
-                      ticket.updatedAt.isAfter(weekStart)) {
-                    completedThisWeek++;
-                  }
-                }
+            // Debounce the update: wait for 300ms of silence before processing
+            _debounceTimer?.cancel();
+            _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                _processTicketUpdates(activeProjects, limitedProjects);
               }
-            } catch (e) {
-              debugPrint(
-                  'Error fetching tickets for project ${project.id}: $e');
-            }
-          }
-
-          return {
-            'ticketsByDate': ticketsByDate,
-            'tasksDueToday': tasksDueToday,
-            'completedThisWeek': completedThisWeek,
-            'activeProjects': activeProjects.length,
-            'recentProjects': limitedProjects,
-          };
-        }).listen((data) {
-          if (!mounted) return;
-          setState(() {
-            _ticketsByDate =
-                data['ticketsByDate'] as Map<DateTime, List<DateTicket>>;
-            _tasksDueToday = data['tasksDueToday'] as int;
-            _completedTasksThisWeek = data['completedThisWeek'] as int;
-            _activeProjects = data['activeProjects'] as int;
-            _recentProjects = data['recentProjects'] as List<Project>;
-            _isLoading = false;
-          });
-        }, onError: (err) {
-          debugPrint('Tickets periodic stream error: $err');
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
             });
-          }
-        });
+          });
+
+          _ticketSubscriptions.add(sub);
+        }
       }, onError: (err) {
         debugPrint('Projects stream error: $err');
         if (mounted) {
@@ -304,6 +183,111 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _processTicketUpdates(
+      List<Project> activeProjects, List<Project> limitedProjects) {
+    // Recalculate aggregates from cache
+    Map<DateTime, List<DateTicket>> ticketsByDate = {};
+    int tasksDueToday = 0;
+    int completedThisWeek = 0;
+
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final weekStart =
+        DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1));
+
+    // Iterate over all cached tickets from all projects
+    _projectTicketsCache.forEach((projectId, projectTickets) {
+      // Find project name for these tickets
+      final projectTitle = activeProjects
+          .firstWhere((p) => p.id == projectId,
+              orElse: () => activeProjects.isNotEmpty
+                  ? activeProjects.first
+                  : Project(
+                      id: 'unknown',
+                      userId: '',
+                      title: 'Unknown',
+                      description: '',
+                      teamMembers: [],
+                      status: 'active',
+                      totalTickets: 0,
+                      completedTickets: 0,
+                      createdAt: DateTime.now(),
+                      updatedAt: DateTime.now(),
+                    )) // Fallback safe
+          .title;
+
+      for (var ticket in projectTickets) {
+        if (ticket.deadline != null) {
+          var deadline = ticket.deadline!;
+
+          // Set default time to 11:59 PM if no time is set
+          if (deadline.hour == 0 &&
+              deadline.minute == 0 &&
+              deadline.second == 0) {
+            deadline = DateTime(
+              deadline.year,
+              deadline.month,
+              deadline.day,
+              23,
+              59,
+            );
+          }
+
+          final deadlineDate =
+              DateTime(deadline.year, deadline.month, deadline.day);
+
+          // Determine ticket status
+          TicketStatus ticketStatus;
+          if (ticket.status == 'done') {
+            ticketStatus = TicketStatus.done;
+          } else if (deadlineDate.isBefore(todayDate)) {
+            ticketStatus = TicketStatus.late;
+          } else {
+            ticketStatus = TicketStatus.pending;
+          }
+
+          // Add ticket to the map
+          final dateTicket = DateTicket(
+            title: ticket.title,
+            status: ticketStatus,
+            deadline: deadline,
+            ticketId: ticket.ticketNumber,
+            projectName: projectTitle,
+            projectId: projectId,
+          );
+
+          if (ticketsByDate.containsKey(deadlineDate)) {
+            ticketsByDate[deadlineDate]!.add(dateTicket);
+          } else {
+            ticketsByDate[deadlineDate] = [dateTicket];
+          }
+
+          // Count tasks due today
+          if (deadline.year == today.year &&
+              deadline.month == today.month &&
+              deadline.day == today.day &&
+              ticket.status != 'done') {
+            tasksDueToday++;
+          }
+
+          // Count completed tasks this week
+          if (ticket.status == 'done' && ticket.updatedAt.isAfter(weekStart)) {
+            completedThisWeek++;
+          }
+        }
+      }
+    });
+
+    setState(() {
+      _ticketsByDate = ticketsByDate;
+      _tasksDueToday = tasksDueToday;
+      _completedTasksThisWeek = completedThisWeek;
+      _activeProjects = activeProjects.length;
+      _recentProjects = limitedProjects;
+      _isLoading = false;
+    });
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -315,10 +299,15 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _journalSubscription?.cancel();
     _authSubscription?.cancel();
+    _journalSubscription?.cancel();
     _projectsSubscription?.cancel();
-    _ticketsSubscription?.cancel();
+    _debounceTimer?.cancel();
+    // Cancel all individual ticket subscriptions
+    for (var sub in _ticketSubscriptions) {
+      sub.cancel();
+    }
+    _ticketSubscriptions.clear();
     super.dispose();
   }
 
@@ -361,6 +350,17 @@ class _HomePageState extends State<HomePage> {
       // Store current user info for use in build methods
       _currentUserEmail = user.email ?? '';
       _currentUserId = user.uid;
+
+      // Initialize providers to ensure they have the correct data and listeners
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Provider.of<WishlistProvider>(context, listen: false).initialize();
+            Provider.of<NotificationProvider>(context, listen: false)
+                .initialize();
+          }
+        });
+      }
 
       // Data loading is now handled by _subscribeToTickets() and _subscribeToJournalEntries()
       // which set up real-time listeners for automatic updates
@@ -1294,7 +1294,7 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       // Uncomment to enable test notifications (development only)
-       floatingActionButton: const TestNotificationButton(),
+      floatingActionButton: const TestNotificationButton(),
     );
   }
 }

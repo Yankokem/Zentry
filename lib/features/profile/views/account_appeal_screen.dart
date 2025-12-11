@@ -32,7 +32,7 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
 
   String _selectedReason = 'suspension';
   bool _isSubmitting = false;
-  List<File> _selectedImages = [];
+  final List<File> _selectedImages = [];
 
   final List<String> _reasons = ['suspension', 'ban'];
   final Map<String, String> _reasonDisplay = {
@@ -91,7 +91,7 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
       // Use passed userId/userEmail if available (from login dialog), otherwise use current auth user
       String? userId = widget.userId;
       String? userEmail = widget.userEmail;
-      
+
       if (userId == null || userEmail == null) {
         final user = _authService.currentUser;
         if (user == null) {
@@ -181,231 +181,234 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
           Form(
             key: _formKey,
             child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.security_rounded,
+                        size: 20, color: AppTheme.textDark),
+                    SizedBox(width: 8),
+                    Text(
+                      'Appeal Your Account',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textDark,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Provide detailed information about why you believe your account restriction should be lifted.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppTheme.textDark.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Reason Dropdown
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedReason,
+                  decoration: InputDecoration(
+                    labelText: 'Restriction Type',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: _reasons.map((reason) {
+                    return DropdownMenuItem(
+                      value: reason,
+                      child: Text(_reasonDisplay[reason]!),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _selectedReason = value!);
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Title Field
+                TextFormField(
+                  controller: _titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Appeal Title',
+                    hintText: 'Brief summary of your appeal',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter a title';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Rich Text Editor Label
+                const Text(
+                  'Appeal Description',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textDark,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Rich Text Editor
+                RichTextEditor(
+                  controller: _contentEditorController,
+                  hintText:
+                      'Explain why you believe your restriction should be lifted...',
+                ),
+                const SizedBox(height: 24),
+
+                // Evidence Section
+                const Text(
+                  'Supporting Evidence',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textDark,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Add screenshots or documents to support your appeal',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Upload Button
+                ElevatedButton.icon(
+                  onPressed: _pickImages,
+                  icon: const Icon(Icons.add_photo_alternate_rounded),
+                  label: const Text('Add Evidence'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey.shade100,
+                    foregroundColor: AppTheme.textDark,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Image Preview
+                if (_selectedImages.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.security_rounded,
-                          size: 20, color: AppTheme.textDark),
-                      SizedBox(width: 8),
                       Text(
-                        'Appeal Your Account',
+                        '${_selectedImages.length} file(s) selected',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textDark,
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 100,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _selectedImages.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    width: 100,
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      image: DecorationImage(
+                                        image:
+                                            FileImage(_selectedImages[index]),
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: GestureDetector(
+                                      onTap: () => _removeImage(index),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.red,
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        padding: const EdgeInsets.all(2),
+                                        child: const Icon(
+                                          Icons.close,
+                                          size: 14,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Provide detailed information about why you believe your account restriction should be lifted.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppTheme.textDark.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
 
-                  // Reason Dropdown
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedReason,
-                    decoration: InputDecoration(
-                      labelText: 'Restriction Type',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    items: _reasons.map((reason) {
-                      return DropdownMenuItem(
-                        value: reason,
-                        child: Text(_reasonDisplay[reason]!),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() => _selectedReason = value!);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Title Field
-                  TextFormField(
-                    controller: _titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Appeal Title',
-                      hintText: 'Brief summary of your appeal',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter a title';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Rich Text Editor Label
-                  const Text(
-                    'Appeal Description',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Rich Text Editor
-                  RichTextEditor(
-                    controller: _contentEditorController,
-                    hintText: 'Explain why you believe your restriction should be lifted...',
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Evidence Section
-                  const Text(
-                    'Supporting Evidence',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add screenshots or documents to support your appeal',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Upload Button
-                  ElevatedButton.icon(
-                    onPressed: _pickImages,
-                    icon: const Icon(Icons.add_photo_alternate_rounded),
-                    label: const Text('Add Evidence'),
+                // Submit Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _isSubmitting ? null : _submitAppeal,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade100,
+                      backgroundColor: AppTheme.primary,
                       foregroundColor: AppTheme.textDark,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Image Preview
-                  if (_selectedImages.isNotEmpty)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${_selectedImages.length} file(s) selected',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          height: 100,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _selectedImages.length,
-                            itemBuilder: (context, index) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Stack(
-                                  children: [
-                                    Container(
-                                      width: 100,
-                                      height: 100,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(8),
-                                        image: DecorationImage(
-                                          image: FileImage(_selectedImages[index]),
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      top: 4,
-                                      right: 4,
-                                      child: GestureDetector(
-                                        onTap: () => _removeImage(index),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.red,
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          padding: const EdgeInsets.all(2),
-                                          child: const Icon(
-                                            Icons.close,
-                                            size: 14,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-
-                  // Submit Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submitAppeal,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: AppTheme.textDark,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Text(
-                              'Submit Appeal',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
-                    ),
+                          )
+                        : const Text(
+                            'Submit Appeal',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
           const SizedBox(height: 32),
         ],
       ),

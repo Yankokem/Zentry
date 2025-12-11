@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Colors
@@ -28,33 +27,31 @@ class AppTheme {
       onSurface: textDark,
       onError: textLight,
     ),
-    textTheme: GoogleFonts.interTextTheme(
-      const TextTheme(
-        displayLarge: TextStyle(
-            fontSize: 32, fontWeight: FontWeight.bold, color: textDark),
-        displayMedium: TextStyle(
-            fontSize: 28, fontWeight: FontWeight.bold, color: textDark),
-        displaySmall: TextStyle(
-            fontSize: 24, fontWeight: FontWeight.bold, color: textDark),
-        headlineMedium: TextStyle(
-            fontSize: 20, fontWeight: FontWeight.w600, color: textDark),
-        headlineSmall: TextStyle(
-            fontSize: 18, fontWeight: FontWeight.w600, color: textDark),
-        titleLarge: TextStyle(
-            fontSize: 16, fontWeight: FontWeight.w600, color: textDark),
-        bodyLarge: TextStyle(fontSize: 16, color: textDark),
-        bodyMedium: TextStyle(fontSize: 14, color: textDark),
-        bodySmall: TextStyle(fontSize: 12, color: textDark),
-        labelLarge: TextStyle(
-            fontSize: 14, fontWeight: FontWeight.w500, color: textDark),
-      ),
+    textTheme: const TextTheme(
+      displayLarge:
+          TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: textDark),
+      displayMedium:
+          TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: textDark),
+      displaySmall:
+          TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textDark),
+      headlineMedium:
+          TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: textDark),
+      headlineSmall:
+          TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: textDark),
+      titleLarge:
+          TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textDark),
+      bodyLarge: TextStyle(fontSize: 16, color: textDark),
+      bodyMedium: TextStyle(fontSize: 14, color: textDark),
+      bodySmall: TextStyle(fontSize: 12, color: textDark),
+      labelLarge:
+          TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: textDark),
     ),
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: background,
       foregroundColor: textDark,
       elevation: 0,
       centerTitle: false,
-      titleTextStyle: GoogleFonts.inter(
+      titleTextStyle: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w600,
         color: textDark,
@@ -151,33 +148,31 @@ class AppTheme {
       onSurface: textLight,
       onError: textLight,
     ),
-    textTheme: GoogleFonts.interTextTheme(
-      const TextTheme(
-        displayLarge: TextStyle(
-            fontSize: 32, fontWeight: FontWeight.bold, color: textLight),
-        displayMedium: TextStyle(
-            fontSize: 28, fontWeight: FontWeight.bold, color: textLight),
-        displaySmall: TextStyle(
-            fontSize: 24, fontWeight: FontWeight.bold, color: textLight),
-        headlineMedium: TextStyle(
-            fontSize: 20, fontWeight: FontWeight.w600, color: textLight),
-        headlineSmall: TextStyle(
-            fontSize: 18, fontWeight: FontWeight.w600, color: textLight),
-        titleLarge: TextStyle(
-            fontSize: 16, fontWeight: FontWeight.w600, color: textLight),
-        bodyLarge: TextStyle(fontSize: 16, color: textLight),
-        bodyMedium: TextStyle(fontSize: 14, color: textLight),
-        bodySmall: TextStyle(fontSize: 12, color: textLight),
-        labelLarge: TextStyle(
-            fontSize: 14, fontWeight: FontWeight.w500, color: textLight),
-      ),
+    textTheme: const TextTheme(
+      displayLarge: TextStyle(
+          fontSize: 32, fontWeight: FontWeight.bold, color: textLight),
+      displayMedium: TextStyle(
+          fontSize: 28, fontWeight: FontWeight.bold, color: textLight),
+      displaySmall: TextStyle(
+          fontSize: 24, fontWeight: FontWeight.bold, color: textLight),
+      headlineMedium: TextStyle(
+          fontSize: 20, fontWeight: FontWeight.w600, color: textLight),
+      headlineSmall: TextStyle(
+          fontSize: 18, fontWeight: FontWeight.w600, color: textLight),
+      titleLarge: TextStyle(
+          fontSize: 16, fontWeight: FontWeight.w600, color: textLight),
+      bodyLarge: TextStyle(fontSize: 16, color: textLight),
+      bodyMedium: TextStyle(fontSize: 14, color: textLight),
+      bodySmall: TextStyle(fontSize: 12, color: textLight),
+      labelLarge: TextStyle(
+          fontSize: 14, fontWeight: FontWeight.w500, color: textLight),
     ),
-    appBarTheme: AppBarTheme(
-      backgroundColor: const Color(0xFF121212),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Color(0xFF121212),
       foregroundColor: textLight,
       elevation: 0,
       centerTitle: false,
-      titleTextStyle: GoogleFonts.inter(
+      titleTextStyle: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w600,
         color: textLight,

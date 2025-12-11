@@ -87,16 +87,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
-              // Close dialog first
+              // 1. Close confirmation dialog
               Navigator.pop(dialogContext);
-              // Perform sign out
-              await _authService.signOut();
+
+              // 2. Show Loading Dialog
               if (!mounted) return;
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.login,
-                (route) => false,
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (ctx) => const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.purple,
+                  ),
+                ),
               );
+
+              // 3. Perform cleanup
+              if (mounted) {
+                Provider.of<WishlistProvider>(context, listen: false).cleanup();
+                Provider.of<NotificationProvider>(context, listen: false)
+                    .cleanup();
+              }
+
+              // 4. Artificial delay to let UI settle and providers cleanup
+              await Future.delayed(const Duration(milliseconds: 500));
+
+              // 5. Navigate to Login and Remove All Routes BEFORE signing out
+              // This unmounts the entire app tree, triggering dispose() on HomePage
+              if (mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  AppRoutes.login,
+                  (route) => false,
+                );
+              }
+
+              // 6. Perform sign out in background (UI is already gone/going)
+              await _authService.signOut();
             },
             child: const Text(
               'Logout',
@@ -138,7 +164,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         fit: BoxFit.cover,
                         onError: (exception, stackTrace) {
                           // Image failed to load, fallback to gradient
-                          debugPrint('Failed to load profile image: $exception');
+                          debugPrint(
+                              'Failed to load profile image: $exception');
                         },
                       )
                     : null,
@@ -256,7 +283,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     subtitle: 'Update your profile and credentials',
                     onTap: () async {
                       // Navigate to account settings and refresh profile when returning
-                      await Navigator.pushNamed(context, AppRoutes.accountSettings);
+                      await Navigator.pushNamed(
+                          context, AppRoutes.accountSettings);
                       // Reload user data when returning to profile
                       await _loadUser();
                     },

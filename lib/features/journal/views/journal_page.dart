@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +23,9 @@ class _JournalPageState extends State<JournalPage> {
   List<Mood> _moods = Mood.defaultMoods;
   bool _isLoading = true;
 
+  StreamSubscription? _entriesSubscription;
+  StreamSubscription? _moodsSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -36,7 +40,8 @@ class _JournalPageState extends State<JournalPage> {
   }
 
   void _loadEntries() {
-    _journalService.getEntriesStream().listen((entries) {
+    _entriesSubscription?.cancel();
+    _entriesSubscription = _journalService.getEntriesStream().listen((entries) {
       if (mounted) {
         setState(() {
           _entries = entries;
@@ -46,12 +51,15 @@ class _JournalPageState extends State<JournalPage> {
     }, onError: (error) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading entries: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Only show error if not a permission denied error caused by logout
+        if (!error.toString().contains('permission-denied')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading entries: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     });
   }
@@ -59,9 +67,10 @@ class _JournalPageState extends State<JournalPage> {
   void _loadMoods() {
     // Start with default moods immediately
     _moods = Mood.defaultMoods;
-    
+
     // Then listen for updates from Firestore (will include custom moods)
-    _moodService.getMoodsStream().listen((moods) {
+    _moodsSubscription?.cancel();
+    _moodsSubscription = _moodService.getMoodsStream().listen((moods) {
       if (mounted) {
         setState(() {
           _moods = moods;
@@ -72,6 +81,8 @@ class _JournalPageState extends State<JournalPage> {
 
   @override
   void dispose() {
+    _entriesSubscription?.cancel();
+    _moodsSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -81,7 +92,7 @@ class _JournalPageState extends State<JournalPage> {
 
     return _entries.where((entry) {
       return entry.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             entry.content.toLowerCase().contains(_searchQuery.toLowerCase());
+          entry.content.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
   }
 
@@ -93,7 +104,8 @@ class _JournalPageState extends State<JournalPage> {
     } catch (e) {
       // Fallback: try case-insensitive match
       try {
-        final mood = _moods.firstWhere((m) => m.name.toLowerCase() == moodName.toLowerCase());
+        final mood = _moods
+            .firstWhere((m) => m.name.toLowerCase() == moodName.toLowerCase());
         return mood.color;
       } catch (e2) {
         // Last resort: return grey
@@ -130,7 +142,8 @@ class _JournalPageState extends State<JournalPage> {
                         Row(
                           children: [
                             IconButton(
-                              icon: Icon(_isSearching ? Icons.close : Icons.search),
+                              icon: Icon(
+                                  _isSearching ? Icons.close : Icons.search),
                               color: const Color(0xFF1E1E1E),
                               onPressed: () {
                                 setState(() {
@@ -149,7 +162,8 @@ class _JournalPageState extends State<JournalPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const AddJournalScreen(),
+                                    builder: (context) =>
+                                        const AddJournalScreen(),
                                   ),
                                 );
                               },
@@ -161,10 +175,11 @@ class _JournalPageState extends State<JournalPage> {
                     if (!_isSearching) ...[
                       Text(
                         'My Journal',
-                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF1E1E1E),
-                        ),
+                        style:
+                            Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF1E1E1E),
+                                ),
                       ),
                       const SizedBox(height: 4),
                       Row(
@@ -172,13 +187,18 @@ class _JournalPageState extends State<JournalPage> {
                           Expanded(
                             child: Text(
                               'Your private thoughts',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: const Color(0xFF1E1E1E).withOpacity(0.7),
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: const Color(0xFF1E1E1E)
+                                        .withOpacity(0.7),
+                                  ),
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: const Color(0xFF1E1E1E),
                               borderRadius: BorderRadius.circular(20),
@@ -240,23 +260,33 @@ class _JournalPageState extends State<JournalPage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                _searchQuery.isNotEmpty ? Icons.search_off : Icons.book_outlined,
+                                _searchQuery.isNotEmpty
+                                    ? Icons.search_off
+                                    : Icons.book_outlined,
                                 size: 80,
                                 color: Colors.grey.withOpacity(0.3),
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                _searchQuery.isNotEmpty ? 'No entries found' : 'No entries yet',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                _searchQuery.isNotEmpty
+                                    ? 'No entries found'
+                                    : 'No entries yet',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
                                       color: Colors.grey,
                                     ),
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                _searchQuery.isNotEmpty 
+                                _searchQuery.isNotEmpty
                                     ? 'Try different keywords'
                                     : 'Tap + to write your first entry',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
                                       color: Colors.grey,
                                     ),
                               ),
@@ -264,7 +294,8 @@ class _JournalPageState extends State<JournalPage> {
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                          padding:
+                              const EdgeInsets.all(AppConstants.paddingMedium),
                           itemCount: filteredEntries.length,
                           itemBuilder: (context, index) {
                             return _buildEntryCard(filteredEntries[index]);
@@ -349,7 +380,8 @@ class _JournalPageState extends State<JournalPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => EditJournalScreen(entry: entry),
+                            builder: (context) =>
+                                EditJournalScreen(entry: entry),
                           ),
                         );
                       } else if (value == 'delete') {
@@ -396,7 +428,8 @@ class _JournalPageState extends State<JournalPage> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: moodColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
@@ -452,7 +485,8 @@ class _JournalPageState extends State<JournalPage> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: moodColor.withOpacity(0.2),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
                 children: [
@@ -478,7 +512,8 @@ class _JournalPageState extends State<JournalPage> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: moodColor.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(8),
@@ -493,7 +528,8 @@ class _JournalPageState extends State<JournalPage> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                      Icon(Icons.calendar_today,
+                          size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
                         entry.date,
@@ -503,7 +539,8 @@ class _JournalPageState extends State<JournalPage> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                      Icon(Icons.access_time,
+                          size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
                         entry.time,
@@ -519,7 +556,8 @@ class _JournalPageState extends State<JournalPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: RichTextViewer(content: entry.content),
               ),
             ),
@@ -544,7 +582,8 @@ class _JournalPageState extends State<JournalPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => EditJournalScreen(entry: entry),
+                            builder: (context) =>
+                                EditJournalScreen(entry: entry),
                           ),
                         );
                       },
@@ -581,8 +620,6 @@ class _JournalPageState extends State<JournalPage> {
       ),
     );
   }
-
-
 
   void _confirmDelete(JournalEntry entry) {
     showDialog(
@@ -671,7 +708,8 @@ class _JournalPageState extends State<JournalPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.mood, size: 18, color: Colors.grey.shade600),
+                            Icon(Icons.mood,
+                                size: 18, color: Colors.grey.shade600),
                             const SizedBox(width: 8),
                             Text(
                               'How are you feeling?',
@@ -688,19 +726,23 @@ class _JournalPageState extends State<JournalPage> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _buildMoodChip('happy', 'Happy', selectedMood, (mood) {
+                            _buildMoodChip('happy', 'Happy', selectedMood,
+                                (mood) {
                               setDialogState(() => selectedMood = mood);
                             }),
                             _buildMoodChip('sad', 'Sad', selectedMood, (mood) {
                               setDialogState(() => selectedMood = mood);
                             }),
-                            _buildMoodChip('angry', 'Angry', selectedMood, (mood) {
+                            _buildMoodChip('angry', 'Angry', selectedMood,
+                                (mood) {
                               setDialogState(() => selectedMood = mood);
                             }),
-                            _buildMoodChip('excited', 'Excited', selectedMood, (mood) {
+                            _buildMoodChip('excited', 'Excited', selectedMood,
+                                (mood) {
                               setDialogState(() => selectedMood = mood);
                             }),
-                            _buildMoodChip('calm', 'Calm', selectedMood, (mood) {
+                            _buildMoodChip('calm', 'Calm', selectedMood,
+                                (mood) {
                               setDialogState(() => selectedMood = mood);
                             }),
                           ],
@@ -724,7 +766,8 @@ class _JournalPageState extends State<JournalPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.edit_note, size: 18, color: Colors.grey.shade600),
+                            Icon(Icons.edit_note,
+                                size: 18, color: Colors.grey.shade600),
                             const SizedBox(width: 8),
                             Text(
                               'Entry Details',
@@ -746,21 +789,26 @@ class _JournalPageState extends State<JournalPage> {
                             labelStyle: TextStyle(color: Colors.grey.shade600),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: moodColor, width: 2),
+                              borderSide:
+                                  BorderSide(color: moodColor, width: 2),
                             ),
                             filled: true,
                             fillColor: Colors.white,
                             suffixIcon: titleController.text.isEmpty
-                                ? const Icon(Icons.error_outline, color: Colors.red, size: 20)
-                                : const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                                ? const Icon(Icons.error_outline,
+                                    color: Colors.red, size: 20)
+                                : const Icon(Icons.check_circle,
+                                    color: Colors.green, size: 20),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -773,15 +821,18 @@ class _JournalPageState extends State<JournalPage> {
                             labelStyle: TextStyle(color: Colors.grey.shade600),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: moodColor, width: 2),
+                              borderSide:
+                                  BorderSide(color: moodColor, width: 2),
                             ),
                             filled: true,
                             fillColor: Colors.white,
@@ -798,7 +849,8 @@ class _JournalPageState extends State<JournalPage> {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -811,7 +863,8 @@ class _JournalPageState extends State<JournalPage> {
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () async {
-                  if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
+                  if (titleController.text.isNotEmpty &&
+                      contentController.text.isNotEmpty) {
                     try {
                       final newEntry = JournalEntry(
                         title: titleController.text,
@@ -846,7 +899,8 @@ class _JournalPageState extends State<JournalPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: moodColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -864,10 +918,11 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
-  Widget _buildMoodChip(String mood, String label, String selectedMood, Function(String) onTap) {
+  Widget _buildMoodChip(
+      String mood, String label, String selectedMood, Function(String) onTap) {
     final isSelected = selectedMood == mood;
     final moodColor = _getMoodColor(mood);
-    
+
     return GestureDetector(
       onTap: () => onTap(mood),
       child: Container(
@@ -938,7 +993,8 @@ class _JournalPageState extends State<JournalPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.mood, size: 18, color: Colors.grey.shade600),
+                            Icon(Icons.mood,
+                                size: 18, color: Colors.grey.shade600),
                             const SizedBox(width: 8),
                             Text(
                               'How are you feeling?',
@@ -955,19 +1011,23 @@ class _JournalPageState extends State<JournalPage> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _buildMoodChip('happy', 'Happy', selectedMood, (mood) {
+                            _buildMoodChip('happy', 'Happy', selectedMood,
+                                (mood) {
                               setDialogState(() => selectedMood = mood);
                             }),
                             _buildMoodChip('sad', 'Sad', selectedMood, (mood) {
                               setDialogState(() => selectedMood = mood);
                             }),
-                            _buildMoodChip('angry', 'Angry', selectedMood, (mood) {
+                            _buildMoodChip('angry', 'Angry', selectedMood,
+                                (mood) {
                               setDialogState(() => selectedMood = mood);
                             }),
-                            _buildMoodChip('excited', 'Excited', selectedMood, (mood) {
+                            _buildMoodChip('excited', 'Excited', selectedMood,
+                                (mood) {
                               setDialogState(() => selectedMood = mood);
                             }),
-                            _buildMoodChip('calm', 'Calm', selectedMood, (mood) {
+                            _buildMoodChip('calm', 'Calm', selectedMood,
+                                (mood) {
                               setDialogState(() => selectedMood = mood);
                             }),
                           ],
@@ -991,7 +1051,8 @@ class _JournalPageState extends State<JournalPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.edit_note, size: 18, color: Colors.grey.shade600),
+                            Icon(Icons.edit_note,
+                                size: 18, color: Colors.grey.shade600),
                             const SizedBox(width: 8),
                             Text(
                               'Entry Details',
@@ -1013,20 +1074,24 @@ class _JournalPageState extends State<JournalPage> {
                             labelStyle: TextStyle(color: Colors.grey.shade600),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: moodColor, width: 2),
+                              borderSide:
+                                  BorderSide(color: moodColor, width: 2),
                             ),
                             filled: true,
                             fillColor: Colors.white,
                             suffixIcon: titleController.text.isNotEmpty
-                                ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+                                ? const Icon(Icons.check_circle,
+                                    color: Colors.green, size: 20)
                                 : null,
                           ),
                         ),
@@ -1040,15 +1105,18 @@ class _JournalPageState extends State<JournalPage> {
                             labelStyle: TextStyle(color: Colors.grey.shade600),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: moodColor, width: 2),
+                              borderSide:
+                                  BorderSide(color: moodColor, width: 2),
                             ),
                             filled: true,
                             fillColor: Colors.white,
@@ -1065,7 +1133,8 @@ class _JournalPageState extends State<JournalPage> {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1078,7 +1147,8 @@ class _JournalPageState extends State<JournalPage> {
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () async {
-                  if (titleController.text.isNotEmpty && contentController.text.isNotEmpty) {
+                  if (titleController.text.isNotEmpty &&
+                      contentController.text.isNotEmpty) {
                     try {
                       final updatedEntry = JournalEntry(
                         id: entry.id,
@@ -1088,7 +1158,8 @@ class _JournalPageState extends State<JournalPage> {
                         time: entry.time,
                         mood: selectedMood,
                       );
-                      await _journalService.updateEntry(entry.id!, updatedEntry);
+                      await _journalService.updateEntry(
+                          entry.id!, updatedEntry);
                       Navigator.pop(context);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1114,7 +1185,8 @@ class _JournalPageState extends State<JournalPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: moodColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1155,13 +1227,27 @@ class _JournalPageState extends State<JournalPage> {
 
   String _getCurrentDate() {
     final now = DateTime.now();
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
   }
 
   String _getCurrentTime() {
     final now = DateTime.now();
-    final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
+    final hour =
+        now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
     final minute = now.minute.toString().padLeft(2, '0');
     final period = now.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';

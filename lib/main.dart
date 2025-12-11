@@ -7,25 +7,23 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'core/core.dart';
 import 'firebase_options.dart';
 
-
 void main() async {
-   WidgetsFlutterBinding.ensureInitialized();
-   await Firebase.initializeApp(
-     options: DefaultFirebaseOptions.currentPlatform,
-   );
-   
-   // Initialize Cloudinary service
-   CloudinaryService().initialize();
-   
-   // Initialize admin account on app startup
-   try {
-     final adminService = AdminService();
-     await adminService.initializeAdminAccount();
-   } catch (e) {
-     debugPrint('Error initializing admin account: $e');
-   }
-   
-   runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Initialize Cloudinary service
+  CloudinaryService().initialize();
+
+  // Initialize admin account on app startup
+  // Initialize admin account on app startup (non-blocking)
+  final adminService = AdminService();
+  adminService.initializeAdminAccount().catchError((e) {
+    debugPrint('Error initializing admin account: $e');
+  });
+
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {

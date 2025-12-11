@@ -1137,8 +1137,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     // Do not filter out current user
     final teamAssignees = assignees;
 
-    // Count how many members have marked as done
-    final doneCount = ticket.membersDone.length;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final isAssigned =
+        currentUser != null && ticket.assignedTo.contains(currentUser.email);
+    final isAlreadyDone =
+        currentUser != null && ticket.membersDone.contains(currentUser.email);
 
     showModalBottomSheet(
       context: context,
@@ -1157,23 +1160,70 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'View Assignees',
+                  'Assignees Progress',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  '($doneCount/${teamAssignees.length})',
+                  ticket.progressDisplay,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: Colors.grey.shade600,
+                    color: ticket.allAssigneesDone
+                        ? Colors.green.shade600
+                        : Colors.orange.shade600,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
+
+            // Mark as Done button for assigned users in todo status
+            if (ticket.status == 'todo' && isAssigned && !isAlreadyDone) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    // Add current user to membersDone
+                    List<String> updatedMembersDone =
+                        List.from(ticket.membersDone);
+                    if (currentUser?.email != null &&
+                        !updatedMembersDone.contains(currentUser!.email)) {
+                      updatedMembersDone.add(currentUser.email!);
+                    }
+
+                    final updatedTicket =
+                        ticket.copyWith(membersDone: updatedMembersDone);
+                    await _projectManager.updateTicket(
+                        ticket.projectId, ticket.ticketNumber, updatedTicket);
+
+                    Navigator.pop(context);
+                    _refreshTickets();
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Marked as done'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.check_circle),
+                  label: const Text('Mark as Done'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             ListView.builder(
               shrinkWrap: true,
               itemCount: teamAssignees.length,
@@ -1475,7 +1525,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
     if (isCreator) {
       // Show Edit and Status buttons for project creator
-      // Creator can ALWAYS change status now (as gatekeeper)
       return Row(
         children: [
           Expanded(
@@ -1501,15 +1550,24 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                _showChangeStatusDialog(ticket);
-              },
+              onPressed: ticket.status == 'todo' && !ticket.allAssigneesDone
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      _showChangeStatusDialog(ticket);
+                    },
               icon: const Icon(Icons.change_circle_outlined),
-              label: const Text('Change Status'),
+              label: ticket.status == 'todo'
+                  ? const Text('Move to In Progress')
+                  : const Text('Change Status'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1E1E1E),
+                backgroundColor:
+                    ticket.status == 'todo' && !ticket.allAssigneesDone
+                        ? Colors.grey.shade400
+                        : const Color(0xFF1E1E1E),
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade400,
+                disabledForegroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1522,31 +1580,49 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     } else if (isAssigned) {
       // Show workflow buttons based on status
 
-      // Case 1: To Do -> Start Work
+      // Case 1: To Do -> Mark as Done (stays in todo)
       if (ticket.status == 'todo') {
+        final isAlreadyDone = ticket.membersDone.contains(currentUser.email);
         return SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () {
-              // Move to In Progress
-              final updatedTicket = ticket.copyWith(status: 'in_progress');
-              _projectManager.updateTicket(
-                  ticket.projectId, ticket.ticketNumber, updatedTicket);
+            onPressed: isAlreadyDone
+                ? null
+                : () {
+                    // Add user to membersDone, stay in todo
+                    List<String> updatedMembersDone =
+                        List.from(ticket.membersDone);
+                    if (currentUser.email != null &&
+                        !updatedMembersDone.contains(currentUser.email)) {
+                      updatedMembersDone.add(currentUser.email!);
+                    }
 
-              Navigator.pop(context);
-              _refreshTickets();
+                    final updatedTicket =
+                        ticket.copyWith(membersDone: updatedMembersDone);
+                    _projectManager.updateTicket(
+                        ticket.projectId, ticket.ticketNumber, updatedTicket);
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Started work on ticket'),
-                  backgroundColor: Colors.blue,
-                ),
-              );
-            },
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Start Work'),
+                    Navigator.pop(context);
+                    _refreshTickets();
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Marked as done'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
+            icon: isAlreadyDone
+                ? const Icon(Icons.check_circle)
+                : const Icon(Icons.check_circle_outline),
+            label: isAlreadyDone
+                ? const Text('Already Marked Done')
+                : const Text('Mark as Done'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
+              backgroundColor:
+                  isAlreadyDone ? Colors.green.shade600 : Colors.green.shade600,
+              disabledBackgroundColor: Colors.green.shade600,
+              disabledForegroundColor: Colors.white,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(

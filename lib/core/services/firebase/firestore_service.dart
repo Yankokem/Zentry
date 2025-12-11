@@ -338,11 +338,12 @@ class FirestoreService {
   // ===== PROJECT INVITATION OPERATIONS =====
 
   /// Accept a project invitation
-  Future<void> acceptProjectInvitation(String projectId, String userEmail) async {
+  Future<void> acceptProjectInvitation(
+      String projectId, String userEmail) async {
     try {
       final projectRef = _db.collection(projectsCollection).doc(projectId);
       final projectDoc = await projectRef.get();
-      
+
       if (!projectDoc.exists) {
         throw Exception('Project not found');
       }
@@ -354,10 +355,12 @@ class FirestoreService {
           [];
 
       // Find and update the member's status
-      final memberIndex = teamMemberDetails.indexWhere((m) => m['email'] == userEmail);
+      final memberIndex =
+          teamMemberDetails.indexWhere((m) => m['email'] == userEmail);
       if (memberIndex != -1) {
         teamMemberDetails[memberIndex]['status'] = 'accepted';
-        teamMemberDetails[memberIndex]['respondedAt'] = DateTime.now().toIso8601String();
+        teamMemberDetails[memberIndex]['respondedAt'] =
+            DateTime.now().toIso8601String();
 
         await projectRef.update({
           'teamMemberDetails': teamMemberDetails,
@@ -372,11 +375,12 @@ class FirestoreService {
   }
 
   /// Reject a project invitation
-  Future<void> rejectProjectInvitation(String projectId, String userEmail) async {
+  Future<void> rejectProjectInvitation(
+      String projectId, String userEmail) async {
     try {
       final projectRef = _db.collection(projectsCollection).doc(projectId);
       final projectDoc = await projectRef.get();
-      
+
       if (!projectDoc.exists) {
         throw Exception('Project not found');
       }
@@ -389,17 +393,17 @@ class FirestoreService {
 
       // Remove the member from the list
       teamMemberDetails.removeWhere((m) => m['email'] == userEmail);
-      
+
       // Also remove from legacy teamMembers array
       final teamMembers = List<String>.from(projectData['teamMembers'] ?? []);
       teamMembers.remove(userEmail);
-      
+
       // Remove the member from all roles they are assigned to
       final roles = (projectData['roles'] as List?)
               ?.map((r) => Map<String, dynamic>.from(r as Map))
               .toList() ??
           [];
-      
+
       for (var role in roles) {
         final members = List<String>.from(role['members'] ?? []);
         members.remove(userEmail);
