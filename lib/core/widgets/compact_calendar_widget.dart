@@ -5,6 +5,7 @@ enum TicketStatus {
   pending,
   done,
   late,
+  inReview,
 }
 
 class DateTicket {
@@ -106,6 +107,10 @@ class _CompactCalendarWidgetState extends State<CompactCalendarWidget> {
                 case TicketStatus.late:
                   statusColor = Colors.red;
                   statusText = 'Late';
+                  break;
+                case TicketStatus.inReview:
+                  statusColor = Colors.purple;
+                  statusText = 'In Review';
                   break;
               }
 
@@ -288,6 +293,8 @@ class _CompactCalendarWidgetState extends State<CompactCalendarWidget> {
               const SizedBox(width: 12),
               _buildLegendItem(Colors.green, 'Done'),
               const SizedBox(width: 12),
+              _buildLegendItem(Colors.purple, 'In Review'),
+              const SizedBox(width: 12),
               _buildLegendItem(Colors.red, 'Late'),
             ],
           ),
@@ -418,6 +425,7 @@ class _CompactCalendarWidgetState extends State<CompactCalendarWidget> {
     // Group tickets by status
     final hasPending = tickets.any((t) => t.status == TicketStatus.pending);
     final hasDone = tickets.any((t) => t.status == TicketStatus.done);
+    final hasInReview = tickets.any((t) => t.status == TicketStatus.inReview);
     final hasLate = tickets.any((t) => t.status == TicketStatus.late);
 
     final dots = <Widget>[];
@@ -427,6 +435,9 @@ class _CompactCalendarWidgetState extends State<CompactCalendarWidget> {
     }
     if (hasDone) {
       dots.add(_buildDot(Colors.green, isSelected));
+    }
+    if (hasInReview) {
+      dots.add(_buildDot(Colors.purple, isSelected));
     }
     if (hasLate) {
       dots.add(_buildDot(Colors.red, isSelected));

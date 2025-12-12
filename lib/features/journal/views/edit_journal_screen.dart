@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/features/journal/journal.dart';
@@ -21,10 +23,14 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
   final _contentEditorController = RichTextEditorController();
   final _journalService = JournalService();
   final _moodService = MoodService();
+  final _cloudinaryService = CloudinaryService();
+  final _imagePicker = ImagePicker();
 
   String _selectedMood = 'happy';
   List<Mood> _moods = Mood.defaultMoods;
   bool _isLoading = false;
+  List<String> _existingImageUrls = [];
+  List<File> _newImages = [];
 
   @override
   void initState() {
@@ -32,6 +38,7 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
     _titleController.text = widget.entry.title;
     _contentEditorController.setJsonContent(widget.entry.content);
     _selectedMood = widget.entry.mood;
+    _existingImageUrls = List.from(widget.entry.imageUrls);
     _loadMoods();
   }
 
@@ -54,6 +61,41 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
     _titleController.dispose();
     _contentEditorController.dispose();
     super.dispose();
+  }
+
+  void _removeExistingImage(int index) {
+    setState(() {
+      _existingImageUrls.removeAt(index);
+    });
+  }
+
+  void _removeNewImage(int index) {
+    setState(() {
+      _newImages.removeAt(index);
+    });
+  }
+
+  Future<List<String>> _uploadNewImages() async {
+    if (_newImages.isEmpty) return [];
+
+    try {
+      final List<String> uploadedUrls = [];
+      for (final image in _newImages) {
+        final imageUrl = await _cloudinaryService.uploadImage(
+          image,
+          uploadType: CloudinaryUploadType.journalImage,
+        );
+        uploadedUrls.add(imageUrl);
+      }
+      return uploadedUrls;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading images: $e')),
+        );
+      }
+      return [];
+    }
   }
 
   void _showAddMoodDialog() {
@@ -190,6 +232,27 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
     );
   }
 
+  Future<void> _pickImages() async {
+    try {
+      final images = await _imagePicker.pickMultiImage(
+        maxHeight: 2048,
+        imageQuality: 85,
+      );
+
+      if (images.isNotEmpty) {
+        setState(() {
+          _newImages.addAll(images.map((img) => File(img.path)));
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking images: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _saveJournalEntry() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -198,12 +261,22 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Upload new images if any
+      List<String> newUploadedUrls = [];
+      if (_newImages.isNotEmpty) {
+        newUploadedUrls = await _uploadNewImages();
+      }
+
+      // Combine existing and new images
+      final allImageUrls = [..._existingImageUrls, ...newUploadedUrls];
+
       final entry = JournalEntry(
         title: _titleController.text.trim(),
         content: _contentEditorController.getJsonContent(),
         date: widget.entry.date,
         time: widget.entry.time,
         mood: _selectedMood,
+        imageUrls: allImageUrls,
       );
 
       await _journalService.updateEntry(widget.entry.id!, entry);
@@ -322,6 +395,146 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
               ],
             ),
             const SizedBox(height: 24),
+
+            // Images Section
+            Text(
+              'Images',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppTheme.textDark,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            // Existing images
+            if (_existingImageUrls.isNotEmpty)
+              Column(
+                children: [
+                  SizedBox(
+                    height: 150,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _existingImageUrls.length,
+                      itemBuilder: (context, index) {
+                        return Stack(
+                          children: [
+                            Container(
+                              width: 150,
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                image: DecorationImage(
+                                  image: NetworkImage(_existingImageUrls[index]),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 12,
+                              child: GestureDetector(
+                                onTap: () => _removeExistingImage(index),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            // New images preview
+            if (_newImages.isNotEmpty)
+              Column(
+                children: [
+                  SizedBox(
+                    height: 150,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _newImages.length,
+                      itemBuilder: (context, index) {
+                        return Stack(
+                          children: [
+                            Container(
+                              width: 150,
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                image: DecorationImage(
+                                  image: FileImage(_newImages[index]),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 12,
+                              child: GestureDetector(
+                                onTap: () => _removeNewImage(index),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            // Add images button
+            GestureDetector(
+              onTap: _pickImages,
+              child: Container(
+                height: 80,
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_photo_alternate,
+                        size: 32, color: Colors.grey.shade400),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tap to add more images',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+
 
             // Entry Title
             Text(

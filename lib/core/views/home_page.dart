@@ -236,13 +236,40 @@ class _HomePageState extends State<HomePage> {
           final deadlineDate =
               DateTime(deadline.year, deadline.month, deadline.day);
 
-          // Determine ticket status
+          // Determine ticket status based on USER'S completion status
           TicketStatus ticketStatus;
+          final currentUserEmail = _currentUserEmail?.toLowerCase();
+          final isAssignedToCurrentUser = currentUserEmail != null && 
+              ticket.assignedTo.any((email) => email.toLowerCase() == currentUserEmail);
+          
+          // Check if current user has marked this ticket as done
+          final userHasMarkedDone = currentUserEmail != null && 
+              ticket.membersDone.any((email) => email.toLowerCase() == currentUserEmail);
+
+          // Check if current user is the project owner/creator
+          final isProjectOwner = activeProjects.any((p) => p.id == projectId && p.userId == _currentUserId);
+
+          // Process if: assigned to user OR user is project owner (for in_review/done status visibility)
+          if (!isAssignedToCurrentUser && !isProjectOwner) continue;
+
+          // Status logic for current user:
+          // 1. If ticket is 'done' -> Done (PM moved it to Done)
+          // 2. If ticket is 'in_review' -> In Review (PM moved to In Review, waiting for review)
+          // 3. If deadline passed and status is 'todo' or 'in_progress' -> Late
+          // 4. If status is 'todo' or 'in_progress' -> Pending
+          
           if (ticket.status == 'done') {
+            // Only mark as Done when PM moves ticket to Done status
             ticketStatus = TicketStatus.done;
-          } else if (deadlineDate.isBefore(todayDate)) {
+          } else if (ticket.status == 'in_review') {
+            // In Review means assignee's work is done, waiting for PM review
+            ticketStatus = TicketStatus.inReview;
+          } else if (deadlineDate.isBefore(todayDate) && 
+                     (ticket.status == 'todo' || ticket.status == 'in_progress')) {
+            // Late only if deadline passed and still in todo/in-progress
             ticketStatus = TicketStatus.late;
           } else {
+            // Future deadline or today, not done yet (status is todo or in_progress)
             ticketStatus = TicketStatus.pending;
           }
 
@@ -262,16 +289,13 @@ class _HomePageState extends State<HomePage> {
             ticketsByDate[deadlineDate] = [dateTicket];
           }
 
-          // Count tasks due today
-          if (deadline.year == today.year &&
-              deadline.month == today.month &&
-              deadline.day == today.day &&
-              ticket.status != 'done') {
+          // Count pending tasks - only for assigned tasks, not all project tickets
+          if (isAssignedToCurrentUser && ticketStatus == TicketStatus.pending) {
             tasksDueToday++;
           }
 
-          // Count completed tasks this week
-          if (ticket.status == 'done' && ticket.updatedAt.isAfter(weekStart)) {
+          // Count completed tasks this week - only when ticket status is 'done'
+          if (isAssignedToCurrentUser && ticket.status == 'done' && ticket.updatedAt.isAfter(weekStart)) {
             completedThisWeek++;
           }
         }
@@ -407,6 +431,8 @@ class _HomePageState extends State<HomePage> {
         return Colors.red.shade400;
       case 'excited':
         return Colors.purple.shade400;
+      case 'grateful':
+        return Colors.brown.shade400;
       case 'calm':
       default:
         return Colors.green.shade400;
@@ -428,16 +454,274 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  DateTime _parseDateAdded(String dateAdded) {
+    try {
+      // Parse format: "MMM dd, yyyy" (e.g., "Nov 13, 2025")
+      return DateTime.parse(dateAdded);
+    } catch (e) {
+      // If parsing fails, try more lenient approach
+      try {
+        // Extract year, month, day from string like "Nov 13, 2025"
+        final parts = dateAdded.split(' ');
+        if (parts.length >= 3) {
+          final monthStr = parts[0];
+          final dayStr = parts[1].replaceAll(',', '');
+          final yearStr = parts[2];
+          
+          const months = {
+            'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+            'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+          };
+          
+          final month = months[monthStr] ?? 1;
+          final day = int.tryParse(dayStr) ?? 1;
+          final year = int.tryParse(yearStr) ?? 2000;
+          
+          return DateTime(year, month, day);
+        }
+      } catch (e) {
+        // Silent catch
+      }
+      // If all parsing fails, return a default date (year 2000)
+      return DateTime(2000);
+    }
+  }
+
   String _getPlainTextFromQuill(String content) {
     try {
-      // Simple extraction - remove Quill formatting
-      final regex = RegExp(r'"insert":"([^"]*)"');
-      final matches = regex.allMatches(content);
-      final textParts = matches.map((m) => m.group(1) ?? '').toList();
-      return textParts.join(' ').trim();
+      // Extract plain text from Quill JSON format
+      if (content.isEmpty) return '';
+      
+      // Match both plain and formatted text: {"insert":"text"} or {"insert":"text","attributes":{...}}
+      // This regex extracts text between "insert":" and the closing quote before any comma or }
+      final insertRegex = RegExp(r'"insert":"([^"\\]*(?:\\.[^"\\]*)*)');
+      final matches = insertRegex.allMatches(content);
+      
+      if (matches.isEmpty) {
+        // If no matches, return content with some basic cleanup
+        return content.replaceAll(RegExp(r'[\\n\\t]'), ' ').trim();
+      }
+      
+      final textParts = <String>[];
+      for (final match in matches) {
+        final text = match.group(1) ?? '';
+        // Stop at first newline
+        if (text.contains('\\n') || text == '\n') {
+          break;
+        }
+        if (text.isNotEmpty && text != '\\n') {
+          textParts.add(text);
+        }
+      }
+      
+      // Join all text parts from the first line
+      final firstLine = textParts.join('');
+      
+      // Clean up escaped characters
+      return firstLine
+          .replaceAll('\\n', ' ')
+          .replaceAll('\\t', ' ')
+          .replaceAll('  ', ' ')
+          .trim();
     } catch (e) {
-      return content;
+      return 'Journal entry';
     }
+  }
+
+  void _showJournalDetail(JournalEntry entry) {
+    final moodColor = _getMoodColor(entry.mood);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: moodColor.withOpacity(0.2),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          entry.title,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: moodColor.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          entry.mood.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: moodColor.withOpacity(0.9),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Icon(Icons.calendar_today,
+                          size: 14, color: Colors.grey.shade600),
+                      const SizedBox(width: 4),
+                      Text(
+                        entry.date,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Icon(Icons.access_time,
+                          size: 14, color: Colors.grey.shade600),
+                      const SizedBox(width: 4),
+                      Text(
+                        entry.time,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Images Section
+            if (entry.imageUrls.isNotEmpty)
+              SizedBox(
+                height: 200,
+                child: PageView.builder(
+                  itemCount: entry.imageUrls.length,
+                  itemBuilder: (context, index) {
+                    return GestureDetector(
+                      onTap: () {
+                        // Show full-screen image viewer
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => _FullScreenImageViewer(
+                              imageUrls: entry.imageUrls,
+                              initialIndex: index,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.network(
+                            entry.imageUrls[index],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey.shade300,
+                                child: const Icon(Icons.broken_image),
+                              );
+                            },
+                          ),
+                          Positioned(
+                            bottom: 8,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: Text(
+                                '${index + 1}/${entry.imageUrls.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  backgroundColor: Colors.black54,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: RichTextViewer(content: entry.content),
+              ),
+            ),
+            // Action Buttons
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                EditJournalScreen(entry: entry),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Edit'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF9ED69),
+                        foregroundColor: const Color(0xFF1E1E1E),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildQuickInsightCard(
@@ -790,7 +1074,7 @@ class _HomePageState extends State<HomePage> {
 
               const SizedBox(height: 16),
 
-              // Quick Insights Row (Single Row)
+              // Quick Insights Row (3 Responsive Cards)
               Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.paddingMedium),
@@ -800,35 +1084,48 @@ class _HomePageState extends State<HomePage> {
                           Expanded(child: SkeletonQuickInsights()),
                         ],
                       )
-                    : Row(
-                        children: [
-                          Expanded(
-                            child: _buildQuickInsightCard(
-                              'Tasks Due',
-                              '$_tasksDueToday',
-                              Icons.today_outlined,
-                              Colors.orange.shade400,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildQuickInsightCard(
-                              'Active Projects',
-                              '$_activeProjects',
-                              Icons.folder_outlined,
-                              Colors.blue.shade400,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildQuickInsightCard(
-                              'Done This Week',
-                              '$_completedTasksThisWeek',
-                              Icons.check_circle_outline,
-                              Colors.green.shade400,
-                            ),
-                          ),
-                        ],
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: AspectRatio(
+                                  aspectRatio: 0.95,
+                                  child: _buildQuickInsightCard(
+                                    'Active Projects',
+                                    '$_activeProjects',
+                                    Icons.folder_outlined,
+                                    Colors.blue.shade400,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: AspectRatio(
+                                  aspectRatio: 0.95,
+                                  child: _buildQuickInsightCard(
+                                    'Pending Tasks',
+                                    '$_tasksDueToday',
+                                    Icons.today_outlined,
+                                    Colors.orange.shade400,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: AspectRatio(
+                                  aspectRatio: 0.95,
+                                  child: _buildQuickInsightCard(
+                                    'Completed Tasks',
+                                    '$_completedTasksThisWeek',
+                                    Icons.check_circle_outline,
+                                    Colors.green.shade400,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
               ),
 
@@ -1045,74 +1342,79 @@ class _HomePageState extends State<HomePage> {
                     builder: (context) {
                       final moodColor =
                           _getMoodColor(_recentJournalEntries.first.mood);
-                      return Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: moodColor.withOpacity(0.3), width: 1.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _getMoodEmoji(_recentJournalEntries.first.mood),
-                              style: const TextStyle(fontSize: 32),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(Icons.calendar_today,
-                                          size: 12, color: moodColor),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _recentJournalEntries.first.date,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _recentJournalEntries.first.title,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1E1E1E),
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _getPlainTextFromQuill(
-                                        _recentJournalEntries.first.content),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                      height: 1.4,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                      return GestureDetector(
+                        onTap: () {
+                          _showJournalDetail(_recentJournalEntries.first);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: moodColor.withOpacity(0.3), width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _getMoodEmoji(_recentJournalEntries.first.mood),
+                                style: const TextStyle(fontSize: 32),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.calendar_today,
+                                            size: 12, color: moodColor),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _recentJournalEntries.first.date,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      _recentJournalEntries.first.title,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1E1E1E),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _getPlainTextFromQuill(
+                                          _recentJournalEntries.first.content),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                        height: 1.4,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -1148,7 +1450,7 @@ class _HomePageState extends State<HomePage> {
 
               const SizedBox(height: 20),
 
-              // My Wishlist (Personal)
+              // Recent Wishlist
               Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppConstants.paddingMedium),
@@ -1156,7 +1458,7 @@ class _HomePageState extends State<HomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'My Wishlist',
+                      'Recent Wishlist',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -1182,111 +1484,126 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 10),
 
-              SizedBox(
-                height: 145,
-                child: Consumer<WishlistProvider>(
-                  builder: (context, wishlistProvider, child) {
-                    // Filter out completed wishlist items and take only first 3
-                    final activeWishes = wishlistProvider.isInitialized
-                        ? wishlistProvider.controller.wishes
-                            .where((w) => !w.completed)
-                            .take(3)
-                            .toList()
-                        : <Wish>[];
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: AppConstants.paddingMedium),
+                  child: SizedBox(
+                    height: 145,
+                    child: SkeletonJournalCard(),
+                  ),
+                )
+              else
+                SizedBox(
+                  height: 145,
+                  child: Consumer<WishlistProvider>(
+                    builder: (context, wishlistProvider, child) {
+                      // Get both personal and shared wishlists, sorted by creation date (newest first)
+                      final allWishes = wishlistProvider.isInitialized
+                          ? wishlistProvider.controller.wishes
+                              .where((w) => !w.completed)
+                              .toList()
+                          : <Wish>[];
+                      
+                      // Sort by creation date descending and take first 5
+                      allWishes.sort((a, b) => _parseDateAdded(b.dateAdded)
+                          .compareTo(_parseDateAdded(a.dateAdded)));
+                      final recentWishes = allWishes.take(5).toList();
 
-                    return ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppConstants.paddingMedium),
-                      children: activeWishes.isNotEmpty
-                          ? [
-                              ...activeWishes.map((wish) {
-                                final categoryColor = wishlistProvider
-                                    .controller
-                                    .getCategoryColor(wish.category);
-                                return Container(
-                                  width: 140,
-                                  margin: const EdgeInsets.only(right: 12),
-                                  child: WishCard(
-                                    title: wish.title,
-                                    price: '₱${wish.price}',
-                                    image: _getWishIcon(wish.category),
-                                    backgroundColor: categoryColor,
+                      return ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppConstants.paddingMedium),
+                        children: recentWishes.isNotEmpty
+                            ? [
+                                ...recentWishes.map((wish) {
+                                  final categoryColor = wishlistProvider
+                                      .controller
+                                      .getCategoryColor(wish.category);
+                                  return Container(
+                                    width: 140,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    child: WishCard(
+                                      title: wish.title,
+                                      price: '₱${wish.price}',
+                                      image: _getWishIcon(wish.category),
+                                      backgroundColor: categoryColor,
+                                    ),
+                                  );
+                                }),
+                                // View All card
+                                GestureDetector(
+                                  onTap: () {
+                                    widget.onNavigateToTab
+                                        ?.call(3); // Wishlist is tab index 3
+                                  },
+                                  child: Container(
+                                    width: 140,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: Colors.grey.shade300,
+                                          width: 1.5),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.arrow_forward,
+                                            color: Colors.grey.shade700,
+                                            size: 24),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'View All',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey.shade700,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                );
-                              }),
-                              // View All card
-                              GestureDetector(
-                                onTap: () {
-                                  widget.onNavigateToTab
-                                      ?.call(3); // Wishlist is tab index 3
-                                },
-                                child: Container(
+                                ),
+                              ]
+                            : [
+                                Container(
                                   width: 140,
-                                  margin: const EdgeInsets.only(right: 12),
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
+                                    color: Colors.purple.withOpacity(0.06),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                        color: Colors.grey.shade300,
-                                        width: 1.5),
+                                        color: Colors.purple.withOpacity(0.2),
+                                        width: 1),
                                   ),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.arrow_forward,
-                                          color: Colors.grey.shade700,
-                                          size: 24),
+                                      Icon(Icons.star_border,
+                                          color: Colors.purple.shade400,
+                                          size: 20),
                                       const SizedBox(height: 8),
                                       Text(
-                                        'View All',
+                                        'No wishlist',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey.shade700,
+                                          color: Colors.purple.shade600,
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                            ]
-                          : [
-                              Container(
-                                width: 140,
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.purple.withOpacity(0.06),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color: Colors.purple.withOpacity(0.2),
-                                      width: 1),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.star_border,
-                                        color: Colors.purple.shade400,
-                                        size: 20),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'No wishlist',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.purple.shade600,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                    );
-                  },
+                              ],
+                      );
+                    },
+                  ),
                 ),
-              ),
 
               const SizedBox(height: 100), // Space for floating nav
             ],
@@ -1295,6 +1612,80 @@ class _HomePageState extends State<HomePage> {
       ),
       // Uncomment to enable test notifications (development only)
       floatingActionButton: const TestNotificationButton(),
+    );
+  }
+}
+
+/// Full-screen image viewer with carousel
+class _FullScreenImageViewer extends StatefulWidget {
+  final List<String> imageUrls;
+  final int initialIndex;
+
+  const _FullScreenImageViewer({
+    required this.imageUrls,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          '${_currentIndex + 1}/${widget.imageUrls.length}',
+          style: const TextStyle(color: Colors.white),
+        ),
+      ),
+      body: PageView.builder(
+        controller: _pageController,
+        onPageChanged: (index) {
+          setState(() => _currentIndex = index);
+        },
+        itemCount: widget.imageUrls.length,
+        itemBuilder: (context, index) {
+          return InteractiveViewer(
+            child: Image.network(
+              widget.imageUrls[index],
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: Colors.grey.shade900,
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.white),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 }

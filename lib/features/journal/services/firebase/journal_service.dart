@@ -44,6 +44,7 @@ class JournalService {
         'date': entry.date,
         'time': entry.time,
         'mood': entry.mood,
+        'imageUrls': entry.imageUrls,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -153,6 +154,7 @@ class JournalService {
         'date': entry.date,
         'time': entry.time,
         'mood': entry.mood,
+        'imageUrls': entry.imageUrls,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {

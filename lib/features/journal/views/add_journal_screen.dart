@@ -23,7 +23,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
   String _selectedMood = 'happy';
   List<Mood> _moods = Mood.defaultMoods;
   bool _isLoading = false;
-  File? _selectedImage;
+  List<File> _selectedImages = [];
 
   @override
   void initState() {
@@ -280,43 +280,48 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
   Future<void> _pickImage() async {
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
+      final List<XFile> images = await picker.pickMultiImage(
         maxWidth: 2048,
         maxHeight: 2048,
         imageQuality: 85,
       );
 
-      if (image != null) {
+      if (images.isNotEmpty) {
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImages = images.map((img) => File(img.path)).toList();
         });
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
+          SnackBar(content: Text('Error picking images: $e')),
         );
       }
     }
   }
 
-  Future<String?> _uploadJournalImage() async {
-    if (_selectedImage == null) return null;
+  Future<List<String>> _uploadJournalImages() async {
+    if (_selectedImages.isEmpty) return [];
 
     try {
-      final imageUrl = await _cloudinaryService.uploadImage(
-        _selectedImage!,
-        uploadType: CloudinaryUploadType.journalImage,
-      );
-      return imageUrl;
+      final List<String> uploadedUrls = [];
+      for (final image in _selectedImages) {
+        final imageUrl = await _cloudinaryService.uploadImage(
+          image,
+          uploadType: CloudinaryUploadType.journalImage,
+        );
+        if (imageUrl != null) {
+          uploadedUrls.add(imageUrl);
+        }
+      }
+      return uploadedUrls;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
+          SnackBar(content: Text('Error uploading images: $e')),
         );
       }
-      return null;
+      return [];
     }
   }
 
@@ -328,10 +333,10 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Upload image if selected
-      String? imageUrl;
-      if (_selectedImage != null) {
-        imageUrl = await _uploadJournalImage();
+      // Upload images if selected
+      List<String> imageUrls = [];
+      if (_selectedImages.isNotEmpty) {
+        imageUrls = await _uploadJournalImages();
       }
 
       final entry = JournalEntry(
@@ -340,7 +345,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
         date: _getCurrentDate(),
         time: _getCurrentTime(),
         mood: _selectedMood,
-        imageUrl: imageUrl,
+        imageUrls: imageUrls,
       );
 
       // Create new entry in Firestore
@@ -495,68 +500,103 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
 
             // Image Attachment Section
             Text(
-              'Add Image (Optional)',
+              'Add Images (Optional)',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: AppTheme.textDark,
                     fontWeight: FontWeight.w600,
                   ),
             ),
             const SizedBox(height: 8),
+            if (_selectedImages.isNotEmpty)
+              Column(
+                children: [
+                  SizedBox(
+                    height: 200,
+                    child: PageView.builder(
+                      itemCount: _selectedImages.length,
+                      itemBuilder: (context, index) {
+                        return Stack(
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                image: DecorationImage(
+                                  image: FileImage(_selectedImages[index]),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 8,
+                              right: 16,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedImages.removeAt(index);
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 8,
+                              left: 0,
+                              right: 0,
+                              child: Center(
+                                child: Text(
+                                  '${index + 1}/${_selectedImages.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    backgroundColor: Colors.black54,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
             GestureDetector(
               onTap: _pickImage,
               child: Container(
-                height: _selectedImage != null ? 200 : 120,
+                height: 120,
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                  image: _selectedImage != null
-                      ? DecorationImage(
-                          image: FileImage(_selectedImage!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
                 ),
-                child: _selectedImage == null
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_photo_alternate,
-                              size: 48, color: Colors.grey.shade400),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Tap to add an image',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      )
-                    : Stack(
-                        children: [
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: GestureDetector(
-                              onTap: () =>
-                                  setState(() => _selectedImage = null),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_photo_alternate,
+                        size: 48, color: Colors.grey.shade400),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap to add more images',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
                       ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 24),

@@ -7,7 +7,7 @@ class JournalEntry {
   String date;
   String time;
   String mood;
-  String? imageUrl; // Cloudinary image URL
+  List<String> imageUrls; // Cloudinary image URLs (multiple)
   DateTime? createdAt;
   DateTime? updatedAt;
 
@@ -18,7 +18,7 @@ class JournalEntry {
     required this.date,
     required this.time,
     this.mood = 'calm',
-    this.imageUrl,
+    this.imageUrls = const [],
     this.createdAt,
     this.updatedAt,
   });
@@ -31,7 +31,7 @@ class JournalEntry {
       'date': date,
       'time': time,
       'mood': mood,
-      'imageUrl': imageUrl,
+      'imageUrls': imageUrls,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };
@@ -45,7 +45,7 @@ class JournalEntry {
       'date': date,
       'time': time,
       'mood': mood,
-      'imageUrl': imageUrl,
+      'imageUrls': imageUrls,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };
@@ -53,6 +53,14 @@ class JournalEntry {
 
   // Create from Map
   factory JournalEntry.fromMap(Map<String, dynamic> map) {
+    // Handle backward compatibility: convert single imageUrl to imageUrls
+    List<String> imageUrls = [];
+    if (map['imageUrls'] != null) {
+      imageUrls = List<String>.from(map['imageUrls']);
+    } else if (map['imageUrl'] != null && map['imageUrl'].toString().isNotEmpty) {
+      imageUrls = [map['imageUrl'] as String];
+    }
+    
     return JournalEntry(
       id: map['id'],
       title: map['title'] ?? '',
@@ -60,7 +68,7 @@ class JournalEntry {
       date: map['date'] ?? '',
       time: map['time'] ?? '',
       mood: map['mood'] ?? 'calm',
-      imageUrl: map['imageUrl'],
+      imageUrls: imageUrls,
       createdAt:
           map['createdAt'] is DateTime ? map['createdAt'] as DateTime : null,
       updatedAt:
@@ -70,6 +78,14 @@ class JournalEntry {
 
   // Create from Firestore document
   factory JournalEntry.fromFirestore(String id, Map<String, dynamic> data) {
+    // Handle backward compatibility: convert single imageUrl to imageUrls
+    List<String> imageUrls = [];
+    if (data['imageUrls'] != null) {
+      imageUrls = List<String>.from(data['imageUrls']);
+    } else if (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty) {
+      imageUrls = [data['imageUrl'] as String];
+    }
+    
     return JournalEntry(
       id: id,
       title: data['title'] ?? '',
@@ -77,7 +93,7 @@ class JournalEntry {
       date: data['date'] ?? '',
       time: data['time'] ?? '',
       mood: data['mood'] ?? 'calm',
-      imageUrl: data['imageUrl'],
+      imageUrls: imageUrls,
       createdAt: data['createdAt'] is Timestamp
           ? (data['createdAt'] as Timestamp).toDate()
           : data['createdAt'] is DateTime
@@ -99,7 +115,7 @@ class JournalEntry {
     String? date,
     String? time,
     String? mood,
-    String? imageUrl,
+    List<String>? imageUrls,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -110,7 +126,7 @@ class JournalEntry {
       date: date ?? this.date,
       time: time ?? this.time,
       mood: mood ?? this.mood,
-      imageUrl: imageUrl ?? this.imageUrl,
+      imageUrls: imageUrls ?? this.imageUrls,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
