@@ -27,11 +27,15 @@ class UserService {
 
       if (snapshot.docs.isNotEmpty) {
         final data = snapshot.docs.first.data();
-        var profilePictureUrl = data['profilePictureUrl'] ?? '';
+        var profilePictureUrl = data['profileImageUrl'] ?? '';
+        
+        print('📸 Loading user details for $email');
+        print('   Profile URL from Firebase: $profilePictureUrl');
 
         // If no profile picture, try to get Google profile picture
         if (profilePictureUrl.isEmpty) {
           profilePictureUrl = _getGoogleProfilePictureUrl(email);
+          print('   No profile URL, using fallback: $profilePictureUrl');
         }
 
         return {
@@ -60,7 +64,7 @@ class UserService {
       if (doc.exists) {
         final data = doc.data()!;
         final email = data['email'] ?? '';
-        var profilePictureUrl = data['profilePictureUrl'] ?? '';
+        var profilePictureUrl = data['profileImageUrl'] ?? '';
 
         // If no profile picture, try to get Google profile picture
         if (profilePictureUrl.isEmpty && email.isNotEmpty) {

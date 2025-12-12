@@ -771,37 +771,29 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
         : email[0].toUpperCase();
 
     if (url.isNotEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundImage: NetworkImage(url),
-        backgroundColor: _getColorForEmail(email),
-        onBackgroundImageError: (exception, stackTrace) {
-          // Will show background color if image fails
-        },
-        child: url.isEmpty
-            ? Text(
-                firstLetter,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: radius * 0.6,
-                ),
-              )
-            : null,
-      );
+      print('Loading avatar for $email with URL: $url');
     }
-
+    
     return CircleAvatar(
       radius: radius,
+      backgroundImage: url.isNotEmpty ? NetworkImage(url) : null,
+      onBackgroundImageError: url.isNotEmpty
+          ? (exception, stackTrace) {
+              print('Error loading avatar for $email: $exception');
+              print('URL was: $url');
+            }
+          : null,
       backgroundColor: _getColorForEmail(email),
-      child: Text(
-        firstLetter,
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: radius * 0.6,
-        ),
-      ),
+      child: url.isEmpty
+          ? Text(
+              firstLetter,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: radius * 0.6,
+              ),
+            )
+          : null,
     );
   }
 

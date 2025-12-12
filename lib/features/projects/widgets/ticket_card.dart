@@ -58,8 +58,14 @@ class _TicketCardState extends State<TicketCard> with SingleTickerProviderStateM
 
   Future<void> _loadUserDetails() async {
     try {
+      print('🎫 TicketCard loading user details for ${widget.ticket.assignedTo.length} assignees');
       _userDetails = await _userService.getUsersDetailsByEmails(widget.ticket.assignedTo);
+      print('✅ Loaded ${_userDetails.length} user details for ticket');
+      _userDetails.forEach((email, data) {
+        print('   $email -> profileUrl: ${data['profilePictureUrl']}');
+      });
     } catch (e) {
+      print('❌ Error loading user details: $e');
       _userDetails = {};
     }
     if (mounted) {
@@ -157,6 +163,11 @@ class _TicketCardState extends State<TicketCard> with SingleTickerProviderStateM
                   child: CircleAvatar(
                     radius: 12,
                     backgroundImage: profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                    onBackgroundImageError: profileUrl.isNotEmpty
+                        ? (exception, stackTrace) {
+                            print('Error loading avatar for $email: $exception');
+                          }
+                        : null,
                     backgroundColor: _getColorForEmail(email),
                     child: profileUrl.isEmpty
                         ? Text(

@@ -163,6 +163,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 radius: 13,
                 backgroundImage:
                     profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                onBackgroundImageError: profileUrl.isNotEmpty
+                    ? (exception, stackTrace) {
+                        print('Error loading profile image for $email: $exception');
+                      }
+                    : null,
                 backgroundColor: Colors.grey.shade300,
                 child: profileUrl.isEmpty
                     ? Text(
@@ -311,6 +316,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           radius: 20,
           backgroundImage:
               profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+          onBackgroundImageError: profileUrl.isNotEmpty
+              ? (exception, stackTrace) {
+                  print('Error loading profile image for member: $exception');
+                }
+              : null,
           backgroundColor:
               isPending ? Colors.orange.shade100 : Colors.grey.shade300,
           child: profileUrl.isEmpty
@@ -1062,6 +1072,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         backgroundImage: profileUrl.isNotEmpty
                             ? NetworkImage(profileUrl)
                             : null,
+                        onBackgroundImageError: profileUrl.isNotEmpty
+                            ? (exception, stackTrace) {
+                                print('Error loading avatar for $email: $exception');
+                              }
+                            : null,
                         backgroundColor: _getColorForEmail(email),
                         child: profileUrl.isEmpty
                             ? Text(
@@ -1255,6 +1270,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                           radius: 18,
                           backgroundImage: profileUrl.isNotEmpty
                               ? NetworkImage(profileUrl)
+                              : null,
+                          onBackgroundImageError: profileUrl.isNotEmpty
+                              ? (exception, stackTrace) {
+                                  print('Error loading avatar for $email: $exception');
+                                }
                               : null,
                           backgroundColor: _getColorForEmail(email),
                           child: profileUrl.isEmpty

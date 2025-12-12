@@ -53,8 +53,13 @@ class _ProjectCardState extends State<ProjectCard> {
         ? [...widget.project.teamMembers, widget.project.userId]
         : widget.project.teamMembers;
 
+    print('🔍 ProjectCard loading ${membersToLoad.length} members for project: ${widget.project.title}');
     if (membersToLoad.isNotEmpty) {
       final details = await _userService.getUsersDetailsByEmails(membersToLoad);
+      print('✅ Loaded ${details.length} user details');
+      details.forEach((email, data) {
+        print('   $email -> profileUrl: ${data['profilePictureUrl']}');
+      });
       if (mounted) {
         setState(() {
           _userDetails = details;
@@ -161,6 +166,11 @@ class _ProjectCardState extends State<ProjectCard> {
                 radius: 12,
                 backgroundImage:
                     profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                onBackgroundImageError: profileUrl.isNotEmpty
+                    ? (exception, stackTrace) {
+                        print('Error loading profile image for $email: $exception');
+                      }
+                    : null,
                 backgroundColor: Colors.grey.shade300,
                 child: profileUrl.isEmpty
                     ? Text(
@@ -377,6 +387,11 @@ class _ProjectCardState extends State<ProjectCard> {
           radius: 20,
           backgroundImage:
               profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+          onBackgroundImageError: profileUrl.isNotEmpty
+              ? (exception, stackTrace) {
+                  print('Error loading profile image: $exception');
+                }
+              : null,
           backgroundColor: Colors.grey.shade300,
           child: profileUrl.isEmpty
               ? Text(

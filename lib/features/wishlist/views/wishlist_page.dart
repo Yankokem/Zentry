@@ -119,6 +119,11 @@ class _WishlistPageState extends State<WishlistPage> {
                 radius: 16,
                 backgroundImage:
                     profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+                onBackgroundImageError: profileUrl.isNotEmpty
+                    ? (exception, stackTrace) {
+                        print('Error loading profile image for $email: $exception');
+                      }
+                    : null,
                 backgroundColor: Colors.grey.shade300,
                 child: profileUrl.isEmpty
                     ? Text(
