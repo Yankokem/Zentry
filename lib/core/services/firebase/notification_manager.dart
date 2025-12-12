@@ -595,6 +595,44 @@ class NotificationManager {
       },
     );
   }
+
+  /// Notify when someone marks a shared wish item as acquired
+  Future<void> notifyWishlistAcquired({
+    required String recipientUserId,
+    required String wishTitle,
+    required String wishlistId,
+    required String acquiredByName,
+  }) async {
+    await _createNotification(
+      userId: recipientUserId,
+      title: 'Wish Item Acquired! 🎁',
+      body: '$acquiredByName marked "$wishTitle" as acquired',
+      type: 'wishlist_acquired',
+      data: {
+        'wishlistId': wishlistId,
+        'wishTitle': wishTitle,
+      },
+    );
+  }
+
+  /// Notify when someone marks a shared wish item as not acquired (undo)
+  Future<void> notifyWishlistUndoAcquired({
+    required String recipientUserId,
+    required String wishTitle,
+    required String wishlistId,
+    required String undoneByName,
+  }) async {
+    await _createNotification(
+      userId: recipientUserId,
+      title: 'Wish Item Status Changed',
+      body: '$undoneByName marked "$wishTitle" as not acquired',
+      type: 'wishlist_undo_acquired',
+      data: {
+        'wishlistId': wishlistId,
+        'wishTitle': wishTitle,
+      },
+    );
+  }
 }
 
 /// Notification model for in-app notifications

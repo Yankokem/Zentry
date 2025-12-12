@@ -36,8 +36,10 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
 
   String _selectedCategory = 'tech';
   bool _isLoading = false;
-  File? _selectedImage;
-  String? _uploadedImageUrl;
+  List<File> _selectedImages = [];
+  List<String> _uploadedImageUrls = [];
+  
+  static const int _maxImages = 5;
 
   @override
   void initState() {
@@ -48,7 +50,12 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       _notesController.text = widget.itemToEdit!.notes;
       _selectedCategory = widget.itemToEdit!.category;
       _teamMembers.addAll(widget.itemToEdit!.sharedWith);
-      _uploadedImageUrl = widget.itemToEdit!.imageUrl;
+      _uploadedImageUrls = List.from(widget.itemToEdit!.imageUrls);
+      // Keep backward compatibility with old imageUrl field
+      if (widget.itemToEdit!.imageUrl != null && 
+          !_uploadedImageUrls.contains(widget.itemToEdit!.imageUrl)) {
+        _uploadedImageUrls.add(widget.itemToEdit!.imageUrl!);
+      }
     }
   }
 
@@ -67,6 +74,13 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
 
   Future<void> _pickImage() async {
     try {
+      if (_selectedImages.length >= _maxImages) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Maximum $_maxImages images allowed')),
+        );
+        return;
+      }
+
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: ImageSource.gallery,
@@ -77,7 +91,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
 
       if (image != null) {
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImages.add(File(image.path));
         });
       }
     } catch (e) {
@@ -89,23 +103,38 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     }
   }
 
-  Future<String?> _uploadWishlistImage() async {
-    if (_selectedImage == null) return _uploadedImageUrl;
-
-    try {
-      final imageUrl = await _cloudinaryService.uploadImage(
-        _selectedImage!,
-        uploadType: CloudinaryUploadType.wishlistImage,
-      );
-      return imageUrl;
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
+  void _removeImage(int index) {
+    setState(() {
+      if (index < _selectedImages.length) {
+        _selectedImages.removeAt(index);
+      } else if (index - _selectedImages.length < _uploadedImageUrls.length) {
+        _uploadedImageUrls.removeAt(index - _selectedImages.length);
       }
-      return null;
+    });
+  }
+
+  Future<List<String>> _uploadWishlistImages() async {
+    List<String> uploadedUrls = [];
+    
+    // Keep existing uploaded images
+    uploadedUrls.addAll(_uploadedImageUrls);
+
+    // Upload new selected images
+    for (final imageFile in _selectedImages) {
+      try {
+        final imageUrl = await _cloudinaryService.uploadImage(
+          imageFile,
+          uploadType: CloudinaryUploadType.wishlistImage,
+        );
+        if (imageUrl != null) {
+          uploadedUrls.add(imageUrl);
+        }
+      } catch (e) {
+        print('Error uploading image: $e');
+      }
     }
+    
+    return uploadedUrls;
   }
 
   Future<void> _saveWishlistItem() async {
@@ -118,11 +147,11 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     debugPrint(
         '📝 Saving wishlist with ${_teamMembers.length} shared members: $_teamMembers');
 
-    // Upload image if selected
-    String? imageUrl = _uploadedImageUrl;
-    if (_selectedImage != null) {
-      imageUrl = await _uploadWishlistImage();
-    }
+    // Upload images if selected
+    List<String> imageUrls = await _uploadWishlistImages();
+    
+    debugPrint('📸 Uploaded ${imageUrls.length} images');
+    debugPrint('📸 Image URLs: $imageUrls');
 
     final bool isEditing = widget.itemToEdit != null;
 
@@ -136,17 +165,22 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       removedMembers = oldMembers.difference(newMembers);
     }
 
+    // Get current user info for sharedByUserId
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final currentUserId = currentUser?.uid ?? '';
+
     // Build sharedWithDetails with status information
     final List<SharedWithDetail> sharedWithDetails = _teamMembers.map((email) {
+      final lowerEmail = email.toLowerCase(); // Normalize to lowercase
       // Check if this is an existing share or new invitation
       if (widget.itemToEdit != null) {
         try {
           final existingShare = widget.itemToEdit!.sharedWithDetails
-              .firstWhere((s) => s.email == email);
+              .firstWhere((s) => s.email.toLowerCase() == lowerEmail);
           
           // Keep existing status for old members
           if (existingShare.status == 'accepted' || existingShare.status == 'rejected') {
-            return existingShare;
+            return existingShare.copyWith(email: lowerEmail); // Update to lowercase
           }
         } catch (e) {
           // Member not found in existing shares, create new pending invitation
@@ -155,7 +189,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       
       // Create new pending invitation for new members
       return SharedWithDetail(
-        email: email,
+        email: lowerEmail,
         status: 'pending',
       );
     }).toList();
@@ -169,12 +203,17 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       notes: _notesController.text.trim(),
       dateAdded: widget.itemToEdit?.dateAdded ?? _getCurrentDate(),
       completed: widget.itemToEdit?.completed ?? false,
-      sharedWith: _teamMembers,
+      sharedWith: _teamMembers.map((e) => e.toLowerCase()).toList(), // Store emails in lowercase for consistency
       sharedWithDetails: sharedWithDetails,
-      imageUrl: imageUrl,
+      imageUrls: imageUrls,
+      // Only set sharedByUserId when creating a new wish, preserve it when editing
+      sharedByUserId: widget.itemToEdit?.sharedByUserId ?? currentUserId,
     );
 
     debugPrint('📦 Wish object sharedWith: ${wish.sharedWith}');
+    debugPrint('📦 Wish object imageUrls: ${wish.imageUrls}');
+    debugPrint('📦 Wish object sharedByUserId: ${wish.sharedByUserId}');
+    debugPrint('📦 Wish object userId: ${wish.userId}');
 
     bool success;
     String? createdWishId;
@@ -517,62 +556,6 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     }
   }
 
-  Future<void> _addSharedWith() async {
-    final member = _newMemberController.text.trim();
-    if (member.isEmpty) return;
-
-    if (_teamMembers.contains(member)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This email is already added to the shared list'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      return;
-    }
-
-    try {
-      final exists = await _firestoreService.userExistsByEmail(member);
-      if (mounted) {
-        if (exists) {
-          setState(() {
-            _teamMembers.add(member);
-            _newMemberController.clear();
-            _suggestedEmails.clear();
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Email added successfully'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No account found with this email'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error checking account: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
   void _selectSuggestedEmail(String email) async {
     if (_teamMembers.contains(email)) {
       if (mounted) {
@@ -766,79 +749,155 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
 
             // Image Attachment Section
             Text(
-              'Item Image (Optional)',
+              'Item Images (Optional)',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: AppTheme.textDark,
                     fontWeight: FontWeight.w600,
                   ),
             ),
             const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                height: _selectedImage != null || _uploadedImageUrl != null
-                    ? 200
-                    : 120,
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                  image: _selectedImage != null
-                      ? DecorationImage(
-                          image: FileImage(_selectedImage!),
-                          fit: BoxFit.cover,
-                        )
-                      : _uploadedImageUrl != null
-                          ? DecorationImage(
-                              image: NetworkImage(_uploadedImageUrl!),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
+            if (_selectedImages.isEmpty && _uploadedImageUrls.isEmpty)
+              GestureDetector(
+                onTap: _pickImage,
+                child: Container(
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_photo_alternate,
+                          size: 48, color: Colors.grey.shade400),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap to add images (max $_maxImages)',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: _selectedImage == null && _uploadedImageUrl == null
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_photo_alternate,
-                              size: 48, color: Colors.grey.shade400),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Tap to add an image of the item',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      )
-                    : Stack(
-                        children: [
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: GestureDetector(
-                              onTap: () => setState(() {
-                                _selectedImage = null;
-                                _uploadedImageUrl = null;
-                              }),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 20,
+              )
+            else
+              Column(
+                children: [
+                  // Display existing images
+                  if (_uploadedImageUrls.isNotEmpty)
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                      ),
+                      itemCount: _uploadedImageUrls.length,
+                      itemBuilder: (context, index) {
+                        return Stack(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                image: DecorationImage(
+                                  image: NetworkImage(_uploadedImageUrls[index]),
+                                  fit: BoxFit.cover,
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: () => setState(() {
+                                  _uploadedImageUrls.removeAt(index);
+                                }),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  // Display newly selected images
+                  if (_selectedImages.isNotEmpty)
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
                       ),
+                      itemCount: _selectedImages.length,
+                      itemBuilder: (context, index) {
+                        return Stack(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                image: DecorationImage(
+                                  image: FileImage(_selectedImages[index]),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: () => setState(() {
+                                  _selectedImages.removeAt(index);
+                                }),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  // Add more button
+                  if (_selectedImages.length + _uploadedImageUrls.length < _maxImages)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          onPressed: _pickImage,
+                          icon: const Icon(Icons.add_photo_alternate),
+                          label: Text('Add Image (${_selectedImages.length + _uploadedImageUrls.length}/$_maxImages)'),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
             const SizedBox(height: 24),
 
             // Item Name

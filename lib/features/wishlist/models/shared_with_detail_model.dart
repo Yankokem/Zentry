@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class SharedWithDetail {
   final String email;
   final String status; // 'pending', 'accepted', 'rejected'
@@ -24,9 +26,12 @@ class SharedWithDetail {
   }
 
   factory SharedWithDetail.fromMap(Map<String, dynamic> map) {
+    final email = map['email'] ?? '';
+    final status = map['status'] ?? 'pending';
+    debugPrint('\ud83c\udfaf SharedWithDetail.fromMap: email=$email, status=$status');
     return SharedWithDetail(
-      email: map['email'] ?? '',
-      status: map['status'] ?? 'pending',
+      email: email,
+      status: status,
       invitedAt: map['invitedAt'] != null
           ? DateTime.parse(map['invitedAt'])
           : DateTime.now(),

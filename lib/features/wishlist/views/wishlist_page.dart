@@ -572,12 +572,11 @@ class _WishlistPageState extends State<WishlistPage> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Icon(Icons.attach_money, size: 12, color: Colors.grey.shade600),
-                            const SizedBox(width: 4),
                             Text(
-                              '\$${item.price}',
+                              '₱${item.price}',
                               style: TextStyle(
                                 fontSize: 12,
+                                fontWeight: FontWeight.bold,
                                 color: Colors.grey.shade600,
                               ),
                             ),
@@ -717,6 +716,15 @@ class _WishlistPageState extends State<WishlistPage> {
     final color = _getCategoryColor(item.category);
     final isCompleted = item.completed;
 
+    // Debug logging
+    debugPrint('🔍 Showing wishlist details for: ${item.title}');
+    debugPrint('   imageUrls count: ${item.imageUrls.length}');
+    debugPrint('   imageUrls: ${item.imageUrls}');
+    debugPrint('   userId: ${item.userId}');
+    debugPrint('   sharedByUserId: ${item.sharedByUserId}');
+    debugPrint('   currentUserId: ${FirebaseAuth.instance.currentUser?.uid}');
+    debugPrint('   isOwner: ${item.isOwner(FirebaseAuth.instance.currentUser?.uid ?? '')}');
+
     // Load user details for this specific item
     if (item.sharedWith.isNotEmpty) {
       for (final email in item.sharedWith) {
@@ -808,14 +816,12 @@ class _WishlistPageState extends State<WishlistPage> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Icon(Icons.attach_money,
-                          size: 14, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
                       Text(
                         '₱${item.price}',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade700,
                         ),
                       ),
                     ],
@@ -829,6 +835,50 @@ class _WishlistPageState extends State<WishlistPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Image Carousel (if images exist)
+                    if (item.imageUrls.isNotEmpty) ...[
+                      SizedBox(
+                        height: 200,
+                        child: PageView.builder(
+                          itemCount: item.imageUrls.length,
+                          itemBuilder: (context, index) {
+                            return GestureDetector(
+                              onTap: () {
+                                // Show full-screen image viewer
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => _FullScreenImageViewer(
+                                    imageUrls: item.imageUrls,
+                                    initialIndex: index,
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: Colors.grey.shade200,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    item.imageUrls[index],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey.shade300,
+                                        child: const Icon(Icons.broken_image),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     // Item Acquired Toggle - simplified, checkbox removed
                     Container(
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -882,6 +932,81 @@ class _WishlistPageState extends State<WishlistPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    // Show "Shared By" section if this is a shared wishlist (not owned by current user)
+                    if (!item.isOwner(FirebaseAuth.instance.currentUser?.uid ?? '') && 
+                        item.sharedByUserId != null && 
+                        item.sharedByUserId!.isNotEmpty) ...[
+                      FutureBuilder<Map<String, String>?>(
+                        future: _userService.getUserDetailsByUid(item.sharedByUserId!),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData || snapshot.data == null) {
+                            return const SizedBox();
+                          }
+                          
+                          final ownerDetails = snapshot.data ?? {};
+                          final ownerName = ownerDetails['fullName'] ?? ownerDetails['email'] ?? 'Unknown';
+                          final profileUrl = ownerDetails['profilePictureUrl'] ?? '';
+                          
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Shared By',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundImage: profileUrl.isNotEmpty
+                                        ? NetworkImage(profileUrl)
+                                        : null,
+                                    backgroundColor: Colors.grey.shade300,
+                                    child: profileUrl.isEmpty
+                                        ? Text(
+                                            ownerName.isNotEmpty
+                                                ? ownerName[0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          ownerName,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        Text(
+                                          ownerDetails['email'] ?? '',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
                     // Only show Shared With section to the owner and if there are shares
                     if (item.isOwner(FirebaseAuth.instance.currentUser?.uid ?? '') && 
                         item.sharedWithDetails.isNotEmpty) ...[
@@ -1360,5 +1485,119 @@ class _WishlistPageState extends State<WishlistPage> {
       'Dec'
     ];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
+  }
+}
+
+/// Full-screen image viewer with carousel and swipe support
+class _FullScreenImageViewer extends StatefulWidget {
+  final List<String> imageUrls;
+  final int initialIndex;
+
+  const _FullScreenImageViewer({
+    required this.imageUrls,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.zero,
+      child: Container(
+        color: Colors.black,
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _pageController,
+              onPageChanged: (index) {
+                setState(() => _currentIndex = index);
+              },
+              itemCount: widget.imageUrls.length,
+              itemBuilder: (context, index) {
+                return InteractiveViewer(
+                  child: Image.network(
+                    widget.imageUrls[index],
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.broken_image,
+                              color: Colors.grey[400],
+                              size: 64,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Unable to load image',
+                              style: TextStyle(color: Colors.grey[400]),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            Positioned(
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${_currentIndex + 1}/${widget.imageUrls.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

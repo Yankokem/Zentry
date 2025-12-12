@@ -105,8 +105,12 @@ class AppRoutes {
         );
 
       case wishlist:
+        final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
-          builder: (_) => const WishlistPage(),
+          builder: (_) => WishlistPage(
+            showModalForWishId: args?['showModalForWishId'] as String?,
+            highlightWishId: args?['highlightWishId'] as String?,
+          ),
         );
 
       case adminBugReportDetails:

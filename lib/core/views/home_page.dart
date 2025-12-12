@@ -29,10 +29,12 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<List<Project>>? _projectsSubscription;
   StreamSubscription<void>? _ticketsSubscription;
+  StreamSubscription<List<Wish>>? _wishesSubscription;
 
   String _firstName = '';
   List<Project> _recentProjects = [];
   List<JournalEntry> _recentJournalEntries = [];
+  List<Wish> _recentWishes = [];
   bool _isLoading = true;
   String? _currentUserEmail;
   String? _currentUserId;
@@ -72,6 +74,30 @@ class _HomePageState extends State<HomePage> {
         }, onError: (err) {
           debugPrint('Journal stream error: $err');
         });
+        
+        // Subscribe to wishlist stream for real-time updates
+        _wishesSubscription?.cancel();
+        final wishlistService = WishlistService();
+        _wishesSubscription =
+            wishlistService.getWishesStream().listen((wishes) {
+          if (!mounted) return;
+          debugPrint('\ud83c\udf81 Home page received ${wishes.length} wishes from stream');
+          for (final wish in wishes) {
+            debugPrint('  - ${wish.title} (completed=${wish.completed}, sharedWith=${wish.sharedWith})');
+          }
+          // Sort by creation date descending and take first 5 (uncompleted)
+          final sorted = wishes
+              .where((w) => !w.completed)
+              .toList()
+            ..sort((a, b) => _parseDateAdded(b.dateAdded)
+                .compareTo(_parseDateAdded(a.dateAdded)));
+          debugPrint('\ud83d\udcc4 After filtering uncompleted: ${sorted.length} wishes');
+          setState(() {
+            _recentWishes = sorted.take(5).toList();
+          });
+        }, onError: (err) {
+          debugPrint('Wishlist stream error: $err');
+        });
       } else {
         // user logged out
         _journalSubscription?.cancel();
@@ -80,6 +106,8 @@ class _HomePageState extends State<HomePage> {
         _projectsSubscription = null;
         _ticketsSubscription?.cancel();
         _ticketsSubscription = null;
+        _wishesSubscription?.cancel();
+        _wishesSubscription = null;
         _debounceTimer?.cancel();
         _debounceTimer = null;
 
@@ -88,6 +116,7 @@ class _HomePageState extends State<HomePage> {
             _recentJournalEntries = [];
             _ticketsByDate = {};
             _recentProjects = [];
+            _recentWishes = [];
             _activeProjects = 0;
             _tasksDueToday = 0;
             _completedTasksThisWeek = 0;
@@ -302,14 +331,25 @@ class _HomePageState extends State<HomePage> {
       }
     });
 
-    setState(() {
-      _ticketsByDate = ticketsByDate;
-      _tasksDueToday = tasksDueToday;
-      _completedTasksThisWeek = completedThisWeek;
-      _activeProjects = activeProjects.length;
-      _recentProjects = limitedProjects;
-      _isLoading = false;
-    });
+    // Only call setState if actual data has changed
+    final stateChanged = 
+        _ticketsByDate.length != ticketsByDate.length ||
+        _tasksDueToday != tasksDueToday ||
+        _completedTasksThisWeek != completedThisWeek ||
+        _activeProjects != activeProjects.length ||
+        _recentProjects.length != limitedProjects.length ||
+        _isLoading == true;
+    
+    if (stateChanged && mounted) {
+      setState(() {
+        _ticketsByDate = ticketsByDate;
+        _tasksDueToday = tasksDueToday;
+        _completedTasksThisWeek = completedThisWeek;
+        _activeProjects = activeProjects.length;
+        _recentProjects = limitedProjects;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -451,6 +491,21 @@ class _HomePageState extends State<HomePage> {
         return Icons.home;
       default:
         return Icons.star;
+    }
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'tech':
+        return Color(0xFF42A5F5); // Blue
+      case 'travel':
+        return Color(0xFF66BB6A); // Green
+      case 'fashion':
+        return Color(0xFFAB47BC); // Purple
+      case 'home':
+        return Color(0xFFFFA726); // Orange
+      default:
+        return Color(0xFF78909C); // Gray
     }
   }
 
@@ -1493,115 +1548,87 @@ class _HomePageState extends State<HomePage> {
                     child: SkeletonJournalCard(),
                   ),
                 )
-              else
+              else if (_recentWishes.isNotEmpty)
                 SizedBox(
                   height: 145,
-                  child: Consumer<WishlistProvider>(
-                    builder: (context, wishlistProvider, child) {
-                      // Get both personal and shared wishlists, sorted by creation date (newest first)
-                      final allWishes = wishlistProvider.isInitialized
-                          ? wishlistProvider.controller.wishes
-                              .where((w) => !w.completed)
-                              .toList()
-                          : <Wish>[];
-                      
-                      // Sort by creation date descending and take first 5
-                      allWishes.sort((a, b) => _parseDateAdded(b.dateAdded)
-                          .compareTo(_parseDateAdded(a.dateAdded)));
-                      final recentWishes = allWishes.take(5).toList();
-
-                      return ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppConstants.paddingMedium),
-                        children: recentWishes.isNotEmpty
-                            ? [
-                                ...recentWishes.map((wish) {
-                                  final categoryColor = wishlistProvider
-                                      .controller
-                                      .getCategoryColor(wish.category);
-                                  return Container(
-                                    width: 140,
-                                    margin: const EdgeInsets.only(right: 12),
-                                    child: WishCard(
-                                      title: wish.title,
-                                      price: '₱${wish.price}',
-                                      image: _getWishIcon(wish.category),
-                                      backgroundColor: categoryColor,
-                                    ),
-                                  );
-                                }),
-                                // View All card
-                                GestureDetector(
-                                  onTap: () {
-                                    widget.onNavigateToTab
-                                        ?.call(3); // Wishlist is tab index 3
-                                  },
-                                  child: Container(
-                                    width: 140,
-                                    margin: const EdgeInsets.only(right: 12),
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: Colors.grey.shade300,
-                                          width: 1.5),
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.arrow_forward,
-                                            color: Colors.grey.shade700,
-                                            size: 24),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'View All',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey.shade700,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppConstants.paddingMedium),
+                    children: [
+                      ..._recentWishes.map((wish) {
+                        return Container(
+                          width: 140,
+                          margin: const EdgeInsets.only(right: 12),
+                          child: GestureDetector(
+                            onTap: () {
+                              // Navigate to wishlist page and show modal for this wish
+                              Navigator.pushNamed(
+                                context,
+                                '/wishlist',
+                                arguments: {
+                                  'showModalForWishId': wish.id,
+                                },
+                              );
+                            },
+                            child: WishCard(
+                              title: wish.title,
+                              price: '₱${wish.price}',
+                              image: _getWishIcon(wish.category),
+                              backgroundColor: _getCategoryColor(wish.category),
+                            ),
+                          ),
+                        );
+                      }),
+                      // View All card
+                      GestureDetector(
+                        onTap: () {
+                          widget.onNavigateToTab
+                              ?.call(3); // Wishlist is tab index 3
+                        },
+                        child: Container(
+                          width: 140,
+                          margin: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.grey.shade300,
+                                width: 1.5),
+                          ),
+                          child: Column(
+                            mainAxisAlignment:
+                                MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.arrow_forward,
+                                  color: Colors.grey.shade700,
+                                  size: 24),
+                              const SizedBox(height: 8),
+                              Text(
+                                'View All',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
                                 ),
-                              ]
-                            : [
-                                Container(
-                                  width: 140,
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.purple.withOpacity(0.06),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                        color: Colors.purple.withOpacity(0.2),
-                                        width: 1),
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.star_border,
-                                          color: Colors.purple.shade400,
-                                          size: 20),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'No wishlist',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.purple.shade600,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                      );
-                    },
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (!_isLoading)
+                SizedBox(
+                  height: 145,
+                  child: Center(
+                    child: Text(
+                      'No wishes yet. Create one to get started!',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
                   ),
                 ),
 

@@ -3,7 +3,6 @@
 
 // Views
 export 'views/wishlist_page.dart';
-export 'views/wishlist_screen.dart' hide WishlistPage;
 export 'views/add_wishlist_screen.dart';
 
 // Models

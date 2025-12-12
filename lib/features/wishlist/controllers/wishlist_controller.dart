@@ -132,14 +132,15 @@ class WishlistController extends ChangeNotifier {
       final newCompletedStatus = !wish.completed;
       await _service.toggleCompleted(wish.id!, newCompletedStatus);
       
-      // Notify accepted members if wishlist is marked as acquired
-      if (newCompletedStatus && wish.acceptedShares.isNotEmpty) {
+      // Notify accepted members when wish status changes
+      if (wish.acceptedShares.isNotEmpty) {
         final currentUser = FirebaseAuth.instance.currentUser;
         if (currentUser != null) {
           try {
             final firestoreService = FirestoreService();
             final currentUserData = await firestoreService.getUserData(currentUser.uid);
             final currentUserName = currentUserData?['fullName'] ?? 'Someone';
+            final notificationManager = NotificationManager();
             
             for (final shareDetail in wish.acceptedShares) {
               final memberEmail = shareDetail.email;
@@ -152,13 +153,23 @@ class WishlistController extends ChangeNotifier {
 
                 if (memberUserDoc.docs.isNotEmpty) {
                   final memberUserId = memberUserDoc.docs.first.id;
-                  await NotificationManager().notifyWishlistUpdate(
-                    recipientUserId: memberUserId,
-                    wishlistTitle: wish.title,
-                    wishlistId: wish.id!,
-                    updaterName: currentUserName,
-                    action: 'acquired',
-                  );
+                  
+                  // Use specific notification methods based on the new status
+                  if (newCompletedStatus) {
+                    await notificationManager.notifyWishlistAcquired(
+                      recipientUserId: memberUserId,
+                      wishTitle: wish.title,
+                      wishlistId: wish.id!,
+                      acquiredByName: currentUserName,
+                    );
+                  } else {
+                    await notificationManager.notifyWishlistUndoAcquired(
+                      recipientUserId: memberUserId,
+                      wishTitle: wish.title,
+                      wishlistId: wish.id!,
+                      undoneByName: currentUserName,
+                    );
+                  }
                 }
               }
             }

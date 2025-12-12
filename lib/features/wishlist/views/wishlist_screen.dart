@@ -281,7 +281,7 @@ class _WishlistPageState extends State<WishlistPage> {
                             Icon(Icons.attach_money, size: 12, color: Colors.grey.shade600),
                             const SizedBox(width: 4),
                             Text(
-                              '\$${item.price}',
+                              '₱${item.price}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade600,
@@ -476,7 +476,7 @@ class _WishlistPageState extends State<WishlistPage> {
                       Icon(Icons.attach_money, size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
                       Text(
-                        '\$${item.price}',
+                        '₱${item.price}',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,

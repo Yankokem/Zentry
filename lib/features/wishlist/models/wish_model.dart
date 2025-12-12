@@ -11,7 +11,9 @@ class Wish {
   final bool completed;
   final List<String> sharedWith; // List of user emails (backward compatibility)
   final List<SharedWithDetail> sharedWithDetails; // Detailed sharing info
-  final String? imageUrl; // Cloudinary image URL
+  final String? imageUrl; // Single image URL (backward compatibility)
+  final List<String> imageUrls; // Multiple image URLs from Cloudinary
+  final String? sharedByUserId; // For shared wishlists: the owner's UID
 
   Wish({
     this.id,
@@ -25,6 +27,8 @@ class Wish {
     this.sharedWith = const [],
     this.sharedWithDetails = const [],
     this.imageUrl,
+    this.imageUrls = const [],
+    this.sharedByUserId,
   });
   
   // Helper getters for sharing management
@@ -40,10 +44,10 @@ class Wish {
   bool get hasAcceptedShares => acceptedShares.isNotEmpty;
   
   bool isSharedWithAccepted(String email) =>
-      acceptedShares.any((s) => s.email == email);
+      acceptedShares.any((s) => s.email.toLowerCase() == email.toLowerCase());
   
   bool isSharedWithPending(String email) =>
-      pendingShares.any((s) => s.email == email);
+      pendingShares.any((s) => s.email.toLowerCase() == email.toLowerCase());
   
   bool isOwner(String email) => userId == email;
 
@@ -60,6 +64,8 @@ class Wish {
       'sharedWith': sharedWith,
       'sharedWithDetails': sharedWithDetails.map((s) => s.toMap()).toList(),
       'imageUrl': imageUrl,
+      'imageUrls': imageUrls,
+      'sharedByUserId': sharedByUserId,
     };
   }
 
@@ -76,6 +82,8 @@ class Wish {
       'sharedWith': sharedWith,
       'sharedWithDetails': sharedWithDetails.map((s) => s.toMap()).toList(),
       'imageUrl': imageUrl,
+      'imageUrls': imageUrls,
+      'sharedByUserId': sharedByUserId,
       'createdAt': dateAdded, // Keep original dateAdded for display
     };
   }
@@ -111,6 +119,8 @@ class Wish {
       sharedWith: List<String>.from(map['sharedWith'] ?? []),
       sharedWithDetails: shareDetails,
       imageUrl: map['imageUrl'],
+      imageUrls: List<String>.from(map['imageUrls'] ?? []),
+      sharedByUserId: map['sharedByUserId'],
     );
   }
 
@@ -146,6 +156,8 @@ class Wish {
       sharedWith: List<String>.from(data['sharedWith'] ?? []),
       sharedWithDetails: shareDetails,
       imageUrl: data['imageUrl'],
+      imageUrls: List<String>.from(data['imageUrls'] ?? []),
+      sharedByUserId: data['sharedByUserId'],
     );
   }
 
@@ -162,6 +174,8 @@ class Wish {
     List<String>? sharedWith,
     List<SharedWithDetail>? sharedWithDetails,
     String? imageUrl,
+    List<String>? imageUrls,
+    String? sharedByUserId,
   }) {
     return Wish(
       id: id ?? this.id,
@@ -175,6 +189,8 @@ class Wish {
       sharedWith: sharedWith ?? this.sharedWith,
       sharedWithDetails: sharedWithDetails ?? this.sharedWithDetails,
       imageUrl: imageUrl ?? this.imageUrl,
+      imageUrls: imageUrls ?? this.imageUrls,
+      sharedByUserId: sharedByUserId ?? this.sharedByUserId,
     );
   }
 }

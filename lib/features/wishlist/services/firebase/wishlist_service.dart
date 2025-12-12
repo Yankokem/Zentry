@@ -72,105 +72,98 @@ class WishlistService {
       return Stream.value([]);
     }
 
-    final controller = StreamController<List<Wish>>();
-
-    // Query for wishes owned by the user
+    // Create two separate streams: owned and shared wishes
     final ownedWishesStream = _wishlistRef
         .where('userId', isEqualTo: _userId)
         .orderBy('createdAt', descending: true)
-        .snapshots();
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Wish.fromFirestore(doc.id, doc.data() as Map<String, dynamic>))
+            .toList());
 
-    // Query for wishes shared with the user
     final sharedWishesStream = _wishlistRef
         .where('sharedWith', arrayContains: userEmail)
-        .snapshots();
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Wish.fromFirestore(doc.id, doc.data() as Map<String, dynamic>))
+            .toList());
 
-    List<Wish> currentOwnedWishes = [];
-    List<Wish> currentSharedWishes = [];
+    // Combine both streams using Stream.multi for proper real-time synchronization
+    return Stream.multi((controller) {
+      late StreamSubscription<List<Wish>> ownedSub;
+      late StreamSubscription<List<Wish>> sharedSub;
 
-    StreamSubscription? ownedSubscription;
-    StreamSubscription? sharedSubscription;
+      List<Wish>? lastOwned;
+      List<Wish>? lastShared;
 
-    void emitCombined() {
-      if (!controller.isClosed) {
-        _emitCombinedWishes(controller, currentOwnedWishes, currentSharedWishes);
+      void emitCombined() {
+        final owned = lastOwned ?? [];
+        final shared = lastShared ?? [];
+
+        final allWishes = <String, Wish>{};
+
+        // Add owned wishes
+        for (final wish in owned) {
+          allWishes[wish.id!] = wish;
+        }
+
+        // Add shared wishes (filter by acceptance status)
+        for (final wish in shared) {
+          debugPrint('🔎 Checking shared wish: ${wish.title}');
+          debugPrint('   acceptedShares: ${wish.acceptedShares.map((s) => '${s.email}:${s.status}').toList()}');
+          debugPrint('   isSharedWithAccepted("$userEmail"): ${wish.isSharedWithAccepted(userEmail)}');
+          
+          if (wish.isSharedWithAccepted(userEmail)) {
+            debugPrint('   ✅ Including in results');
+            allWishes[wish.id!] = wish;
+          } else {
+            debugPrint('   ❌ Excluding (not accepted)');
+          }
+        }
+
+        // Sort by createdAt descending
+        final sortedWishes = allWishes.values.toList();
+        sortedWishes.sort((a, b) {
+          return b.dateAdded.compareTo(a.dateAdded);
+        });
+
+        debugPrint('📤 emitCombined emitting ${sortedWishes.length} total wishes');
+        controller.add(sortedWishes);
       }
-    }
 
-    ownedSubscription = ownedWishesStream.listen(
-      (snapshot) {
-        try {
-          currentOwnedWishes = snapshot.docs.map((doc) =>
-            Wish.fromFirestore(doc.id, doc.data() as Map<String, dynamic>)
-          ).toList();
+      ownedSub = ownedWishesStream.listen(
+        (wishes) {
+          lastOwned = wishes;
           emitCombined();
-        } catch (e) {
-          if (!controller.isClosed) {
-            controller.addError(e);
-          }
-        }
-      },
-      onError: (error) {
-        if (!controller.isClosed) {
+        },
+        onError: (error) {
+          debugPrint('❌ Error in owned wishes stream: $error');
           controller.addError(error);
-        }
-      },
-    );
+        },
+      );
 
-    sharedSubscription = sharedWishesStream.listen(
-      (snapshot) {
-        try {
-          // Filter to only include wishes where current user has accepted the invitation
-          currentSharedWishes = snapshot.docs
-              .map((doc) =>
-                  Wish.fromFirestore(doc.id, doc.data() as Map<String, dynamic>))
-              .where((wish) => wish.isSharedWithAccepted(userEmail))
-              .toList();
+      sharedSub = sharedWishesStream.listen(
+        (wishes) {
+          debugPrint('🎁 Shared wishes stream update: ${wishes.length} wishes');
+          for (final wish in wishes) {
+            debugPrint('  - Wish: ${wish.title}, email=$userEmail, isAccepted=${wish.isSharedWithAccepted(userEmail)}');
+            debugPrint('    sharedWithDetails: ${wish.sharedWithDetails.map((s) => '${s.email}:${s.status}').toList()}');
+          }
+          lastShared = wishes;
           emitCombined();
-        } catch (e) {
-          if (!controller.isClosed) {
-            controller.addError(e);
-          }
-        }
-      },
-      onError: (error) {
-        if (!controller.isClosed) {
+        },
+        onError: (error) {
+          debugPrint('❌ Error in shared wishes stream: $error');
           controller.addError(error);
-        }
-      },
-    );
+        },
+      );
 
-    controller.onCancel = () async {
-      await ownedSubscription?.cancel();
-      await sharedSubscription?.cancel();
-      await controller.close();
-    };
-
-    return controller.stream;
-  }
-
-  void _emitCombinedWishes(StreamController<List<Wish>> controller, List<Wish> owned, List<Wish> shared) {
-    final allWishes = <String, Wish>{};
-
-    // Add owned wishes
-    for (final wish in owned) {
-      allWishes[wish.id!] = wish;
-    }
-
-    // Add shared wishes (will overwrite if already present)
-    for (final wish in shared) {
-      allWishes[wish.id!] = wish;
-    }
-
-    final sortedWishes = allWishes.values.toList();
-    // Sort by createdAt descending (assuming createdAt is a string date)
-    sortedWishes.sort((a, b) {
-      final aDate = a.dateAdded;
-      final bDate = b.dateAdded;
-      return bDate.compareTo(aDate);
+      // Cleanup when stream is cancelled
+      controller.onCancel = () {
+        ownedSub.cancel();
+        sharedSub.cancel();
+      };
     });
-
-    controller.add(sortedWishes);
   }
 
   /// Get all wishlist items (one-time fetch)
@@ -352,6 +345,8 @@ class WishlistService {
   /// Accept a wishlist sharing invitation
   Future<void> acceptWishlistInvitation(String wishId, String userEmail) async {
     try {
+      debugPrint('🎯 acceptWishlistInvitation called for wishId=$wishId, email=$userEmail');
+      
       final wishRef = _wishlistRef.doc(wishId);
       final wishDoc = await wishRef.get();
       
@@ -360,25 +355,60 @@ class WishlistService {
       }
 
       final wishData = wishDoc.data() as Map<String, dynamic>;
+      debugPrint('📄 Current Firestore data: $wishData');
+      
       final sharedWithDetails = (wishData['sharedWithDetails'] as List?)
               ?.map((m) => Map<String, dynamic>.from(m as Map))
               .toList() ??
           [];
+      
+      debugPrint('📋 Current sharedWithDetails: $sharedWithDetails');
+      
+      // Also get the current sharedWith array for backward compatibility
+      final List<String> sharedWith = List<String>.from(
+        (wishData['sharedWith'] as List?) ?? []
+      );
+      
+      debugPrint('📧 Current sharedWith: $sharedWith');
 
-      // Find and update the share status
-      final shareIndex = sharedWithDetails.indexWhere((s) => s['email'] == userEmail);
+      // Find and update the share status in sharedWithDetails (case-insensitive)
+      final shareIndex = sharedWithDetails.indexWhere((s) => s['email'].toString().toLowerCase() == userEmail.toLowerCase());
+      debugPrint('🔍 Found share at index: $shareIndex');
+      
       if (shareIndex != -1) {
         sharedWithDetails[shareIndex]['status'] = 'accepted';
         sharedWithDetails[shareIndex]['respondedAt'] = DateTime.now().toIso8601String();
+        
+        debugPrint('✏️ Updated sharedWithDetails["status"] to "accepted"');
+        debugPrint('📋 Updated sharedWithDetails: $sharedWithDetails');
+        
+        // IMPORTANT: Also add the email to sharedWith array if not already there
+        // This is critical for the stream query: where('sharedWith', arrayContains: userEmail)
+        // Use case-insensitive comparison for safety
+        final emailAlreadyExists = sharedWith.any((email) => email.toLowerCase() == userEmail.toLowerCase());
+        if (!emailAlreadyExists) {
+          sharedWith.add(userEmail.toLowerCase()); // Store lowercase for consistency
+          debugPrint('➕ Added email to sharedWith array');
+        } else {
+          debugPrint('✓ Email already in sharedWith array');
+        }
 
+        debugPrint('📤 Updating Firestore with:');
+        debugPrint('   sharedWithDetails: $sharedWithDetails');
+        debugPrint('   sharedWith: $sharedWith');
+        
         await wishRef.update({
           'sharedWithDetails': sharedWithDetails,
+          'sharedWith': sharedWith, // Update both arrays for stream to pick it up
           'updatedAt': FieldValue.serverTimestamp(),
         });
+        
+        debugPrint('✅ Firestore update successful');
       } else {
-        throw Exception('Invitation not found');
+        throw Exception('Invitation not found for email: $userEmail');
       }
     } catch (e) {
+      debugPrint('❌ Error in acceptWishlistInvitation: $e');
       throw Exception('Failed to accept wishlist invitation: $e');
     }
   }
