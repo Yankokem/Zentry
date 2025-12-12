@@ -44,26 +44,25 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Future<void> _loadUserDetails() async {
-    // Load team members
+    final details = <String, Map<String, String>>{};
+    
+    // Load team members by email
     if (widget.project.teamMembers.isNotEmpty) {
-      final details = await _userService
+      final teamDetails = await _userService
           .getUsersDetailsByEmails(widget.project.teamMembers);
-      if (mounted) {
-        setState(() {
-          _userDetails = details;
-        });
-      }
+      details.addAll(teamDetails);
     }
 
-    // For shared projects, also load creator details by UID
-    if (widget.project.category == 'shared') {
+    // Load project creator/manager by UID
+    // project.userId is a UID, we need to fetch and store by email
+    if (widget.project.userId.isNotEmpty) {
       try {
         final creatorDetails =
             await _userService.getUserDetailsByUid(widget.project.userId);
-        if (creatorDetails != null && mounted) {
-          setState(() {
-            _userDetails[creatorDetails['email']!] = creatorDetails;
-          });
+        if (creatorDetails != null && creatorDetails['email'] != null) {
+          // Store creator details keyed by their email
+          details[creatorDetails['email']!] = creatorDetails;
+          print('✅ ProjectDetail loaded creator: ${creatorDetails['email']} (UID: ${widget.project.userId})');
         }
       } catch (e) {
         debugPrint('Error loading creator details: $e');
@@ -72,6 +71,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
     if (mounted) {
       setState(() {
+        _userDetails = details;
         _isLoadingUsers = false;
       });
     }
@@ -117,30 +117,32 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   List<Widget> _buildDetailAvatarStack() {
     final avatarWidgets = <Widget>[];
 
-    // Get list of emails to display
+    // Build list of emails to display (in correct order)
     List<String> displayEmails = [];
-
-    if (widget.project.category == 'shared') {
-      // For shared projects, include all team members
-      displayEmails = [...widget.project.teamMembers];
-
-      // Add creator email if we have it loaded
-      final creatorEmail = _userDetails.entries
-          .firstWhere(
-            (entry) => entry.value['uid'] == widget.project.userId,
-            orElse: () => const MapEntry('', {}),
-          )
-          .key;
-
-      if (creatorEmail.isNotEmpty && !displayEmails.contains(creatorEmail)) {
-        displayEmails.add(creatorEmail);
+    
+    // Find project manager's email by looking through loaded details
+    // project.userId is a UID, we need to find the corresponding email
+    String? managerEmail;
+    for (final entry in _userDetails.entries) {
+      if (entry.value['uid'] == widget.project.userId) {
+        managerEmail = entry.key;
+        break;
       }
+    }
+    
+    // Add manager first if found
+    if (managerEmail != null && managerEmail.isNotEmpty) {
+      displayEmails.add(managerEmail);
+      print('✅ Found manager email: $managerEmail for UID: ${widget.project.userId}');
     } else {
-      // For workspace, exclude creator
-      displayEmails = widget.project.teamMembers
-          .where(
-              (email) => _userDetails[email]?['uid'] != widget.project.userId)
-          .toList();
+      print('⚠️ Could not find manager email for UID: ${widget.project.userId}');
+    }
+    
+    // Then add team members (excluding manager to avoid duplicate)
+    for (final email in widget.project.teamMembers) {
+      if (email != managerEmail) {
+        displayEmails.add(email);
+      }
     }
 
     for (int i = 0; i < displayEmails.length; i++) {

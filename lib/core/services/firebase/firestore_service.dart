@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -205,63 +206,111 @@ class FirestoreService {
   // Get user projects as a stream for real-time updates
   Stream<List<Project>> getUserProjectsStream(String userId, String userEmail) {
     try {
-      // Combine both owned and shared projects streams
-      return _db
+      // Create two real-time streams: one for owned, one for shared projects
+      final ownedStream = _db
           .collection(projectsCollection)
           .where('userId', isEqualTo: userId)
           .snapshots()
-          .asyncMap((ownedSnapshot) async {
-        // Get shared projects
-        final sharedSnapshot = await _db
-            .collection(projectsCollection)
-            .where('teamMembers', arrayContains: userEmail)
-            .get();
+          .map((snapshot) => snapshot.docs.map((doc) => Project.fromMap(doc.data())).toList());
 
-        final allProjects = <Project>[];
+      final sharedStream = _db
+          .collection(projectsCollection)
+          .where('teamMembers', arrayContains: userEmail)
+          .snapshots()
+          .map((snapshot) => snapshot.docs.map((doc) => Project.fromMap(doc.data())).toList());
 
-        // Add owned projects
-        allProjects.addAll(
-            ownedSnapshot.docs.map((doc) => Project.fromMap(doc.data())));
-
-        // Add shared projects (avoid duplicates)
-        for (final doc in sharedSnapshot.docs) {
-          final project = Project.fromMap(doc.data());
-          if (!allProjects.any((p) => p.id == project.id)) {
-            allProjects.add(project);
-          }
-        }
-
-        // Calculate actual ticket counts for each project
-        final projectsWithUpdatedCounts = <Project>[];
-        for (final project in allProjects) {
+      // Merge both streams and calculate ticket counts
+      return Stream.multi((controller) {
+        late StreamSubscription<List<Project>> ownedSub;
+        late StreamSubscription<List<Project>> sharedSub;
+        
+        List<Project>? lastOwned;
+        List<Project>? lastShared;
+        
+        Future<void> emitCombined() async {
           try {
-            final ticketsSnapshot = await _db
-                .collection(projectsCollection)
-                .doc(project.id)
-                .collection(ticketsSubcollection)
-                .get();
+            final owned = lastOwned ?? [];
+            final shared = lastShared ?? [];
+            
+            final allProjects = <Project>[];
+            allProjects.addAll(owned);
+            
+            // Add shared projects (only if user has accepted the invitation)
+            for (final project in shared) {
+              if (!allProjects.any((p) => p.id == project.id)) {
+                // Check if user has accepted this invitation
+                final userTeamMember = project.teamMemberDetails
+                    .firstWhere(
+                      (member) => member.email == userEmail,
+                      orElse: () => TeamMember(
+                        email: userEmail,
+                        status: 'pending',
+                      ),
+                    );
+                
+                // Only include if user has accepted
+                if (userTeamMember.isAccepted) {
+                  allProjects.add(project);
+                }
+              }
+            }
+            
+            // Calculate actual ticket counts for each project
+            final projectsWithUpdatedCounts = <Project>[];
+            for (final project in allProjects) {
+              try {
+                final ticketsSnapshot = await _db
+                    .collection(projectsCollection)
+                    .doc(project.id)
+                    .collection(ticketsSubcollection)
+                    .get();
 
-            final tickets = ticketsSnapshot.docs
-                .map((doc) => Ticket.fromMap(doc.data()))
-                .toList();
+                final tickets = ticketsSnapshot.docs
+                    .map((doc) => Ticket.fromMap(doc.data()))
+                    .toList();
 
-            final totalTickets = tickets.length;
-            final completedTickets =
-                tickets.where((ticket) => ticket.status == 'done').length;
+                final totalTickets = tickets.length;
+                final completedTickets =
+                    tickets.where((ticket) => ticket.status == 'done').length;
 
-            final updatedProject = project.copyWith(
-              totalTickets: totalTickets,
-              completedTickets: completedTickets,
-            );
+                final updatedProject = project.copyWith(
+                  totalTickets: totalTickets,
+                  completedTickets: completedTickets,
+                );
 
-            projectsWithUpdatedCounts.add(updatedProject);
+                projectsWithUpdatedCounts.add(updatedProject);
+              } catch (e) {
+                print('Error fetching tickets for project ${project.id}: $e');
+                projectsWithUpdatedCounts.add(project);
+              }
+            }
+            
+            controller.add(projectsWithUpdatedCounts);
           } catch (e) {
-            print('Error fetching tickets for project ${project.id}: $e');
-            projectsWithUpdatedCounts.add(project);
+            controller.addError(e);
           }
         }
-
-        return projectsWithUpdatedCounts;
+        
+        ownedSub = ownedStream.listen(
+          (projects) {
+            lastOwned = projects;
+            emitCombined();
+          },
+          onError: controller.addError,
+        );
+        
+        sharedSub = sharedStream.listen(
+          (projects) {
+            lastShared = projects;
+            emitCombined();
+          },
+          onError: controller.addError,
+        );
+        
+        controller.onCancel = () {
+          ownedSub.cancel();
+          sharedSub.cancel();
+        };
       });
     } catch (e) {
       throw Exception('Failed to get user projects stream: $e');
@@ -542,14 +591,81 @@ class FirestoreService {
 
   // Listen to projects changes (both owned and shared)
   Stream<List<Project>> listenToUserProjects(String userId, String userEmail) {
-    // For real-time listeners, we need to combine two streams
-    // This is a simplified version - in production, you might want to use a more sophisticated approach
-    return _db
+    // Create two real-time streams: one for owned, one for shared projects
+    // This ensures both are updated immediately when projects are created or shared
+    
+    final ownedStream = _db
         .collection(projectsCollection)
         .where('userId', isEqualTo: userId)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => Project.fromMap(doc.data())).toList());
+        .map((snapshot) => snapshot.docs.map((doc) => Project.fromMap(doc.data())).toList());
+
+    final sharedStream = _db
+        .collection(projectsCollection)
+        .where('teamMembers', arrayContains: userEmail)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => Project.fromMap(doc.data())).toList());
+
+    // Merge both streams using mergeMap-like behavior
+    // Listen to both streams and emit combined results whenever either changes
+    return Stream.multi((controller) {
+      late StreamSubscription<List<Project>> ownedSub;
+      late StreamSubscription<List<Project>> sharedSub;
+      
+      List<Project>? lastOwned;
+      List<Project>? lastShared;
+      
+      void emitCombined() {
+        final owned = lastOwned ?? [];
+        final shared = lastShared ?? [];
+        
+        final allProjects = <Project>[];
+        allProjects.addAll(owned);
+        
+        // Add shared projects (only if user has accepted the invitation)
+        for (final project in shared) {
+          if (!allProjects.any((p) => p.id == project.id)) {
+            // Check if user has accepted this invitation
+            final userTeamMember = project.teamMemberDetails
+                .firstWhere(
+                  (member) => member.email == userEmail,
+                  orElse: () => TeamMember(
+                    email: userEmail,
+                    status: 'pending',
+                  ),
+                );
+            
+            // Only include if user has accepted
+            if (userTeamMember.isAccepted) {
+              allProjects.add(project);
+            }
+          }
+        }
+        
+        controller.add(allProjects);
+      }
+      
+      ownedSub = ownedStream.listen(
+        (projects) {
+          lastOwned = projects;
+          emitCombined();
+        },
+        onError: controller.addError,
+      );
+      
+      sharedSub = sharedStream.listen(
+        (projects) {
+          lastShared = projects;
+          emitCombined();
+        },
+        onError: controller.addError,
+      );
+      
+      controller.onCancel = () {
+        ownedSub.cancel();
+        sharedSub.cancel();
+      };
+    });
   }
 
   // Listen to tickets changes for a project (from subcollection)

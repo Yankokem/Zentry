@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 
 import 'package:zentry/core/core.dart';
 import 'package:flutter/services.dart';
@@ -25,6 +26,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   bool _isLoading = true;
   String? _errorMessage;
   String _selectedCategory = 'all';
+  StreamSubscription<List<Project>>? _projectsStreamSubscription;
 
   @override
   void initState() {
@@ -44,7 +46,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     // Listen to filter changes
     widget.filterNotifier?.addListener(_onFilterChanged);
 
-    _loadProjects();
+    _setupProjectsStream();
   }
 
   void _onFilterChanged() {
@@ -55,37 +57,50 @@ class _ProjectsPageState extends State<ProjectsPage> {
     }
   }
 
-  Future<void> _loadProjects() async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-    }
-
+  void _setupProjectsStream() {
+    _projectsStreamSubscription?.cancel();
+    
     try {
-      final projects = await _projectManager.getProjects();
-      if (mounted) {
-        setState(() {
-          _projects = projects;
-          _isLoading = false;
-        });
-      }
+      _projectsStreamSubscription = _projectManager.listenToProjects().listen(
+        (projects) {
+          if (mounted) {
+            setState(() {
+              _projects = projects;
+              _isLoading = false;
+              _errorMessage = null;
+            });
+          }
+        },
+        onError: (error) {
+          if (mounted) {
+            setState(() {
+              _errorMessage = error.toString();
+              _isLoading = false;
+            });
+          }
+          print('Error in projects stream: $error');
+        },
+      );
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = 'Failed to set up projects stream: $e';
           _isLoading = false;
         });
       }
-      print('Error loading projects: $e');
+      print('Error setting up projects stream: $e');
     }
+  }
+
+  Future<void> _loadProjects() async {
+    _setupProjectsStream();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     widget.filterNotifier?.removeListener(_onFilterChanged);
+    _projectsStreamSubscription?.cancel();
     super.dispose();
   }
 

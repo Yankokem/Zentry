@@ -48,30 +48,36 @@ class _ProjectCardState extends State<ProjectCard> {
   }
 
   Future<void> _loadUserDetails() async {
-    // For shared projects, include creator; for workspace, use only teamMembers
-    final membersToLoad = widget.project.category == 'shared'
-        ? [...widget.project.teamMembers, widget.project.userId]
-        : widget.project.teamMembers;
+    final details = <String, Map<String, String>>{};
+    
+    // Always load team members by email
+    if (widget.project.teamMembers.isNotEmpty) {
+      final teamDetails = await _userService.getUsersDetailsByEmails(widget.project.teamMembers);
+      details.addAll(teamDetails);
+    }
 
-    print('🔍 ProjectCard loading ${membersToLoad.length} members for project: ${widget.project.title}');
-    if (membersToLoad.isNotEmpty) {
-      final details = await _userService.getUsersDetailsByEmails(membersToLoad);
-      print('✅ Loaded ${details.length} user details');
-      details.forEach((email, data) {
-        print('   $email -> profileUrl: ${data['profilePictureUrl']}');
+    // Load project creator/manager by UID
+    // project.userId is a UID, we need to fetch and store by email
+    if (widget.project.userId.isNotEmpty) {
+      try {
+        final creatorDetails = await _userService.getUserDetailsByUid(widget.project.userId);
+        if (creatorDetails != null && creatorDetails['email'] != null) {
+          // Store creator details keyed by their email so avatar lookup works
+          details[creatorDetails['email']!] = creatorDetails;
+          print('✅ Loaded creator details: ${creatorDetails['email']} (UID: ${widget.project.userId})');
+        }
+      } catch (e) {
+        print('⚠️ Error loading creator details by UID: $e');
+      }
+    }
+
+    print('🔍 ProjectCard loaded ${details.length} user details for project: ${widget.project.title}');
+    
+    if (mounted) {
+      setState(() {
+        _userDetails = details;
+        _isLoadingUsers = false;
       });
-      if (mounted) {
-        setState(() {
-          _userDetails = details;
-          _isLoadingUsers = false;
-        });
-      }
-    } else {
-      if (mounted) {
-        setState(() {
-          _isLoadingUsers = false;
-        });
-      }
     }
   }
 
@@ -137,17 +143,38 @@ class _ProjectCardState extends State<ProjectCard> {
   List<Widget> _buildAvatarStack() {
     final avatarWidgets = <Widget>[];
 
-    // For shared projects, include creator; for workspace, exclude it
-    final displayMembers = widget.project.category == 'shared'
-        ? [...widget.project.teamMembers, widget.project.userId]
-        : widget.project.teamMembers
-            .where((email) => email != widget.project.userId)
-            .toList();
+    // Build list of emails to display (in correct order)
+    List<String> displayEmails = [];
+    
+    // Find project manager's email by looking through loaded details
+    // project.userId is a UID, we need to find the corresponding email
+    String? managerEmail;
+    for (final entry in _userDetails.entries) {
+      if (entry.value['uid'] == widget.project.userId) {
+        managerEmail = entry.key;
+        break;
+      }
+    }
+    
+    // Add manager first if found
+    if (managerEmail != null && managerEmail.isNotEmpty) {
+      displayEmails.add(managerEmail);
+      print('✅ Found manager email: $managerEmail for UID: ${widget.project.userId}');
+    } else {
+      print('⚠️ Could not find manager email for UID: ${widget.project.userId}');
+    }
+    
+    // Then add team members (excluding manager to avoid duplicate)
+    for (final email in widget.project.teamMembers) {
+      if (email != managerEmail) {
+        displayEmails.add(email);
+      }
+    }
 
-    final count = displayMembers.length > 10 ? 10 : displayMembers.length;
+    final count = displayEmails.length > 10 ? 10 : displayEmails.length;
 
     for (int i = 0; i < count; i++) {
-      final email = displayMembers[i];
+      final email = displayEmails[i];
       final details = _userDetails[email] ?? {};
       final displayName = _userService.getDisplayName(details, email);
       final profileUrl = details['profilePictureUrl'] ?? '';
