@@ -32,6 +32,7 @@ class _AdminBugReportDetailsScreenState
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM d, yyyy • hh:mm a');
     final statusColor = _getStatusColor(widget.report.status);
+    final isClosed = widget.report.status == 'Closed';
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -229,66 +230,91 @@ class _AdminBugReportDetailsScreenState
                   _buildStatusDropdown(),
                   const SizedBox(height: 20),
 
-                  // Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _isUpdating ? null : _updateReport,
+                  // Action Buttons (disabled if closed)
+                  if (isClosed)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.lock_outlined, color: Colors.grey[600], size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'This report is closed and cannot be modified',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _isUpdating ? null : _updateReport,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF9ED69),
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            icon: _isUpdating
+                                ? SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation(
+                                        Colors.grey[600],
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(Icons.check_circle_rounded),
+                            label: Text(
+                              _isUpdating ? 'Updating...' : 'Save Changes',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: _isUpdating ? null : _deleteReport,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF9ED69),
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            backgroundColor: Colors.red[50],
+                            foregroundColor: Colors.red[600],
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 16,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.red[200]!),
                             ),
                             elevation: 0,
                           ),
-                          icon: _isUpdating
-                              ? SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation(
-                                      Colors.grey[600],
-                                    ),
-                                  ),
-                                )
-                              : const Icon(Icons.check_circle_rounded),
-                          label: Text(
-                            _isUpdating ? 'Updating...' : 'Save Changes',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
+                          icon: const Icon(Icons.delete_rounded, size: 18),
+                          label: const Text(
+                            'Delete',
+                            style: TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      ElevatedButton.icon(
-                        onPressed: _isUpdating ? null : _deleteReport,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red[50],
-                          foregroundColor: Colors.red[600],
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                            horizontal: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.red[200]!),
-                          ),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(Icons.delete_rounded, size: 18),
-                        label: const Text(
-                          'Delete',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -300,6 +326,8 @@ class _AdminBugReportDetailsScreenState
   }
 
   Widget _buildStatusDropdown() {
+    final isClosed = widget.report.status == 'Closed';
+    
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey[300]!),
@@ -314,7 +342,11 @@ class _AdminBugReportDetailsScreenState
         isExpanded: true,
         underline: const SizedBox(),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        items: ['Open', 'In Progress', 'Closed']
+        disabledHint: Text(
+          'This report is closed',
+          style: TextStyle(color: Colors.grey[500]),
+        ),
+        items: isClosed ? null : ['Open', 'In Progress', 'Closed']
             .map((status) => DropdownMenuItem(
                   value: status,
                   child: Row(
@@ -339,7 +371,7 @@ class _AdminBugReportDetailsScreenState
                   ),
                 ))
             .toList(),
-        onChanged: (value) {
+        onChanged: isClosed ? null : (value) {
           setState(() {
             _selectedStatus = value ?? '';
           });

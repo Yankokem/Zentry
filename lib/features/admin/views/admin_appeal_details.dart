@@ -25,17 +25,8 @@ class _AdminAppealDetailsScreenState extends State<AdminAppealDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    // Only set status if it's a valid option for this appeal type
-    final isSuspension = widget.appeal.reason == 'suspension';
-    final validOptions = isSuspension
-        ? ['1 day', '3 days', '7 days', '14 days', '30 days', 'Lift Suspension', 'Rejected']
-        : ['Lift Ban', 'Rejected'];
-    
-    if (validOptions.contains(widget.appeal.status)) {
-      _selectedStatus = widget.appeal.status;
-    } else {
-      _selectedStatus = '';
-    }
+    // Initialize with empty status - user must choose an action
+    _selectedStatus = '';
   }
 
   @override
@@ -521,8 +512,8 @@ class _AdminAppealDetailsScreenState extends State<AdminAppealDetailsScreen> {
     final isSuspension = widget.appeal.reason == 'suspension';
     
     final options = isSuspension
-        ? ['1 day', '3 days', '7 days', '14 days', '30 days', 'Lift Suspension', 'Rejected']
-        : ['Lift Ban', 'Rejected'];
+        ? ['Uphold Decision', '1 day', '3 days', '7 days', '14 days', '30 days', 'Lift Suspension', 'Rejected']
+        : ['Uphold Decision', 'Lift Ban', 'Rejected'];
 
     return Container(
       decoration: BoxDecoration(
@@ -581,7 +572,8 @@ class _AdminAppealDetailsScreenState extends State<AdminAppealDetailsScreen> {
       return;
     }
 
-    if (_reasonController.text.isEmpty) {
+    // Only require reason if not upholding decision
+    if (_selectedStatus != 'Uphold Decision' && _reasonController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please provide a reason for this decision')),
       );
@@ -592,7 +584,7 @@ class _AdminAppealDetailsScreenState extends State<AdminAppealDetailsScreen> {
     try {
       await _service.updateAppealWithResponse(
         widget.appeal.id,
-        'Closed',
+        _selectedStatus,
         _reasonController.text,
       );
       if (!mounted) return;

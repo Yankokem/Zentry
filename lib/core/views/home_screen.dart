@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/features/projects/projects.dart';
@@ -16,6 +17,25 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   final ValueNotifier<String> _projectsFilterNotifier = ValueNotifier<String>('all');
+  final AdminService _adminService = AdminService();
+
+  @override
+  void initState() {
+    super.initState();
+    _updateUserLastActive();
+  }
+
+  /// Update the current user's last active timestamp
+  Future<void> _updateUserLastActive() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await _adminService.updateLastActive(user.uid);
+      }
+    } catch (e) {
+      debugPrint('Error updating last active: $e');
+    }
+  }
 
   void _onNavigateToProjects(String? filter) {
     if (filter != null) {

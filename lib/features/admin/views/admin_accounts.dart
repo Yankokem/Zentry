@@ -250,6 +250,8 @@ class _AdminAccountsPageState extends State<AdminAccountsPage>
                       final initials = name.split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join();
                       final role = (u['role'] ?? '').toString();
                       final status = (u['status'] ?? 'active').toString().toLowerCase();
+                      final lastActiveDateTime = u['lastActiveDateTime'] as DateTime?;
+                      final isOnline = status == 'active' && _adminService.isUserOnline(lastActiveDateTime);
                       final isAdmin = role == 'admin';
                       
                       return GestureDetector(
@@ -312,7 +314,7 @@ class _AdminAccountsPageState extends State<AdminAccountsPage>
                                       width: 14,
                                       height: 14,
                                       decoration: BoxDecoration(
-                                        color: _getStatusColor(status),
+                                        color: isOnline ? Colors.green : Colors.grey[400],
                                         shape: BoxShape.circle,
                                         border: Border.all(
                                           color: Colors.white,
@@ -453,19 +455,6 @@ class _AdminAccountsPageState extends State<AdminAccountsPage>
         ),
       ),
     );
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'active':
-        return Colors.green;
-      case 'suspended':
-        return Colors.orange;
-      case 'banned':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
   }
 
   Widget _buildActionButtons(Map<String, dynamic> user, bool isAdmin, String status) {

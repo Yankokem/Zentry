@@ -62,8 +62,6 @@ class AdminService {
       }
 
       if (userCredential.user != null) {
-        // Store admin metadata in Firestore
-        // This requires Firestore rules to allow admin email access
         await _firestore.collection('admins').doc('system_admin').set({
           'uid': userCredential.user!.uid,
           'email': adminEmail,
@@ -82,7 +80,6 @@ class AdminService {
           ],
         });
 
-        // Also create user document for consistency
         await _firestore.collection('users').doc(userCredential.user!.uid).set({
           'firstName': 'Zentry',
           'lastName': 'Admin',
@@ -103,10 +100,8 @@ class AdminService {
       } else {
         print('Error initializing admin account: ${e.code} - ${e.message}');
       }
-      // Don't rethrow - allow app to continue even if admin init fails
     } catch (e) {
       print('Error initializing admin account: $e');
-      // Don't rethrow - allow app to continue even if admin init fails
     }
   }
 
@@ -188,6 +183,9 @@ class AdminService {
           'lastActive': metadata['lastActive'] != null
               ? _formatLastActive((metadata['lastActive'] as Timestamp).toDate())
               : 'Never',
+          'lastActiveDateTime': metadata['lastActive'] != null
+              ? (metadata['lastActive'] as Timestamp).toDate()
+              : null,
           'suspensionReason': metadata['suspensionReason'],
           'suspensionDuration': metadata['suspensionDuration'],
           'suspensionStartDate': metadata['suspensionStartDate'],
@@ -464,5 +462,16 @@ class AdminService {
       final years = (difference.inDays / 365).floor();
       return '${years}y ago';
     }
+  }
+
+  /// Check if a user is currently online (active within last 5 minutes)
+  bool isUserOnline(DateTime? lastActiveDateTime) {
+    if (lastActiveDateTime == null) return false;
+    
+    final now = DateTime.now();
+    final difference = now.difference(lastActiveDateTime);
+    
+    // User is online if last active within last 5 minutes
+    return difference.inMinutes <= 5;
   }
 }

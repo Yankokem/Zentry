@@ -119,28 +119,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       ],
                     ),
                   ),
-                if (_userData!['role'] == 'member')
-                  const PopupMenuItem(
-                    value: 'promote',
-                    child: Row(
-                      children: [
-                        Icon(Icons.arrow_upward, color: Colors.blue, size: 20),
-                        SizedBox(width: 12),
-                        Text('Promote to Admin'),
-                      ],
-                    ),
-                  )
-                else if (_userData!['role'] == 'admin')
-                  const PopupMenuItem(
-                    value: 'demote',
-                    child: Row(
-                      children: [
-                        Icon(Icons.arrow_downward, color: Colors.grey, size: 20),
-                        SizedBox(width: 12),
-                        Text('Demote to Member'),
-                      ],
-                    ),
-                  ),
+
               ],
             ),
         ],
@@ -235,6 +214,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     final role = _userData!['role'] ?? 'member';
     final status = _userData!['status'] ?? 'active';
     final profileImageUrl = _userData!['profileImageUrl'];
+    final lastActiveDateTime = _userData!['lastActive'] as DateTime?;
+    final isOnline = status == 'active' && _adminService.isUserOnline(lastActiveDateTime);
     final initials = name.split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join();
 
     return Container(
@@ -308,7 +289,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: _getStatusColor(status),
+                    color: isOnline ? Colors.green : Colors.grey[400],
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: Colors.white,
@@ -367,32 +348,65 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: _getStatusColor(status).withOpacity(0.1),
+              color: isOnline ? Colors.green.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: _getStatusColor(status).withOpacity(0.3),
+                color: isOnline ? Colors.green.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
               ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  _getStatusIcon(status),
-                  size: 16,
-                  color: _getStatusColor(status),
+                  isOnline ? Icons.circle : Icons.circle_outlined,
+                  size: 8,
+                  color: isOnline ? Colors.green : Colors.grey[600],
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  status.toUpperCase(),
+                  isOnline ? 'ONLINE' : 'OFFLINE',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: _getStatusColor(status),
+                    color: isOnline ? Colors.green : Colors.grey[600],
                   ),
                 ),
               ],
             ),
           ),
+
+          // Account Status Badge
+          if (status != 'active')
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: _getStatusColor(status).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _getStatusColor(status).withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _getStatusIcon(status),
+                    size: 16,
+                    color: _getStatusColor(status),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    status.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _getStatusColor(status),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // Suspension/Ban Info
           if (status == 'suspended' && _userData!['suspensionReason'] != null) ...[
@@ -470,95 +484,123 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   }
 
   Widget _buildStatisticsGrid() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.5,
-      children: [
-        _buildStatCard(
-          'Journal Entries',
-          _userData!['journalCount'].toString(),
-          Icons.book_outlined,
-          Colors.blue,
-        ),
-        _buildStatCard(
-          'Projects',
-          '${_userData!['projects']}',
-          Icons.folder_outlined,
-          Colors.purple,
-        ),
-        _buildStatCard(
-          'Tickets',
-          _userData!['tickets'].toString(),
-          Icons.assignment_outlined,
-          Colors.orange,
-        ),
-        _buildStatCard(
-          'Wishlists',
-          _userData!['wishlists'].toString(),
-          Icons.star_outline,
-          Colors.amber,
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth > 600 ? 4 : 2;
+        final spacing = constraints.maxWidth > 600 ? 12.0 : 12.0;
+        
+        return GridView.count(
+          crossAxisCount: crossAxisCount,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: spacing,
+          mainAxisSpacing: spacing,
+          childAspectRatio: 1.0,
+          children: [
+            _buildStatCard(
+              'Journal Entries',
+              _userData!['journalCount'].toString(),
+              Icons.book_outlined,
+              Colors.blue,
+            ),
+            _buildStatCard(
+              'Projects',
+              '${_userData!['projects']}',
+              Icons.folder_outlined,
+              Colors.purple,
+            ),
+            _buildStatCard(
+              'Tickets',
+              _userData!['tickets'].toString(),
+              Icons.assignment_outlined,
+              Colors.orange,
+            ),
+            _buildStatCard(
+              'Wishlists',
+              _userData!['wishlists'].toString(),
+              Icons.star_outline,
+              Colors.amber,
+            ),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildStatCard(String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final padding = constraints.maxWidth > 80 ? 12.0 : 8.0;
+        final valueFontSize = constraints.maxWidth > 120 ? 20.0 : 16.0;
+        final labelFontSize = constraints.maxWidth > 120 ? 11.0 : 9.0;
+        final iconSize = constraints.maxWidth > 120 ? 20.0 : 16.0;
+        
+        return Container(
+          padding: EdgeInsets.all(padding),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: EdgeInsets.all(padding * 0.75),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(icon, color: color, size: iconSize),
+              ),
+              SizedBox(height: padding),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: valueFontSize,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1E1E1E),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: padding * 0.5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: labelFontSize,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E1E1E),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildAccountInfoCard() {
     final createdAt = _userData!['createdAt'];
-    final lastActive = _userData!['lastActiveFormatted'] ?? 'Never';
+    final lastActiveDateTime = _userData!['lastActive'] as DateTime?;
+    final lastActiveFormatted = _userData!['lastActiveFormatted'] ?? 'Never';
     final phoneNumber = _userData!['phoneNumber'] ?? 'Not provided';
     final country = _userData!['country'] ?? 'Not provided';
+    
+    // Format last active with both relative and absolute time
+    String lastActiveDisplay = lastActiveFormatted;
+    if (lastActiveDateTime != null) {
+      final absoluteTime = DateFormat('MMM d, yyyy · h:mm a').format(lastActiveDateTime);
+      lastActiveDisplay = '$lastActiveFormatted ($absoluteTime)';
+    }
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -578,7 +620,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           _buildInfoRow(Icons.calendar_today, 'Member Since',
               createdAt != null ? DateFormat('MMM d, yyyy').format(createdAt) : 'Unknown'),
           const Divider(height: 24),
-          _buildInfoRow(Icons.access_time, 'Last Active', lastActive),
+          _buildInfoRow(Icons.access_time, 'Last Active', lastActiveDisplay),
           const Divider(height: 24),
           _buildInfoRow(Icons.phone, 'Phone Number', phoneNumber),
           const Divider(height: 24),
@@ -672,12 +714,6 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       case 'activate':
         _showActivateConfirmation();
         break;
-      case 'promote':
-        _showRoleChangeConfirmation('admin');
-        break;
-      case 'demote':
-        _showRoleChangeConfirmation('member');
-        break;
     }
   }
 
@@ -716,51 +752,6 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               }
             },
             child: const Text('Activate'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showRoleChangeConfirmation(String newRole) {
-    final action = newRole == 'admin' ? 'promote' : 'demote';
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('${action == 'promote' ? 'Promote' : 'Demote'} User'),
-        content: Text(
-            'Are you sure you want to $action ${_userData!['name']} to ${newRole == 'admin' ? 'admin' : 'member'}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                await _adminService.updateUserRole(
-                  userId: widget.userId,
-                  role: newRole,
-                );
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(
-                            'User ${action == 'promote' ? 'promoted' : 'demoted'} successfully')),
-                  );
-                  _loadUserData();
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
-                }
-              }
-            },
-            child: Text(action == 'promote' ? 'Promote' : 'Demote'),
           ),
         ],
       ),

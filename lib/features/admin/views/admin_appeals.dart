@@ -121,7 +121,7 @@ class _AdminAppealsPageState extends State<AdminAppealsPage>
                             },
                             child: _buildStatChip(
                               context,
-                              icon: Icons.done_outline_rounded,
+                              icon: Icons.check_circle_rounded,
                               label: 'Closed',
                               count: closedAppeals.length,
                               color: Colors.green,
@@ -166,49 +166,45 @@ class _AdminAppealsPageState extends State<AdminAppealsPage>
     required String label,
     required int count,
     required Color color,
-    required bool isSelected,
+    bool isSelected = false,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
+        color: isSelected ? color.withOpacity(0.15) : color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 1,
+          color: isSelected ? color.withOpacity(0.6) : color.withOpacity(0.3),
+          width: isSelected ? 2 : 1,
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: color.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                count.toString(),
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            count.toString(),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
