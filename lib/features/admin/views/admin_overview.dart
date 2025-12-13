@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 
 import 'package:zentry/features/admin/admin.dart';
 import 'package:zentry/features/admin/widgets/skeleton_loader.dart';
+import 'package:zentry/features/admin/services/admin_analytics_service.dart';
 
 class AdminOverviewPage extends StatefulWidget {
   const AdminOverviewPage({super.key});
@@ -19,13 +20,64 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
   // Services - initialized once
   late final BugReportService _bugReportService = BugReportService();
   late final AccountAppealService _appealService = AccountAppealService();
+  late final AdminAnalyticsService _analyticsService = AdminAnalyticsService();
   
   // Activity chart filters
-  String _activityInterval = 'Weekly'; // Daily, Weekly, Monthly
+  String _activityInterval = 'Monthly'; // Daily, Weekly, Monthly
   String _activityType = 'All'; // All, Projects, Journal, Wishlist
   
   // User sign-ups filters
   String _signupPeriod = 'Last 7 Days'; // Last 7 Days, Last 30 Days, Last 3 Months, Custom
+  
+  // Real-time data for charts
+  Map<String, List<Map<String, dynamic>>> _activityData = {};
+  List<Map<String, dynamic>> _signupData = [];
+  bool _isLoadingActivity = true;
+  bool _isLoadingSignups = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivityData();
+    _loadSignupData();
+  }
+
+  Future<void> _loadActivityData() async {
+    setState(() => _isLoadingActivity = true);
+    try {
+      final data = await _analyticsService.getActivityData(
+        interval: _activityInterval,
+        activityType: _activityType,
+      );
+      if (mounted) {
+        setState(() {
+          _activityData = data;
+          _isLoadingActivity = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingActivity = false);
+      }
+    }
+  }
+
+  Future<void> _loadSignupData() async {
+    setState(() => _isLoadingSignups = true);
+    try {
+      final data = await _analyticsService.getSignupTrendData(_signupPeriod);
+      if (mounted) {
+        setState(() {
+          _signupData = data;
+          _isLoadingSignups = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingSignups = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,10 +110,6 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
 
             // User Sign-ups Trend
             _buildSignupTrendChart(context),
-            const SizedBox(height: 24),
-
-            // Recent Activity Feed
-            _buildRecentActivity(context),
             const SizedBox(height: 20),
           ],
         ),
@@ -82,8 +130,10 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                 return SkeletonStatCard();
               }
               
-              final count = snapshot.data?.length ?? 0;
-              final pending = snapshot.data?.where((r) => r.status == 'Open').length ?? 0;
+              final allReports = snapshot.data ?? [];
+              final open = allReports.where((r) => r.status == 'Open').length;
+              final inProgress = allReports.where((r) => r.status == 'In Progress').length;
+              final totalActive = open + inProgress;
               
               return Container(
                 padding: const EdgeInsets.all(16),
@@ -118,7 +168,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      '$count',
+                      '$totalActive',
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -126,7 +176,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$pending pending',
+                      '$open open, $inProgress in progress',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -148,8 +198,8 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                 return SkeletonStatCard();
               }
               
-              final count = snapshot.data?.length ?? 0;
-              final pending = snapshot.data?.where((a) => a.status == 'Pending').length ?? 0;
+              final allAppeals = snapshot.data ?? [];
+              final pending = allAppeals.where((a) => a.status == 'Pending').length;
               
               return Container(
                 padding: const EdgeInsets.all(16),
@@ -174,7 +224,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                         ),
                         const SizedBox(width: 8),
                         const Text(
-                          'Appeals',
+                          'Pending Appeals',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -184,7 +234,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      '$count',
+                      '$pending',
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -192,7 +242,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$pending pending',
+                      'Awaiting review',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -277,6 +327,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                     onChanged: (value) {
                       if (value != null) {
                         setState(() => _activityInterval = value);
+                        _loadActivityData();
                       }
                     },
                   ),
@@ -306,6 +357,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                     onChanged: (value) {
                       if (value != null) {
                         setState(() => _activityType = value);
+                        _loadActivityData();
                       }
                     },
                   ),
@@ -315,8 +367,22 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
           ),
           // Chart
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: _buildActivityBarChart(),
+          ),
+          // Chart label
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Center(
+              child: Text(
+                _analyticsService.getActivityChartLabel(_activityInterval),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -324,8 +390,15 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
   }
 
   Widget _buildActivityBarChart() {
-    // Sample data based on filters
-    final data = _getActivityData();
+    if (_isLoadingActivity) {
+      return const SizedBox(
+        height: 250,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Convert real data to chart format
+    final data = _convertActivityDataForChart();
     
     return SizedBox(
       height: 250,
@@ -424,30 +497,24 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
     );
   }
 
-  List<Map<String, dynamic>> _getActivityData() {
-    // Generate sample data based on selected interval
-    if (_activityInterval == 'Daily') {
-      return List.generate(7, (i) => {
-        'label': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
-        'projects': _activityType == 'All' || _activityType == 'Projects' ? [5, 8, 6, 9, 7, 4, 3][i] : 0,
-        'journal': _activityType == 'All' || _activityType == 'Journal' ? [12, 15, 18, 14, 16, 10, 8][i] : 0,
-        'wishlist': _activityType == 'All' || _activityType == 'Wishlist' ? [3, 5, 4, 6, 5, 2, 1][i] : 0,
-      });
-    } else if (_activityInterval == 'Weekly') {
-      return List.generate(6, (i) => {
-        'label': 'W${i + 1}',
-        'projects': _activityType == 'All' || _activityType == 'Projects' ? [28, 32, 30, 35, 29, 31][i] : 0,
-        'journal': _activityType == 'All' || _activityType == 'Journal' ? [68, 72, 70, 75, 69, 71][i] : 0,
-        'wishlist': _activityType == 'All' || _activityType == 'Wishlist' ? [18, 22, 20, 25, 19, 21][i] : 0,
-      });
-    } else {
-      return List.generate(6, (i) => {
-        'label': ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i],
-        'projects': _activityType == 'All' || _activityType == 'Projects' ? [120, 135, 128, 142, 138, 145][i] : 0,
-        'journal': _activityType == 'All' || _activityType == 'Journal' ? [280, 295, 288, 302, 298, 305][i] : 0,
-        'wishlist': _activityType == 'All' || _activityType == 'Wishlist' ? [75, 82, 78, 85, 81, 88][i] : 0,
+  List<Map<String, dynamic>> _convertActivityDataForChart() {
+    final projects = _activityData['projects'] ?? [];
+    final journal = _activityData['journal'] ?? [];
+    final wishlist = _activityData['wishlist'] ?? [];
+
+    final result = <Map<String, dynamic>>[];
+    final maxLength = [projects.length, journal.length, wishlist.length].reduce((a, b) => a > b ? a : b);
+
+    for (int i = 0; i < maxLength; i++) {
+      result.add({
+        'label': i < projects.length ? projects[i]['label'] : '',
+        'projects': i < projects.length ? projects[i]['value'] : 0,
+        'journal': i < journal.length ? journal[i]['value'] : 0,
+        'wishlist': i < wishlist.length ? wishlist[i]['value'] : 0,
       });
     }
+
+    return result;
   }
 
   double _getMaxY(List<Map<String, dynamic>> data) {
@@ -568,28 +635,61 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _buildHealthMetric(
-                  'Total Users',
-                  '124',
-                  '+12 this week',
-                  Icons.people_outline,
-                  Colors.green,
+                StreamBuilder<int>(
+                  stream: _analyticsService.getTotalUsersCountStream(),
+                  builder: (context, totalSnapshot) {
+                    return FutureBuilder<int>(
+                      future: _analyticsService.getNewUsersThisWeek(),
+                      builder: (context, weekSnapshot) {
+                        final total = totalSnapshot.data ?? 0;
+                        final thisWeek = weekSnapshot.data ?? 0;
+                        return _buildHealthMetric(
+                          'Total Users',
+                          '$total',
+                          '+$thisWeek this week',
+                          Icons.people_outline,
+                          Colors.green,
+                        );
+                      },
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
-                _buildHealthMetric(
-                  'Active Sessions',
-                  '87',
-                  '70% online',
-                  Icons.wifi_rounded,
-                  Colors.blue,
+                StreamBuilder<int>(
+                  stream: _analyticsService.getActiveUsersCountStream(),
+                  builder: (context, activeSnapshot) {
+                    return StreamBuilder<int>(
+                      stream: _analyticsService.getTotalUsersCountStream(),
+                      builder: (context, totalSnapshot) {
+                        final active = activeSnapshot.data ?? 0;
+                        final total = totalSnapshot.data ?? 1;
+                        final percentage = total > 0 ? ((active / total) * 100).toInt() : 0;
+                        return _buildHealthMetric(
+                          'Active Users',
+                          '$active',
+                          '$percentage% active (7 days)',
+                          Icons.wifi_rounded,
+                          Colors.blue,
+                        );
+                      },
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
-                _buildHealthMetric(
-                  'Bug Reports',
-                  '3',
-                  '2 resolved today',
-                  Icons.bug_report_outlined,
-                  Colors.orange,
+                StreamBuilder<List<BugReportModel>>(
+                  stream: _bugReportService.getBugReportsStream(),
+                  builder: (context, snapshot) {
+                    final reports = snapshot.data ?? [];
+                    final open = reports.where((r) => r.status == 'Open').length;
+                    final closed = reports.where((r) => r.status == 'Closed').length;
+                    return _buildHealthMetric(
+                      'Bug Reports',
+                      '${reports.length}',
+                      '$open open, $closed closed',
+                      Icons.bug_report_outlined,
+                      Colors.orange,
+                    );
+                  },
                 ),
               ],
             ),
@@ -702,6 +802,8 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                     setState(() => _signupPeriod = value);
                     if (value == 'Custom') {
                       _showDateRangePicker(context);
+                    } else {
+                      _loadSignupData();
                     }
                   }
                 },
@@ -752,7 +854,19 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
   }
 
   Widget _buildSignupLineChart() {
-    final data = _getSignupData();
+    if (_isLoadingSignups) {
+      return const SizedBox(
+        height: 220,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_signupData.isEmpty) {
+      return const SizedBox(
+        height: 220,
+        child: Center(child: Text('No signup data available')),
+      );
+    }
     
     return SizedBox(
       height: 220,
@@ -774,11 +888,11 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
-                  if (value.toInt() >= 0 && value.toInt() < data.length) {
+                  if (value.toInt() >= 0 && value.toInt() < _signupData.length) {
                     return Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        data[value.toInt()]['label'],
+                        _signupData[value.toInt()]['label'],
                         style: TextStyle(
                           fontSize: 10,
                           color: Colors.grey.shade600,
@@ -811,7 +925,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
           borderData: FlBorderData(show: false),
           lineBarsData: [
             LineChartBarData(
-              spots: data.asMap().entries.map((e) {
+              spots: _signupData.asMap().entries.map((e) {
                 return FlSpot(e.key.toDouble(), e.value['value'].toDouble());
               }).toList(),
               isCurved: true,
@@ -857,172 +971,4 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
       ),
     );
   }
-
-  List<Map<String, dynamic>> _getSignupData() {
-    if (_signupPeriod == 'Last 7 Days') {
-      return [
-        {'label': 'Mon', 'value': 8},
-        {'label': 'Tue', 'value': 12},
-        {'label': 'Wed', 'value': 10},
-        {'label': 'Thu', 'value': 15},
-        {'label': 'Fri', 'value': 13},
-        {'label': 'Sat', 'value': 18},
-        {'label': 'Sun', 'value': 20},
-      ];
-    } else if (_signupPeriod == 'Last 30 Days') {
-      return List.generate(30, (i) => {
-        'label': (i + 1).toString(),
-        'value': 8 + (i % 5) * 2 + (i ~/ 7),
-      });
-    } else {
-      return [
-        {'label': 'Jul', 'value': 45},
-        {'label': 'Aug', 'value': 52},
-        {'label': 'Sep', 'value': 48},
-        {'label': 'Oct', 'value': 58},
-        {'label': 'Nov', 'value': 55},
-        {'label': 'Dec', 'value': 62},
-      ];
-    }
-  }
-
-  // Recent Activity Feed - Admin specific events
-  Widget _buildRecentActivity(BuildContext context) {
-    final activities = [
-      _ActivityItem(
-        icon: Icons.person_add_outlined,
-        title: 'New user signed up',
-        subtitle: 'john.doe@example.com',
-        time: '15 min ago',
-        color: const Color(0xFF43E97B),
-      ),
-      _ActivityItem(
-        icon: Icons.bug_report_outlined,
-        title: 'Bug report status changed',
-        subtitle: 'Issue #127: Login bug marked as resolved',
-        time: '1 hour ago',
-        color: const Color(0xFFFF9A9E),
-      ),
-      _ActivityItem(
-        icon: Icons.person_add_outlined,
-        title: 'New user signed up',
-        subtitle: 'jane.smith@example.com',
-        time: '2 hours ago',
-        color: const Color(0xFF43E97B),
-      ),
-      _ActivityItem(
-        icon: Icons.gavel_outlined,
-        title: 'Account appeal received',
-        subtitle: 'User requested account reactivation',
-        time: '3 hours ago',
-        color: const Color(0xFF667EEA),
-      ),
-      _ActivityItem(
-        icon: Icons.bug_report_outlined,
-        title: 'Bug report status changed',
-        subtitle: 'Issue #125: Dashboard layout fixed',
-        time: '5 hours ago',
-        color: const Color(0xFFFF9A9E),
-      ),
-      _ActivityItem(
-        icon: Icons.check_circle_outline,
-        title: 'Account appeal approved',
-        subtitle: 'User account successfully reactivated',
-        time: '6 hours ago',
-        color: const Color(0xFF667EEA),
-      ),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Recent Activity',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E1E1E),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: ListView.separated(
-            shrinkWrap: true,
-            physics: activities.length > 5 ? const AlwaysScrollableScrollPhysics() : const NeverScrollableScrollPhysics(),
-            itemCount: activities.length > 5 ? 5 : activities.length,
-            separatorBuilder: (context, index) => Divider(
-              height: 1,
-              color: Colors.grey.shade200,
-            ),
-            itemBuilder: (context, index) {
-              final activity = activities[index];
-              return ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: activity.color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(activity.icon, size: 20, color: activity.color),
-                ),
-                title: Text(
-                  activity.title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E1E1E),
-                  ),
-                ),
-                subtitle: Text(
-                  activity.subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                trailing: Text(
-                  activity.time,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-
-}
-
-// Helper class for activity items
-class _ActivityItem {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String time;
-  final Color color;
-
-  _ActivityItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.time,
-    required this.color,
-  });
 }

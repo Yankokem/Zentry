@@ -19,3 +19,4 @@ export 'models/account_appeal_model.dart';
 // Services
 export 'services/firebase/bug_report_service.dart';
 export 'services/firebase/account_appeal_service.dart';
+export 'services/admin_analytics_service.dart';
