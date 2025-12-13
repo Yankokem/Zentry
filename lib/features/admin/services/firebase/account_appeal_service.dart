@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:zentry/features/admin/admin.dart';
+import 'package:zentry/features/admin/services/admin_notification_service.dart';
 
 class AccountAppealService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -50,6 +51,49 @@ class AccountAppealService {
       
       if (kDebugMode) {
         print('✅ Appeal submitted successfully with ID: ${docRef.id}');
+      }
+      
+      // Notify admin of new appeal
+      final adminNotificationService = AdminNotificationService();
+      
+      // Get user information to determine urgency
+      String userName = 'Unknown User';
+      String? accountStatus;
+      
+      try {
+        final userDoc = await _firestore.collection('users').doc(appeal.userId).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          userName = userData?['fullName'] ?? 'Unknown User';
+          accountStatus = userData?['accountStatus'];
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error fetching user data for notification: $e');
+        }
+      }
+      
+      // Determine if this is an urgent appeal (suspended/banned user)
+      final isUrgent = accountStatus != null && 
+                       (accountStatus.toLowerCase().contains('suspend') ||
+                        accountStatus.toLowerCase().contains('ban'));
+      
+      if (isUrgent) {
+        await adminNotificationService.notifyUrgentAppeal(
+          appealId: docRef.id,
+          userId: appeal.userId,
+          userName: userName,
+          accountStatus: accountStatus,
+          appealMessage: appeal.content,
+        );
+      } else {
+        await adminNotificationService.notifyNewAppeal(
+          appealId: docRef.id,
+          userId: appeal.userId,
+          userName: userName,
+          reason: appeal.reason,
+          appealMessage: appeal.content,
+        );
       }
     } catch (e) {
       if (kDebugMode) {
@@ -136,6 +180,23 @@ class AccountAppealService {
           .map((doc) => AccountAppealModel.fromMap(doc.id, doc.data()))
           .toList();
     });
+  }
+
+  /// Get a single appeal by ID
+  Future<AccountAppealModel?> getAppealById(String appealId) async {
+    try {
+      final doc = await _firestore
+          .collection(_collection)
+          .doc(appealId)
+          .get();
+      
+      if (doc.exists) {
+        return AccountAppealModel.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Failed to fetch appeal: $e');
+    }
   }
 
   /// Stream appeals by status

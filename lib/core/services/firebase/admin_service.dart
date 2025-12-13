@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:zentry/features/admin/services/admin_notification_service.dart';
 
 class AdminService {
   static const String adminEmail = 'zentry_admin@zentry.app.com';
@@ -424,10 +425,24 @@ class AdminService {
 
       // If suspension has expired, reactivate user
       if (now.isAfter(expiryDate)) {
+        // Get user info before updating status
+        final userDoc = await _firestore.collection('users').doc(userId).get();
+        final userName = userDoc.data()?['fullName'] ?? 'Unknown User';
+        
         await updateUserStatus(
           userId: userId,
           status: 'active',
         );
+        
+        // Notify admin that suspension has been automatically lifted
+        final adminNotificationService = AdminNotificationService();
+        await adminNotificationService.notifyAccountAction(
+          userId: userId,
+          userName: userName,
+          action: 'Suspension Lifted',
+          reason: 'Suspension period expired automatically',
+        );
+        
         return 'active';
       }
 

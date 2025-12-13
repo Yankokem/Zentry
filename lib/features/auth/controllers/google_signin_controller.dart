@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:zentry/core/core.dart';
+import 'package:zentry/features/admin/services/admin_notification_service.dart';
 
 class GoogleSignInController with ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -69,6 +70,14 @@ class GoogleSignInController with ChangeNotifier {
       // Initialize user metadata for admin tracking
       final adminService = AdminService();
       await adminService.initializeUserMetadata(user.uid);
+
+      // Notify admin of new Google user registration
+      final adminNotificationService = AdminNotificationService();
+      await adminNotificationService.notifyNewUser(
+        userId: user.uid,
+        userName: user.displayName ?? 'Google User',
+        userEmail: user.email ?? 'No Email',
+      );
 
       // User document created in Firestore
 

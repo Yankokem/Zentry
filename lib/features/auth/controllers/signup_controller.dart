@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:zentry/core/core.dart';
+import 'package:zentry/features/admin/services/admin_notification_service.dart';
 
 class SignupController {
   final AuthService _authService = AuthService();
@@ -74,6 +75,14 @@ class SignupController {
       // Initialize user metadata for admin tracking
       final adminService = AdminService();
       await adminService.initializeUserMetadata(userId);
+      
+      // Notify admin of new user registration
+      final adminNotificationService = AdminNotificationService();
+      await adminNotificationService.notifyNewUser(
+        userId: userId,
+        userName: fullName,
+        userEmail: email,
+      );
       
       _isLoading = false;
       return true;

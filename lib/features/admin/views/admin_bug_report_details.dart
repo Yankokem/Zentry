@@ -383,7 +383,12 @@ class _AdminBugReportDetailsScreenState
   Future<void> _updateReport() async {
     setState(() => _isUpdating = true);
     try {
-      await _service.updateBugReportStatus(widget.report.id, _selectedStatus);
+      await _service.updateBugReportStatus(
+        widget.report.id, 
+        _selectedStatus,
+        oldStatus: widget.report.status,
+        title: widget.report.title,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Report updated successfully')),

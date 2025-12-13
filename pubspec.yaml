@@ -29,6 +29,7 @@ dependencies:
   uuid: ^4.2.2
   table_calendar: ^3.0.9
   rxdart: ^0.28.0
+  timeago: ^3.7.0
   
   # Encryption
   encrypt: ^5.0.3

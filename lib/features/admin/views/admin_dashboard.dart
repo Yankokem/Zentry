@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/features/admin/admin.dart';
+import 'package:zentry/features/admin/services/admin_notification_service.dart';
+import 'package:zentry/features/admin/views/admin_notifications_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -12,6 +14,7 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final AuthService _authService = AuthService();
+  final AdminNotificationService _notificationService = AdminNotificationService();
   int _currentIndex = 0;
 
   final List<Widget> _pages = const [
@@ -69,14 +72,54 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.notifications_none_rounded,
-                        color: Color(0xFF1E1E1E),
-                      ),
-                      tooltip: 'Notifications',
-                      onPressed: () {
-                        // TODO: Implement notification center
+                    StreamBuilder<int>(
+                      stream: _notificationService.getUnreadCountStream(),
+                      builder: (context, snapshot) {
+                        final unreadCount = snapshot.data ?? 0;
+                        return Stack(
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.notifications_none_rounded,
+                                color: Color(0xFF1E1E1E),
+                              ),
+                              tooltip: 'Notifications',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AdminNotificationsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            if (unreadCount > 0)
+                              Positioned(
+                                right: 8,
+                                top: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 16,
+                                    minHeight: 16,
+                                  ),
+                                  child: Text(
+                                    unreadCount > 99 ? '99+' : '$unreadCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
                       },
                     ),
                     IconButton(

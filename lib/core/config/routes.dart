@@ -38,6 +38,7 @@ class AppRoutes {
 
   // Admin
   static const String adminBugReportDetails = '/admin/bug-report-details';
+  static const String adminAppealDetails = '/admin/appeal-details';
   static const String adminAccountAction = '/admin/account-action';
   static const String adminUserDetail = '/admin/user-detail';
 
@@ -118,6 +119,15 @@ class AppRoutes {
           builder: (_) => AdminGuard(
             child: AdminBugReportDetailsScreen(
               report: settings.arguments as BugReportModel,
+            ),
+          ),
+        );
+
+      case adminAppealDetails:
+        return MaterialPageRoute(
+          builder: (_) => AdminGuard(
+            child: AdminAppealDetailsScreen(
+              appeal: settings.arguments as AccountAppealModel,
             ),
           ),
         );
