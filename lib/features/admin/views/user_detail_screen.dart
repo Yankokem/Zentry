@@ -146,14 +146,14 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         ],
       ),
       body: _isLoading
-          ? SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+          ? const SingleChildScrollView(
+              padding: EdgeInsets.all(20),
               child: Column(
                 children: [
                   SkeletonProfileCard(),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20),
                   SkeletonStatGrid(itemCount: 4),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20),
                   SkeletonDetailCard(rowCount: 5),
                 ],
               ),

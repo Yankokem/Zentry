@@ -22,7 +22,14 @@ class NotificationService {
   // Initialize notifications
   Future<void> initialize() async {
     // Request permissions
-    await _requestPermissions();
+    final hasPermissions = await _requestPermissions();
+    
+    if (!hasPermissions) {
+      print('Notification permissions not granted. Firebase messaging features will be disabled.');
+      // Still initialize local notifications for in-app notifications
+      await _initializeLocalNotifications();
+      return;
+    }
 
     // Initialize local notifications
     await _initializeLocalNotifications();
@@ -31,26 +38,63 @@ class NotificationService {
     await _configureFirebaseMessaging();
 
     // Get FCM token
-    final token = await _firebaseMessaging.getToken();
-    if (token != null) {
-      await _saveFCMToken(token);
-    }
+    try {
+      final token = await _firebaseMessaging.getToken();
+      if (token != null) {
+        await _saveFCMToken(token);
+      }
 
-    // Listen for token updates
-    _firebaseMessaging.onTokenRefresh.listen(_saveFCMToken);
+      // Listen for token updates
+      _firebaseMessaging.onTokenRefresh.listen(_saveFCMToken);
+    } catch (e) {
+      print('Error setting up Firebase messaging: $e');
+    }
+  }
+
+  // Check current notification permission status
+  Future<AuthorizationStatus> getPermissionStatus() async {
+    try {
+      final settings = await _firebaseMessaging.getNotificationSettings();
+      return settings.authorizationStatus;
+    } catch (e) {
+      print('Error getting permission status: $e');
+      return AuthorizationStatus.notDetermined;
+    }
   }
 
   // Request notification permissions
-  Future<void> _requestPermissions() async {
-    // Firebase messaging permissions
-    final settings = await _firebaseMessaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+  Future<bool> _requestPermissions() async {
+    try {
+      // Firebase messaging permissions
+      final settings = await _firebaseMessaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
 
-    print('Firebase messaging permission status: ${settings.authorizationStatus}');
+      print('Firebase messaging permission status: ${settings.authorizationStatus}');
+      
+      // Check if permissions are granted
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        return true;
+      } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
+        print('Using provisional permissions - some features may be limited');
+        return true;
+      } else if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        print('Notification permissions denied');
+        return false;
+      } else if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        print('Permission status not determined');
+        return false;
+      } else {
+        print('Permission status: ${settings.authorizationStatus}');
+        return false;
+      }
+    } catch (e) {
+      print('Error requesting permissions: $e');
+      return false;
+    }
   }
 
   // Initialize local notifications
@@ -130,14 +174,27 @@ class NotificationService {
 
   // Configure Firebase messaging
   Future<void> _configureFirebaseMessaging() async {
-    // Handle background messages
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    try {
+      // Check current permission status before proceeding
+      final settings = await _firebaseMessaging.getNotificationSettings();
+      
+      if (settings.authorizationStatus != AuthorizationStatus.authorized && 
+          settings.authorizationStatus != AuthorizationStatus.provisional) {
+        print('Cannot configure Firebase messaging: permissions not granted');
+        return;
+      }
 
-    // Handle foreground messages
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      // Handle background messages
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // Handle when app is opened from notification
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+      // Handle foreground messages
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+
+      // Handle when app is opened from notification
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+    } catch (e) {
+      print('Error configuring Firebase messaging: $e');
+    }
   }
 
   // Save FCM token to Firestore
@@ -153,8 +210,17 @@ class NotificationService {
 
   // Handle foreground messages
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    await _showLocalNotification(message);
-    await _saveNotificationToFirestore(message);
+    try {
+      // Check permissions before showing notification
+      final permissionStatus = await getPermissionStatus();
+      if (permissionStatus == AuthorizationStatus.authorized || 
+          permissionStatus == AuthorizationStatus.provisional) {
+        await _showLocalNotification(message);
+      }
+      await _saveNotificationToFirestore(message);
+    } catch (e) {
+      print('Error handling foreground message: $e');
+    }
   }
 
   // Handle when app is opened from notification

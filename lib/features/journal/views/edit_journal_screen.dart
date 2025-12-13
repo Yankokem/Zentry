@@ -30,7 +30,7 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
   List<Mood> _moods = Mood.defaultMoods;
   bool _isLoading = false;
   List<String> _existingImageUrls = [];
-  List<File> _newImages = [];
+  final List<File> _newImages = [];
 
   @override
   void initState() {

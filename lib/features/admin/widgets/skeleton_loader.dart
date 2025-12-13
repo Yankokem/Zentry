@@ -102,13 +102,13 @@ class SkeletonChart extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SkeletonLoader(width: 150, height: 20),
+          const SkeletonLoader(width: 150, height: 20),
           const SizedBox(height: 20),
           Column(
             children: List.generate(
               4,
-              (index) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+              (index) => const Padding(
+                padding: EdgeInsets.only(bottom: 12),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -204,11 +204,11 @@ class SkeletonDetailCard extends StatelessWidget {
           rowCount,
           (index) => Padding(
             padding: EdgeInsets.only(bottom: index < rowCount - 1 ? 16 : 0),
-            child: Column(
+            child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SkeletonLoader(width: 80, height: 12),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 SkeletonLoader(width: 200, height: 16),
               ],
             ),

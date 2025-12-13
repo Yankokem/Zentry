@@ -48,11 +48,11 @@ class _AdminAppealsPageState extends State<AdminAppealsPage>
                       children: [
                         Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
                         const SizedBox(height: 16),
-                        Text('Failed to load appeals'),
+                        const Text('Failed to load appeals'),
                         const SizedBox(height: 8),
                         Text(
                           '${snapshot.error}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -64,10 +64,10 @@ class _AdminAppealsPageState extends State<AdminAppealsPage>
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Column(
                     children: [
-                      Row(
+                      const Row(
                         children: [
                           Expanded(child: SkeletonStatCard()),
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12),
                           Expanded(child: SkeletonStatCard()),
                         ],
                       ),

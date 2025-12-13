@@ -291,14 +291,14 @@ class _AdminAppealDetailsScreenState extends State<AdminAppealDetailsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            const Row(
                               children: [
                                 Icon(
                                   Icons.message_rounded,
                                   color: Colors.black,
                                   size: 18,
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8),
                                 Text(
                                   'Admin Response',
                                   style: TextStyle(

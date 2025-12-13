@@ -592,12 +592,16 @@ class _ProjectCardState extends State<ProjectCard> {
                       Expanded(
                         child: Row(
                           children: [
-                            Text(
-                              widget.project.title,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E1E1E),
+                            Expanded(
+                              child: Text(
+                                widget.project.title,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E1E1E),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (widget.project.isPinned) ...[

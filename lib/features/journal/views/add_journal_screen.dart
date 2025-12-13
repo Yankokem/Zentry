@@ -310,10 +310,8 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
           image,
           uploadType: CloudinaryUploadType.journalImage,
         );
-        if (imageUrl != null) {
-          uploadedUrls.add(imageUrl);
-        }
-      }
+        uploadedUrls.add(imageUrl);
+            }
       return uploadedUrls;
     } catch (e) {
       if (mounted) {
