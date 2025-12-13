@@ -36,7 +36,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
 
   String _selectedCategory = 'tech';
   bool _isLoading = false;
-  List<File> _selectedImages = [];
+  final List<File> _selectedImages = [];
   List<String> _uploadedImageUrls = [];
   
   static const int _maxImages = 5;
@@ -76,7 +76,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     try {
       if (_selectedImages.length >= _maxImages) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Maximum $_maxImages images allowed')),
+          const SnackBar(content: Text('Maximum $_maxImages images allowed')),
         );
         return;
       }
@@ -126,10 +126,8 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
           imageFile,
           uploadType: CloudinaryUploadType.wishlistImage,
         );
-        if (imageUrl != null) {
-          uploadedUrls.add(imageUrl);
-        }
-      } catch (e) {
+        uploadedUrls.add(imageUrl);
+            } catch (e) {
         print('Error uploading image: $e');
       }
     }

@@ -39,15 +39,34 @@ class _AddTicketPageState extends State<AddTicketPage> {
   @override
   void initState() {
     super.initState();
+    
+    // Check if current user is the project manager
+    final projectManager = ProjectManager();
+    final currentUserId = projectManager.getCurrentUserId();
+    if (currentUserId != widget.project.userId) {
+      // If not the project manager, show error and navigate back
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Only project managers can create tickets'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      });
+      return;
+    }
+    
     _descriptionController.clear();
     
-    // Get team members
+    // Get team members who have accepted the project invitation
     final currentUser = FirebaseAuth.instance.currentUser;
-    final assignableMembers = widget.project.category == 'workspace'
-        ? widget.project.acceptedMemberEmails
-        : widget.project.acceptedMemberEmails
-            .where((email) => email != currentUser?.email)
-            .toList();
+    final assignableMembers = widget.project.acceptedMemberEmails
+        .where((email) => email != currentUser?.email)
+        .toList();
 
     if (assignableMembers.isNotEmpty) {
       selectedAssignees = [assignableMembers.first];
@@ -224,7 +243,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
                                         },
                                         child: Container(
                                           padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
+                                          decoration: const BoxDecoration(
                                             color: Colors.black54,
                                             shape: BoxShape.circle,
                                           ),
@@ -853,6 +872,23 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
   bool _isLoading = true;
   late List<String> _selectedItems;
 
+  Color _getProjectColor() {
+    switch (widget.project.color) {
+      case 'yellow':
+        return const Color(0xFFF9ED69);
+      case 'blue':
+        return Colors.blue.shade300;
+      case 'green':
+        return Colors.green.shade300;
+      case 'purple':
+        return Colors.purple.shade300;
+      case 'red':
+        return Colors.red.shade300;
+      default:
+        return const Color(0xFFF9ED69);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -862,9 +898,9 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
 
   Future<void> _loadUserDetails() async {
     try {
-      // Get team members excluding the project creator
+      // Get team members who have accepted the project invitation, excluding the project creator
       final currentUser = FirebaseAuth.instance.currentUser;
-      final assignableMembers = widget.project.assignableMemberEmails
+      final assignableMembers = widget.project.acceptedMemberEmails
           .where((email) => email != currentUser?.email)
           .toList();
 
@@ -946,116 +982,133 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
           borderRadius: BorderRadius.circular(12),
           color: Colors.grey.shade50,
         ),
-        child: const SizedBox(
+        child: SizedBox(
           height: 40,
           child: Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(_getProjectColor()),
+            ),
           ),
         ),
       );
     }
 
-    // Build role-based list
-    final roleWidgets = <Widget>[];
     final currentUser = FirebaseAuth.instance.currentUser;
-    final assignableMembers = widget.project.assignableMemberEmails
+    final assignableMembers = widget.project.acceptedMemberEmails
         .where((email) => email != currentUser?.email)
         .toList();
 
-    for (final role in widget.project.roles) {
-      final roleMembers = role.members
-          .where((email) => assignableMembers.contains(email))
-          .toList();
-
-      if (roleMembers.isNotEmpty) {
-        final allRoleSelected =
-            roleMembers.every((email) => _selectedItems.contains(email));
-
-        roleWidgets.add(
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.grey.shade50,
+    if (assignableMembers.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.grey.shade50,
+        ),
+        child: Center(
+          child: Text(
+            'No team members available',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 14,
             ),
-            child: ExpansionTile(
-              leading: Checkbox(
-                value: allRoleSelected,
-                tristate: true,
-                onChanged: (bool? value) {
-                  setState(() {
-                    if (value == true) {
-                      for (final email in roleMembers) {
-                        if (!_selectedItems.contains(email)) {
-                          _selectedItems.add(email);
-                        }
-                      }
-                    } else {
-                      for (final email in roleMembers) {
-                        _selectedItems.remove(email);
-                      }
-                    }
-                    widget.onSelectionChanged(_selectedItems);
-                  });
-                },
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Selected assignees display
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
               ),
-              title: Text(
-                role.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-              subtitle: Text(
-                '${roleMembers.length} member${roleMembers.length > 1 ? 's' : ''}',
-                style: const TextStyle(fontSize: 12),
-              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  color: Colors.white,
-                  child: Column(
-                    children: roleMembers.map((email) {
-                      final isSelected = _selectedItems.contains(email);
-                      return Padding(
+                Row(
+                  children: [
+                    Icon(Icons.people_outline, 
+                         size: 18, 
+                         color: Colors.grey.shade600),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Selected Assignees',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${_selectedItems.length} selected',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_selectedItems.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _selectedItems.map((email) {
+                      return Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _getProjectColor(),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Checkbox(
-                              value: isSelected,
-                              onChanged: (bool? checked) {
+                            _buildAvatar(email, radius: 10),
+                            const SizedBox(width: 6),
+                            Text(
+                              _getDisplayName(email),
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () {
                                 setState(() {
-                                  if (checked == true) {
-                                    _selectedItems.add(email);
-                                  } else {
-                                    _selectedItems.remove(email);
-                                  }
+                                  _selectedItems.remove(email);
                                   widget.onSelectionChanged(_selectedItems);
                                 });
                               },
-                            ),
-                            const SizedBox(width: 8),
-                            _buildAvatar(email, radius: 18),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _getDisplayName(email),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  Text(
-                                    email,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
+                              child: Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.grey.shade400,
                               ),
                             ),
                           ],
@@ -1063,127 +1116,267 @@ class _AssigneeSelectorState extends State<_AssigneeSelector> {
                       );
                     }).toList(),
                   ),
-                ),
+                ] else ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'No assignees selected',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-        );
+          
+          // Members list
+          Container(
+            constraints: const BoxConstraints(maxHeight: 300),
+            child: SingleChildScrollView(
+              child: Column(
+                children: _buildMemberSections(assignableMembers),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildMemberSections(List<String> assignableMembers) {
+    final sections = <Widget>[];
+    
+    // Build role-based sections
+    for (final role in widget.project.roles) {
+      final roleMembers = role.members
+          .where((email) => assignableMembers.contains(email))
+          .toList();
+
+      if (roleMembers.isNotEmpty) {
+        sections.add(_buildRoleSection(role, roleMembers));
       }
     }
 
-    // Add "Other Members" section for users not in any role
+    // Add "Other Members" section
     final unassignedMembers = assignableMembers
         .where((email) =>
             !widget.project.roles.any((role) => role.members.contains(email)))
         .toList();
 
     if (unassignedMembers.isNotEmpty) {
-      roleWidgets.add(
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(12),
-            color: Colors.white,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'Other Members',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
+      sections.add(_buildOtherMembersSection(unassignedMembers));
+    }
+
+    return sections;
+  }
+
+  Widget _buildRoleSection(ProjectRole role, List<String> roleMembers) {
+    final allRoleSelected = roleMembers.every((email) => _selectedItems.contains(email));
+    
+    return Container(
+      margin: const EdgeInsets.only(top: 1),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Colors.grey.shade200, width: 1),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Role header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: Colors.grey.shade50,
+            child: Row(
+              children: [
+                Icon(Icons.group, 
+                     size: 16, 
+                     color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    role.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Colors.black,
+                    ),
                   ),
                 ),
-              ),
-              ...unassignedMembers.map((email) {
-                final isSelected = _selectedItems.contains(email);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
+                Text(
+                  '${roleMembers.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (allRoleSelected) {
+                        for (final email in roleMembers) {
+                          _selectedItems.remove(email);
+                        }
+                      } else {
+                        for (final email in roleMembers) {
+                          if (!_selectedItems.contains(email)) {
+                            _selectedItems.add(email);
+                          }
+                        }
+                      }
+                      widget.onSelectionChanged(_selectedItems);
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: allRoleSelected 
+                          ? _getProjectColor() 
+                          : Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Icon(
+                      allRoleSelected ? Icons.check : Icons.add,
+                      size: 14,
+                      color: allRoleSelected ? Colors.black : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Role members
+          ...roleMembers.map((email) => _buildMemberTile(email)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOtherMembersSection(List<String> members) {
+    return Container(
+      margin: const EdgeInsets.only(top: 1),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Colors.grey.shade200, width: 1),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Section header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: Colors.grey.shade50,
+            child: Row(
+              children: [
+                Icon(Icons.person, 
+                     size: 16, 
+                     color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Other Members',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${members.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Members
+          ...members.map((email) => _buildMemberTile(email)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMemberTile(String email) {
+    final isSelected = _selectedItems.contains(email);
+    
+    return Container(
+      margin: const EdgeInsets.only(top: 1),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Colors.grey.shade100, width: 1),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            setState(() {
+              if (isSelected) {
+                _selectedItems.remove(email);
+              } else {
+                _selectedItems.add(email);
+              }
+              widget.onSelectionChanged(_selectedItems);
+            });
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                _buildAvatar(email, radius: 16),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Checkbox(
-                        value: isSelected,
-                        onChanged: (bool? checked) {
-                          setState(() {
-                            if (checked == true) {
-                              _selectedItems.add(email);
-                            } else {
-                              _selectedItems.remove(email);
-                            }
-                            widget.onSelectionChanged(_selectedItems);
-                          });
-                        },
+                      Text(
+                        _getDisplayName(email),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          color: Color(0xFF1E1E1E),
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      _buildAvatar(email, radius: 18),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _getDisplayName(email),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 13,
-                              ),
-                            ),
-                            Text(
-                              email,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
+                      const SizedBox(height: 2),
+                      Text(
+                        email,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
                         ),
                       ),
                     ],
                   ),
-                );
-              }),
-            ],
+                ),
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: isSelected ? _getProjectColor() : Colors.grey.shade300,
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    color: isSelected ? _getProjectColor() : Colors.transparent,
+                  ),
+                  child: isSelected
+                      ? const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Colors.black,
+                        )
+                      : null,
+                ),
+              ],
+            ),
           ),
         ),
-      );
-    }
-
-    return Column(
-      children: roleWidgets.isEmpty
-          ? [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.grey.shade50,
-                ),
-                child: Center(
-                  child: Text(
-                    'No team members available',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            ]
-          : List.generate(roleWidgets.length, (index) {
-              final widget = roleWidgets[index];
-              return index < roleWidgets.length - 1
-                  ? Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: widget,
-                    )
-                  : widget;
-            }),
+      ),
     );
   }
 }

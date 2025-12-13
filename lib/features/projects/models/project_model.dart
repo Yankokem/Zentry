@@ -131,22 +131,25 @@ class Project {
 
   factory Project.fromMap(Map<String, dynamic> map) {
     // Handle backward compatibility: if teamMemberDetails doesn't exist,
-    // create it from teamMembers with 'accepted' status
+    // create it from teamMembers with 'pending' status
     List<TeamMember> memberDetails = [];
     if (map['teamMemberDetails'] != null) {
       memberDetails = (map['teamMemberDetails'] as List)
           .map((m) => TeamMember.fromMap(m as Map<String, dynamic>))
           .toList();
     } else if (map['teamMembers'] != null) {
-      // Migrate old data: assume existing members are accepted
+      // Migrate old data: creator is accepted, other members are pending
+      // This ensures they need to explicitly accept invitations
       memberDetails = (map['teamMembers'] as List)
           .map((email) => TeamMember(
                 email: email as String,
-                status: 'accepted',
+                status: 'pending', // Default to pending
                 invitedAt: DateTime.now(),
-                respondedAt: DateTime.now(),
               ))
           .toList();
+      
+      // Note: We can't determine creator's email from userId alone in old data,
+      // so all members start as pending and will be handled by the acceptance flow
     }
 
     return Project(

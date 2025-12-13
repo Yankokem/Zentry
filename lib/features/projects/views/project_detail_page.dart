@@ -103,6 +103,42 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     setState(() {});
   }
 
+  // Check if current user is the project manager (creator)
+  bool _isCurrentUserProjectManager() {
+    final currentUserId = _projectManager.getCurrentUserId();
+    return currentUserId == widget.project.userId;
+  }
+
+  // Helper method to get member's assigned role from project.roles
+  String _getMemberRole(String email) {
+    // First check if this is the project creator (Project Manager)
+    if (widget.project.userId.isNotEmpty) {
+      for (final entry in _userDetails.entries) {
+        if (entry.value['uid'] == widget.project.userId && entry.key == email) {
+          return 'Project Manager';
+        }
+      }
+    }
+    
+    // Check roles in project.roles for this member
+    for (final role in widget.project.roles) {
+      if (role.members.contains(email)) {
+        return role.name;
+      }
+    }
+    
+    // Check teamMemberDetails for assigned role
+    final teamMember = widget.project.teamMemberDetails
+        .where((m) => m.email == email)
+        .firstOrNull;
+    if (teamMember?.role != null && teamMember!.role!.isNotEmpty) {
+      return teamMember.role!;
+    }
+    
+    // Default to Member if no role assigned
+    return 'Member';
+  }
+
   double _calculateAvatarStackWidth() {
     final count = widget.project.teamMembers.length;
     // Each avatar overlaps by 10px (20px spacing on 30px diameter)
@@ -293,10 +329,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     final displayName =
                         _userService.getDisplayName(details, email);
                     final profileUrl = details['profilePictureUrl'] ?? '';
+                    final role = _getMemberRole(email);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _buildMemberTileWithRole(
-                          displayName, email, profileUrl, 'Member'),
+                          displayName, email, profileUrl, role),
                     );
                   }),
                 ],
@@ -312,6 +349,34 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       String displayName, String email, String profileUrl, String role) {
     // Check if member is pending
     final isPending = widget.project.isMemberPending(email);
+
+    // Get role colors
+    Color getRoleColor(String role) {
+      switch (role.toLowerCase()) {
+        case 'project manager':
+          return Colors.blue;
+        case 'backend':
+        case 'back end':
+          return Colors.purple;
+        case 'frontend':
+        case 'front end':
+          return Colors.green;
+        case 'designer':
+        case 'ui/ux':
+          return Colors.pink;
+        case 'developer':
+          return Colors.orange;
+        case 'tester':
+        case 'qa':
+          return Colors.red;
+        case 'member':
+          return Colors.green;
+        default:
+          return Colors.green;
+      }
+    }
+
+    final roleColor = getRoleColor(role);
 
     return Row(
       children: [
@@ -356,14 +421,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: role == 'Project Manager'
-                          ? Colors.blue.shade100
-                          : Colors.green.shade100,
+                      color: roleColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: role == 'Project Manager'
-                            ? Colors.blue.shade300
-                            : Colors.green.shade300,
+                        color: roleColor.withOpacity(0.3),
                       ),
                     ),
                     child: Text(
@@ -371,9 +432,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: role == 'Project Manager'
-                            ? Colors.blue.shade700
-                            : Colors.green.shade700,
+                        color: roleColor.withOpacity(0.8),
                       ),
                     ),
                   ),
@@ -552,22 +611,23 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                             ],
                           ),
                         ),
-                        // Add Ticket Button
-                        GestureDetector(
-                          onTap: () => _navigateToAddTicketPage(),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E1E1E),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.add,
-                              color: Color(0xFFF9ED69),
-                              size: 24,
+                        // Add Ticket Button - Only show for project manager
+                        if (_isCurrentUserProjectManager())
+                          GestureDetector(
+                            onTap: () => _navigateToAddTicketPage(),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E1E1E),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.add,
+                                color: Color(0xFFF9ED69),
+                                size: 24,
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -1065,6 +1125,17 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   void _showAddTicketDialog() {
+    // Only allow project managers to add tickets
+    if (!_isCurrentUserProjectManager()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only project managers can create tickets'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     TicketDialogs.showAddTicketDialog(context, widget.project, _refreshTickets);
   }
 

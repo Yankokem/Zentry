@@ -727,6 +727,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
             TextFormField(
               controller: _descriptionController,
               maxLines: 3,
+              maxLength: 255,
               decoration: InputDecoration(
                 hintText: 'Enter project description',
                 filled: true,
@@ -735,6 +736,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                   borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
                   borderSide: BorderSide.none,
                 ),
+                counterText: '',
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {

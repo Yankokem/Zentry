@@ -127,7 +127,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
             builder: (context, snapshot) {
               // Show skeleton while loading or if there's an error
               if (snapshot.connectionState == ConnectionState.waiting || snapshot.hasError) {
-                return SkeletonStatCard();
+                return const SkeletonStatCard();
               }
               
               final allReports = snapshot.data ?? [];
@@ -195,7 +195,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
             builder: (context, snapshot) {
               // Show skeleton while loading or if there's an error
               if (snapshot.connectionState == ConnectionState.waiting || snapshot.hasError) {
-                return SkeletonStatCard();
+                return const SkeletonStatCard();
               }
               
               final allAppeals = snapshot.data ?? [];

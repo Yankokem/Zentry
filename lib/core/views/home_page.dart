@@ -497,15 +497,15 @@ class _HomePageState extends State<HomePage> {
   Color _getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'tech':
-        return Color(0xFF42A5F5); // Blue
+        return const Color(0xFF42A5F5); // Blue
       case 'travel':
-        return Color(0xFF66BB6A); // Green
+        return const Color(0xFF66BB6A); // Green
       case 'fashion':
-        return Color(0xFFAB47BC); // Purple
+        return const Color(0xFFAB47BC); // Purple
       case 'home':
-        return Color(0xFFFFA726); // Orange
+        return const Color(0xFFFFA726); // Orange
       default:
-        return Color(0xFF78909C); // Gray
+        return const Color(0xFF78909C); // Gray
     }
   }
 

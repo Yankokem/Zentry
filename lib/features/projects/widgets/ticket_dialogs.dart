@@ -77,6 +77,21 @@ class TicketDialogs {
     Project project,
     VoidCallback refreshTickets,
   ) {
+    // Check if current user is the project manager
+    final projectManager = ProjectManager();
+    final currentUserId = projectManager.getCurrentUserId();
+    if (currentUserId != project.userId) {
+      // If not the project manager, show error and return
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only project managers can create tickets'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final titleController = TextEditingController();
     final descController = TextEditingController();
     String selectedPriority = 'medium';
