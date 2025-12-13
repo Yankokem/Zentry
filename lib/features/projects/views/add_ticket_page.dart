@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/core/services/firebase/notification_manager.dart';
+import 'package:zentry/features/journal/widgets/rich_text_editor.dart';
 import 'package:zentry/features/projects/projects.dart';
 
 class AddTicketPage extends StatefulWidget {
@@ -23,19 +26,22 @@ class AddTicketPage extends StatefulWidget {
 class _AddTicketPageState extends State<AddTicketPage> {
   final _formKey = GlobalKey<FormState>();
   final titleController = TextEditingController();
-  final descController = TextEditingController();
+  final _descriptionController = RichTextEditorController();
+  final _cloudinaryService = CloudinaryService();
+  
   String selectedPriority = 'medium';
   String selectedStatus = 'todo';
   List<String> selectedAssignees = [];
+  List<File> _selectedImages = [];
   DateTime? selectedDeadline;
-  bool _isSaving = false; // Prevent double-tap
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+    _descriptionController.clear();
+    
     // Get team members
-    // For workspace projects, include the creator as they can assign to themselves
-    // For shared projects, exclude the creator from assignees
     final currentUser = FirebaseAuth.instance.currentUser;
     final assignableMembers = widget.project.category == 'workspace'
         ? widget.project.acceptedMemberEmails
@@ -168,37 +174,116 @@ class _AddTicketPageState extends State<AddTicketPage> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: descController,
-                      style: const TextStyle(fontSize: 16),
-                      decoration: InputDecoration(
-                        labelText: 'Description',
-                        hintText:
-                            'Provide detailed information about this ticket',
-                        labelStyle: TextStyle(color: Colors.grey.shade600),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              BorderSide(color: _getProjectColor(), width: 2),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
+                    // Image Attachment Section
+                    Text(
+                      'Add Images (Optional)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
                       ),
-                      maxLines: 5,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a description';
-                        }
-                        return null;
-                      },
+                    ),
+                    const SizedBox(height: 8),
+                    if (_selectedImages.isNotEmpty)
+                      Column(
+                        children: [
+                          SizedBox(
+                            height: 150,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _selectedImages.length,
+                              itemBuilder: (context, index) {
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      width: 150,
+                                      margin: const EdgeInsets.only(right: 12),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Image.file(
+                                          _selectedImages[index],
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 4,
+                                      right: 16,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            _selectedImages.removeAt(index);
+                                          });
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black54,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ),
+                    GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate,
+                                size: 40, color: Colors.grey.shade400),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tap to add images',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Rich Text Description Editor
+                    Text(
+                      'Description',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    RichTextEditor(
+                      controller: _descriptionController,
+                      hintText: 'Describe the ticket requirements and details...',
                     ),
                   ],
                 ),
@@ -577,15 +662,23 @@ class _AddTicketPageState extends State<AddTicketPage> {
       });
 
       try {
+        // Upload images if selected
+        List<String> imageUrls = [];
+        if (_selectedImages.isNotEmpty) {
+          imageUrls = await _uploadTicketImages();
+        }
+
         // Generate ticket number
         final ticketNumber =
             'TICK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
         final newTicket = Ticket(
           ticketNumber: ticketNumber,
-          userId: '', // This will be set by ProjectManager
+          userId: '',
           title: titleController.text,
-          description: descController.text,
+          description: _descriptionController.getJsonContent(),
+          richDescription: _descriptionController.getJsonContent(),
+          imageUrls: imageUrls,
           priority: selectedPriority,
           status: selectedStatus,
           assignedTo: selectedAssignees,
@@ -685,10 +778,56 @@ class _AddTicketPageState extends State<AddTicketPage> {
     );
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final List<XFile> images = await picker.pickMultiImage(
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 85,
+      );
+
+      if (images.isNotEmpty) {
+        setState(() {
+          _selectedImages = images.map((img) => File(img.path)).toList();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking images: $e')),
+        );
+      }
+    }
+  }
+
+  Future<List<String>> _uploadTicketImages() async {
+    if (_selectedImages.isEmpty) return [];
+
+    try {
+      final List<String> uploadedUrls = [];
+      for (final image in _selectedImages) {
+        final imageUrl = await _cloudinaryService.uploadImage(
+          image,
+          uploadType: CloudinaryUploadType.projectImage,
+        );
+        uploadedUrls.add(imageUrl);
+      }
+      return uploadedUrls;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading images: $e')),
+        );
+      }
+      return [];
+    }
+  }
+
   @override
   void dispose() {
     titleController.dispose();
-    descController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 }

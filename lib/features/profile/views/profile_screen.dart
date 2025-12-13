@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:zentry/core/core.dart';
 
@@ -18,11 +18,167 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _fullName = '';
   String _email = '';
   String? _profileImageUrl;
+  
+  // KPI stats
+  int _totalProjects = 0;
+  int _journalEntries = 0;
+  int _wishlistItems = 0;
+  bool _isLoadingStats = true;
 
   @override
   void initState() {
     super.initState();
     _loadUser();
+    _loadStats();
+  }
+  
+  Future<void> _loadStats() async {
+    int projectCount = 0;
+    int journalCount = 0;
+    int wishlistCount = 0;
+    
+    try {
+      final user = _authService.currentUser;
+      if (user == null) {
+        debugPrint('❌ No user logged in');
+        return;
+      }
+      
+      debugPrint('🔍 Loading stats for user: ${user.uid} (${user.email})');
+      final userEmailLower = user.email?.toLowerCase() ?? '';
+      
+      final firestore = FirebaseFirestore.instance;
+      
+      // === PROJECTS COUNT ===
+      try {
+        final projectsSnapshot = await firestore
+            .collection('projects')
+            .get();
+        
+        debugPrint('📊 Total projects in Firestore: ${projectsSnapshot.docs.length}');
+        
+        projectCount = 0;
+        for (final doc in projectsSnapshot.docs) {
+          final data = doc.data();
+          final projectId = doc.id;
+          final deleted = data['deleted'] == true;
+          final status = (data['status'] as String? ?? '').trim().toLowerCase();
+          final userId = data['userId'] as String?;
+          final workspaceMembers = List<String>.from(data['workspaceMembers'] as List? ?? []);
+          final sharedWith = List<String>.from(data['sharedWith'] as List? ?? []);
+          
+          debugPrint('📌 [$projectId] Status: $status | Deleted: $deleted | Owner: $userId');
+          debugPrint('   WS Members: $workspaceMembers | SharedWith: $sharedWith');
+          
+          // Skip deleted projects
+          if (deleted) {
+            debugPrint('   ⊘ SKIP: deleted');
+            continue;
+          }
+          
+          // Skip "finished" status projects
+          if (status == 'finished') {
+            debugPrint('   ⊘ SKIP: finished status');
+            continue;
+          }
+          
+          // Check if user is owner
+          final isOwner = userId == user.uid;
+          // Check if user is workspace member
+          final isWorkspaceMember = workspaceMembers.contains(user.uid);
+          // Check if user is in shared list (case-insensitive)
+          final isShared = sharedWith.any((email) => email.toLowerCase() == userEmailLower);
+          
+          debugPrint('   Owner: $isOwner | WS Member: $isWorkspaceMember | Shared: $isShared');
+          
+          if (isOwner || isWorkspaceMember || isShared) {
+            debugPrint('   ✓ INCLUDED');
+            projectCount++;
+          } else {
+            debugPrint('   ⊘ SKIP: not owner/member/shared');
+          }
+        }
+        
+        debugPrint('✅ Final project count: $projectCount');
+      } catch (e) {
+        debugPrint('❌ Error loading projects: $e');
+      }
+      
+      // === JOURNAL ENTRIES COUNT ===
+      try {
+        final journalSnapshot = await firestore
+            .collection('journal_entries')
+            .where('userId', isEqualTo: user.uid)
+            .get();
+        
+        debugPrint('📓 Journal entries found: ${journalSnapshot.docs.length}');
+        
+        journalCount = 0;
+        for (final doc in journalSnapshot.docs) {
+          final data = doc.data();
+          final deleted = data['deleted'] == true;
+          
+          if (deleted) {
+            continue;
+          }
+          journalCount++;
+        }
+        
+        debugPrint('✅ Final journal count: $journalCount');
+      } catch (e) {
+        debugPrint('❌ Error loading journal entries: $e');
+      }
+      
+      // === WISHLIST ITEMS COUNT ===
+      try {
+        final wishlistSnapshot = await firestore
+            .collection('wishlists')
+            .where('userId', isEqualTo: user.uid)
+            .get();
+        
+        debugPrint('⭐ Total wishlist items for user: ${wishlistSnapshot.docs.length}');
+        
+        wishlistCount = 0;
+        for (final doc in wishlistSnapshot.docs) {
+          final data = doc.data();
+          final itemTitle = data['title'] as String? ?? 'Unknown';
+          final completed = data['completed'] == true;
+          
+          debugPrint('   Item: "$itemTitle" | Completed: $completed');
+          
+          // Only count items NOT acquired (completed == false)
+          if (completed == false) {
+            wishlistCount++;
+            debugPrint('      ✓ INCLUDED (not acquired)');
+          } else {
+            debugPrint('      ⊘ SKIP (acquired)');
+          }
+        }
+        
+        debugPrint('✅ Final wishlist count: $wishlistCount');
+      } catch (e) {
+        debugPrint('❌ Error loading wishlist items: $e');
+      }
+      
+      // Update state with final counts
+      if (mounted) {
+        setState(() {
+          _totalProjects = projectCount;
+          _journalEntries = journalCount;
+          _wishlistItems = wishlistCount;
+          _isLoadingStats = false;
+        });
+        
+        debugPrint('🎯 FINAL: Projects: $_totalProjects | Journals: $_journalEntries | Wishlist: $_wishlistItems');
+      }
+    } catch (e) {
+      debugPrint('❌ Fatal error in _loadStats: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingStats = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadUser() async {
@@ -110,14 +266,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -195,40 +348,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 40),
 
             // Stats Cards
-            const Padding(
-              padding: EdgeInsets.symmetric(
+            Padding(
+              padding: const EdgeInsets.symmetric(
                 horizontal: AppConstants.paddingMedium,
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _ProfileStatCard(
-                      icon: Icons.check_circle_rounded,
-                      count: '42',
-                      label: 'Tasks Done',
-                      color: Colors.green,
+              child: _isLoadingStats
+                  ? const Center(child: CircularProgressIndicator())
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: _ProfileStatCard(
+                            icon: Icons.folder_rounded,
+                            count: '$_totalProjects',
+                            label: 'Total Projects',
+                            color: Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ProfileStatCard(
+                            icon: Icons.book_rounded,
+                            count: '$_journalEntries',
+                            label: 'Journal Entries',
+                            color: Colors.purple,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ProfileStatCard(
+                            icon: Icons.star_rounded,
+                            count: '$_wishlistItems',
+                            label: 'Wishlist Items',
+                            color: Colors.orange,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: _ProfileStatCard(
-                      icon: Icons.book_rounded,
-                      count: '18',
-                      label: 'Journal Entries',
-                      color: Colors.purple,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: _ProfileStatCard(
-                      icon: Icons.star_rounded,
-                      count: '7',
-                      label: 'Wishes',
-                      color: Colors.orange,
-                    ),
-                  ),
-                ],
-              ),
             ),
 
             const SizedBox(height: 32),
@@ -423,14 +578,12 @@ class _ProfileOption extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
-  final Widget? trailing;
 
   const _ProfileOption({
     required this.icon,
     required this.title,
     required this.subtitle,
     this.onTap,
-    this.trailing,
   });
 
   @override
@@ -480,12 +633,11 @@ class _ProfileOption extends StatelessWidget {
                 ],
               ),
             ),
-            trailing ??
-                const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 18,
-                  color: Colors.grey,
-                ),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 18,
+              color: Colors.grey,
+            ),
           ],
         ),
       ),

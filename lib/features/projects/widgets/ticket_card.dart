@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -101,6 +102,27 @@ class _TicketCardState extends State<TicketCard> with SingleTickerProviderStateM
     ];
     final hash = email.hashCode.abs();
     return colors[hash % colors.length];
+  }
+
+  /// Extract plain text from delta JSON content
+  String _getPlainTextFromDescription(String description) {
+    try {
+      // Try to parse as delta JSON
+      final decoded = json.decode(description);
+      if (decoded is List) {
+        // Extract text from delta operations
+        final buffer = StringBuffer();
+        for (var op in decoded) {
+          if (op is Map && op.containsKey('insert')) {
+            buffer.write(op['insert']);
+          }
+        }
+        return buffer.toString().trim();
+      }
+    } catch (e) {
+      // If parsing fails, return as-is (backward compatibility)
+    }
+    return description;
   }
 
   Widget _buildAvatarStack() {
@@ -289,7 +311,7 @@ class _TicketCardState extends State<TicketCard> with SingleTickerProviderStateM
                 const SizedBox(height: 8),
                 // Description
                 Text(
-                  widget.ticket.description,
+                  _getPlainTextFromDescription(widget.ticket.description),
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.grey.shade600,

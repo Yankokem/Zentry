@@ -5,6 +5,8 @@ class Ticket {
   final String userId;
   final String title;
   final String description;
+  final String? richDescription; // JSON string for Quill delta
+  final List<String> imageUrls; // Multiple images for tickets
   final String priority;
   final String status; // 'todo', 'in_progress', 'in_review', 'done'
   final List<String> assignedTo;
@@ -20,6 +22,8 @@ class Ticket {
     required this.userId,
     required this.title,
     required this.description,
+    this.richDescription,
+    this.imageUrls = const [],
     required this.priority,
     required this.status,
     required this.assignedTo,
@@ -37,6 +41,8 @@ class Ticket {
       'userId': userId,
       'title': title,
       'description': description,
+      'richDescription': richDescription,
+      'imageUrls': imageUrls,
       'priority': priority,
       'status': status,
       'assignedTo': assignedTo,
@@ -70,6 +76,8 @@ class Ticket {
       userId: map['userId'],
       title: map['title'],
       description: map['description'],
+      richDescription: map['richDescription'],
+      imageUrls: List<String>.from(map['imageUrls'] ?? []),
       priority: map['priority'],
       status: map['status'],
       assignedTo: assignedTo,
@@ -96,6 +104,8 @@ class Ticket {
     String? userId,
     String? title,
     String? description,
+    String? richDescription,
+    List<String>? imageUrls,
     String? priority,
     String? status,
     List<String>? assignedTo,
@@ -110,6 +120,8 @@ class Ticket {
       userId: userId ?? this.userId,
       title: title ?? this.title,
       description: description ?? this.description,
+      richDescription: richDescription ?? this.richDescription,
+      imageUrls: imageUrls ?? this.imageUrls,
       priority: priority ?? this.priority,
       status: status ?? this.status,
       assignedTo: assignedTo ?? this.assignedTo,

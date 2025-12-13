@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/core/services/firebase/notification_manager.dart';
+import 'package:zentry/features/journal/widgets/rich_text_editor.dart';
 import 'package:zentry/features/projects/projects.dart';
 
 class MultiSelectDialog extends StatefulWidget {
@@ -318,21 +321,31 @@ class EditTicketPage extends StatefulWidget {
 class _EditTicketPageState extends State<EditTicketPage> {
   final _formKey = GlobalKey<FormState>();
   final titleController = TextEditingController();
-  final descController = TextEditingController();
+  final _descriptionController = RichTextEditorController();
+  final _cloudinaryService = CloudinaryService();
+  
   String selectedPriority = '';
   String selectedStatus = '';
   List<String> selectedAssignees = [];
+  List<File> _selectedImages = [];
+  List<String> _uploadedImageUrls = [];
   DateTime? selectedDeadline;
 
   @override
   void initState() {
     super.initState();
     titleController.text = widget.ticket.title;
-    descController.text = widget.ticket.description;
+    // Load rich description into editor
+    if (widget.ticket.richDescription != null && widget.ticket.richDescription!.isNotEmpty) {
+      _descriptionController.setJsonContent(widget.ticket.richDescription!);
+    } else {
+      _descriptionController.setPlainText(widget.ticket.description);
+    }
     selectedPriority = widget.ticket.priority;
     selectedStatus = widget.ticket.status;
     selectedAssignees = widget.ticket.assignedTo;
     selectedDeadline = widget.ticket.deadline;
+    _uploadedImageUrls = List.from(widget.ticket.imageUrls);
   }
 
   Color _getProjectColor() {
@@ -488,37 +501,131 @@ class _EditTicketPageState extends State<EditTicketPage> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: descController,
-                      style: const TextStyle(fontSize: 16),
-                      decoration: InputDecoration(
-                        labelText: 'Description',
-                        hintText:
-                            'Provide detailed information about this ticket',
-                        labelStyle: TextStyle(color: Colors.grey.shade600),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              BorderSide(color: _getProjectColor(), width: 2),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
+                    // Image Attachment Section
+                    Text(
+                      'Images',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
                       ),
-                      maxLines: 5,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a description';
-                        }
-                        return null;
-                      },
+                    ),
+                    const SizedBox(height: 8),
+                    if (_selectedImages.isNotEmpty || _uploadedImageUrls.isNotEmpty)
+                      Column(
+                        children: [
+                          SizedBox(
+                            height: 150,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _selectedImages.length + _uploadedImageUrls.length,
+                              itemBuilder: (context, index) {
+                                final bool isNewImage = index < _selectedImages.length;
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      width: 150,
+                                      margin: const EdgeInsets.only(right: 12),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: isNewImage
+                                            ? Image.file(
+                                                _selectedImages[index],
+                                                fit: BoxFit.cover,
+                                              )
+                                            : Image.network(
+                                                _uploadedImageUrls[index - _selectedImages.length],
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return Container(
+                                                    color: Colors.grey.shade300,
+                                                    child: const Icon(Icons.broken_image),
+                                                  );
+                                                },
+                                              ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 4,
+                                      right: 16,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            if (isNewImage) {
+                                              _selectedImages.removeAt(index);
+                                            } else {
+                                              _uploadedImageUrls.removeAt(index - _selectedImages.length);
+                                            }
+                                          });
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black54,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ),
+                    GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate,
+                                size: 40, color: Colors.grey.shade400),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tap to add images',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Description',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    RichTextEditor(
+                      controller: _descriptionController,
+                      hintText: 'Describe the ticket requirements and details...',
                     ),
                   ],
                 ),
@@ -825,9 +932,17 @@ class _EditTicketPageState extends State<EditTicketPage> {
       // Track status change
       final statusChanged = widget.ticket.status != selectedStatus;
 
+      // Upload images if selected
+      List<String> imageUrls = List.from(_uploadedImageUrls);
+      if (_selectedImages.isNotEmpty) {
+        imageUrls.addAll(await _uploadTicketImages());
+      }
+
       final updatedTicket = widget.ticket.copyWith(
         title: titleController.text,
-        description: descController.text,
+        description: _descriptionController.getJsonContent(),
+        richDescription: _descriptionController.getJsonContent(),
+        imageUrls: imageUrls,
         priority: selectedPriority,
         status: selectedStatus,
         assignedTo: selectedAssignees,
@@ -1072,10 +1187,56 @@ class _EditTicketPageState extends State<EditTicketPage> {
     }
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final List<XFile> images = await picker.pickMultiImage(
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 85,
+      );
+
+      if (images.isNotEmpty) {
+        setState(() {
+          _selectedImages = images.map((img) => File(img.path)).toList();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking images: $e')),
+        );
+      }
+    }
+  }
+
+  Future<List<String>> _uploadTicketImages() async {
+    if (_selectedImages.isEmpty) return [];
+
+    try {
+      final List<String> uploadedUrls = [];
+      for (final image in _selectedImages) {
+        final imageUrl = await _cloudinaryService.uploadImage(
+          image,
+          uploadType: CloudinaryUploadType.projectImage,
+        );
+        uploadedUrls.add(imageUrl);
+      }
+      return uploadedUrls;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading images: $e')),
+        );
+      }
+      return [];
+    }
+  }
+
   @override
   void dispose() {
     titleController.dispose();
-    descController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 }

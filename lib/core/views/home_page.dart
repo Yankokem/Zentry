@@ -1093,7 +1093,7 @@ class _HomePageState extends State<HomePage> {
                               },
                             ),
                             IconButton(
-                              icon: const Icon(Icons.person_outline, size: 20),
+                              icon: const Icon(Icons.settings, size: 20),
                               color: const Color(0xFF1E1E1E),
                               padding: const EdgeInsets.all(8),
                               constraints: const BoxConstraints(),

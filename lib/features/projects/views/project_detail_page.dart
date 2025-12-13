@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -884,9 +885,73 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
             const SizedBox(height: 16),
 
+            // Image Carousel (if images exist)
+            if (ticket.imageUrls.isNotEmpty) ...[
+              SizedBox(
+                height: 200,
+                child: PageView.builder(
+                  itemCount: ticket.imageUrls.length,
+                  itemBuilder: (context, index) {
+                    return GestureDetector(
+                      onTap: () {
+                        // Show full-screen image viewer
+                        showDialog(
+                          context: context,
+                          builder: (context) => Dialog(
+                            backgroundColor: Colors.black,
+                            child: Stack(
+                              children: [
+                                Center(
+                                  child: InteractiveViewer(
+                                    child: Image.network(
+                                      ticket.imageUrls[index],
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 16,
+                                  right: 16,
+                                  child: IconButton(
+                                    icon: const Icon(Icons.close, color: Colors.white),
+                                    onPressed: () => Navigator.pop(context),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.grey.shade200,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            ticket.imageUrls[index],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey.shade300,
+                                child: const Icon(Icons.broken_image),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             // Description
             Text(
-              ticket.description,
+              _getPlainTextFromDescription(ticket.description),
               style: TextStyle(
                 fontSize: 15,
                 color: Colors.grey.shade700,
@@ -1021,6 +1086,27 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     ];
     final hash = email.hashCode.abs();
     return colors[hash % colors.length];
+  }
+
+  /// Extract plain text from delta JSON content
+  String _getPlainTextFromDescription(String description) {
+    try {
+      // Try to parse as delta JSON
+      final decoded = json.decode(description);
+      if (decoded is List) {
+        // Extract text from delta operations
+        final buffer = StringBuffer();
+        for (var op in decoded) {
+          if (op is Map && op.containsKey('insert')) {
+            buffer.write(op['insert']);
+          }
+        }
+        return buffer.toString().trim();
+      }
+    } catch (e) {
+      // If parsing fails, return as-is (backward compatibility)
+    }
+    return description;
   }
 
   Widget _buildAssigneeAvatarStack(List<String> assignees,
