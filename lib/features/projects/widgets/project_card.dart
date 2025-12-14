@@ -780,41 +780,63 @@ class _ProjectCardState extends State<ProjectCard> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Progress',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            '${widget.project.completedTickets}/${widget.project.totalTickets} tickets',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: widget.project.totalTickets > 0
-                              ? widget.project.completedTickets /
-                                  widget.project.totalTickets
-                              : 0,
-                          backgroundColor: Colors.grey.shade200,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            _getProjectColor(),
-                          ),
-                          minHeight: 8,
-                        ),
+                      StreamBuilder<List<Ticket>>(
+                        stream: ProjectManager().listenToProjectTickets(widget.project.id),
+                        builder: (context, snapshot) {
+                          int doneCount = widget.project.completedTickets;
+                          int totalCount = widget.project.totalTickets;
+                          double progress = 0.0;
+
+                          if (snapshot.hasData) {
+                            final tickets = snapshot.data!;
+                            doneCount = tickets.where((t) => t.status == 'done').length;
+                            totalCount = tickets.length;
+                            progress = totalCount > 0 ? doneCount / totalCount : 0.0;
+                          } else {
+                            progress = widget.project.totalTickets > 0
+                                ? widget.project.completedTickets / widget.project.totalTickets
+                                : 0.0;
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Progress',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    '$doneCount/$totalCount tickets',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: LinearProgressIndicator(
+                                  value: progress,
+                                  backgroundColor: Colors.grey.shade200,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    _getProjectColor(),
+                                  ),
+                                  minHeight: 8,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),

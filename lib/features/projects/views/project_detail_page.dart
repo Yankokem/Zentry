@@ -23,6 +23,7 @@ class ProjectDetailPage extends StatefulWidget {
 class _ProjectDetailPageState extends State<ProjectDetailPage> {
   final ProjectManager _projectManager = ProjectManager();
   final UserService _userService = UserService();
+  final ProjectNotificationService _notificationService = ProjectNotificationService();
   Map<String, Map<String, String>> _userDetails = {};
   String? _highlightedTicketId;
   bool _isLoadingUsers = false;
@@ -616,41 +617,52 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
           // Kanban Board
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildKanbanColumn(
-                    'To Do',
-                    _getTicketsByStatus('todo'),
-                    Colors.grey.shade400,
-                    'todo',
+            child: StreamBuilder<List<Ticket>>(
+              stream: _projectManager.listenToProjectTickets(widget.project.id),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                final allTickets = snapshot.data ?? [];
+                
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildKanbanColumn(
+                        'To Do',
+                        allTickets.where((t) => t.status == 'todo').toList(),
+                        Colors.grey.shade400,
+                        'todo',
+                      ),
+                      const SizedBox(width: 16),
+                      _buildKanbanColumn(
+                        'In Progress',
+                        allTickets.where((t) => t.status == 'in_progress').toList(),
+                        Colors.orange.shade400,
+                        'in_progress',
+                      ),
+                      const SizedBox(width: 16),
+                      _buildKanbanColumn(
+                        'In Review',
+                        allTickets.where((t) => t.status == 'in_review').toList(),
+                        Colors.purple.shade400,
+                        'in_review',
+                      ),
+                      const SizedBox(width: 16),
+                      _buildKanbanColumn(
+                        'Done',
+                        allTickets.where((t) => t.status == 'done').toList(),
+                        Colors.green.shade400,
+                        'done',
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  _buildKanbanColumn(
-                    'In Progress',
-                    _getTicketsByStatus('in_progress'),
-                    Colors.orange.shade400,
-                    'in_progress',
-                  ),
-                  const SizedBox(width: 16),
-                  _buildKanbanColumn(
-                    'In Review',
-                    _getTicketsByStatus('in_review'),
-                    Colors.purple.shade400,
-                    'in_review',
-                  ),
-                  const SizedBox(width: 16),
-                  _buildKanbanColumn(
-                    'Done',
-                    _getTicketsByStatus('done'),
-                    Colors.green.shade400,
-                    'done',
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ],
@@ -660,7 +672,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   Widget _buildKanbanColumn(
     String title,
-    Future<List<Ticket>> ticketsFuture,
+    List<Ticket> tickets,
     Color color,
     String status,
   ) {
@@ -712,29 +724,23 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   ),
                 ),
                 const Spacer(),
-                FutureBuilder<List<Ticket>>(
-                  future: ticketsFuture,
-                  builder: (context, snapshot) {
-                    final count = snapshot.data?.length ?? 0;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: color,
-                        ),
-                      ),
-                    );
-                  },
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${tickets.length}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -742,66 +748,49 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
           // Tickets List
           Flexible(
-            child: FutureBuilder<List<Ticket>>(
-              future: ticketsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Error loading tickets',
-                      style: TextStyle(color: Colors.red.shade400),
-                    ),
-                  );
-                } else {
-                  final tickets = snapshot.data ?? [];
-                  return tickets.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.inbox_outlined,
-                                  size: 48,
-                                  color: Colors.grey.shade300,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'No tickets',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                ),
-                              ],
+            child: tickets.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.inbox_outlined,
+                            size: 48,
+                            color: Colors.grey.shade300,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No tickets',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade500,
                             ),
                           ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(16),
-                          itemCount: tickets.length,
-                          itemBuilder: (context, index) {
-                            final ticket = tickets[index];
-                            final isHighlighted =
-                                _highlightedTicketId == ticket.ticketNumber;
-                            return TicketCard(
-                              ticket: ticket,
-                              project: widget.project,
-                              isHighlighted: isHighlighted,
-                              onTap: () {
-                                _showTicketDetailsSheet(ticket);
-                              },
-                            );
-                          },
-                        );
-                }
-              },
-            ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: tickets.length,
+                    itemBuilder: (context, index) {
+                      final ticket = tickets[index];
+                      final isHighlighted =
+                          _highlightedTicketId == ticket.ticketNumber;
+                      return TicketCard(
+                        ticket: ticket,
+                        project: widget.project,
+                        isHighlighted: isHighlighted,
+                        onTap: () {
+                          _showTicketDetailsSheet(ticket);
+                        },
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -1272,6 +1261,26 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     await _projectManager.updateTicket(
                         ticket.projectId, ticket.ticketNumber, updatedTicket);
 
+                    // Send notification to PM
+                    await _notificationService.notifyPMTicketReady(
+                      ticket: updatedTicket,
+                      project: widget.project,
+                      action: 'marked_done',
+                    );
+
+                    // Check if this is the last assignee
+                    final remainingAssignees = updatedTicket.assignedTo
+                        .where((email) => !updatedTicket.membersDone.contains(email))
+                        .toList();
+
+                    if (remainingAssignees.length == 1) {
+                      await _notificationService.notifyLastAssignee(
+                        ticket: updatedTicket,
+                        project: widget.project,
+                        lastAssigneeEmail: remainingAssignees.first,
+                      );
+                    }
+
                     Navigator.pop(context);
                     _refreshTickets();
 
@@ -1401,107 +1410,148 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
-  void _showChangeStatusDialog(Ticket ticket) {
-    showDialog(
+  void _showChangeStatusDialog(Ticket ticket) async {
+    final statuses = ['todo', 'in_progress', 'in_review', 'done'];
+    
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Change Status'),
-        content: Column(
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStatusOption('todo', 'To Do', Colors.grey.shade400, ticket),
-            _buildStatusOption(
-                'in_progress', 'In Progress', Colors.orange.shade400, ticket),
-            _buildStatusOption(
-                'in_review', 'In Review', Colors.purple.shade400, ticket),
-            _buildStatusOption('done', 'Done', Colors.green.shade400, ticket),
+            Text(
+              'Change Ticket Status',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            ...statuses.map((status) {
+              final isCurrentStatus = ticket.status == status;
+              return ListTile(
+                leading: _getStatusIcon(status),
+                title: Text(_formatStatus(status)),
+                trailing: isCurrentStatus ? const Icon(Icons.check) : null,
+                onTap: isCurrentStatus
+                    ? null
+                    : () async {
+                        Navigator.pop(context);
+                        await _handleStatusChange(ticket, status);
+                      },
+              );
+            }),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatusOption(
-      String statusValue, String statusLabel, Color color, Ticket ticket) {
-    final isCurrentStatus = ticket.status == statusValue;
+  Future<void> _handleStatusChange(Ticket ticket, String newStatus) async {
+    final oldStatus = ticket.status;
     
-    // Determine if this status option should be disabled
-    bool isDisabled = false;
-    if (ticket.status == 'todo' && statusValue == 'in_progress' && !ticket.allAssigneesDone) {
-      isDisabled = true;
-    } else if (ticket.status == 'in_progress' && statusValue == 'in_review' && !ticket.allAssigneesDone) {
-      isDisabled = true;
-    }
-
-    return InkWell(
-      onTap: isDisabled ? null : () {
-        if (!isCurrentStatus) {
-          final updatedTicket = ticket.copyWith(
-            status: statusValue,
-            membersDone: [], // Reset member progress when status changes
-          );
-          _projectManager.updateTicket(
-              ticket.projectId, ticket.ticketNumber, updatedTicket);
-          Navigator.pop(context);
-          _refreshTickets();
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Moved to $statusLabel'),
-              backgroundColor: color,
+    // Show confirmation for specific transitions
+    if (ticket.status == 'in_review') {
+      if (newStatus == 'done') {
+        // Confirm moving to Done
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Mark as Done?'),
+            content: const Text(
+              'When a ticket is marked as done, you cannot change its status or edit it anymore. Are you sure?',
             ),
-          );
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isCurrentStatus 
-              ? color.withOpacity(0.2) 
-              : isDisabled 
-                  ? Colors.grey.shade100 
-                  : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isCurrentStatus 
-                ? color 
-                : isDisabled 
-                    ? Colors.grey.shade300 
-                    : Colors.grey.shade200,
-            width: 2,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                ),
+                child: const Text('Mark as Done'),
+              ),
+            ],
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+        );
+        
+        if (confirmed != true) return;
+      } else if (newStatus == 'todo' || newStatus == 'in_progress') {
+        // Confirm reverting to previous status
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Revert Status?'),
+            content: Text(
+              'Are you sure you want to bring this ticket back to ${_formatStatus(newStatus)}? You can still edit the ticket as long as it\'s not marked as Done.',
             ),
-            const SizedBox(width: 12),
-            Text(
-              statusLabel,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: isCurrentStatus ? FontWeight.bold : FontWeight.w500,
-                color: isDisabled 
-                    ? Colors.grey.shade400 
-                    : const Color(0xFF1E1E1E),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
               ),
-            ),
-            const Spacer(),
-            if (isCurrentStatus)
-              Icon(Icons.check_circle, color: color, size: 24)
-            else if (isDisabled)
-              Icon(Icons.lock, color: Colors.grey.shade400, size: 20),
-          ],
-        ),
-      ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                ),
+                child: const Text('Revert Status'),
+              ),
+            ],
+          ),
+        );
+        
+        if (confirmed != true) return;
+      }
+    }
+    
+    // Update ticket status
+    final updatedTicket = ticket.copyWith(status: newStatus);
+    await _projectManager.updateTicket(
+      ticket.projectId,
+      ticket.ticketNumber,
+      updatedTicket,
     );
+    
+    // Send notifications to assignees
+    await _notificationService.notifyAssigneeStatusChanged(
+      ticket: updatedTicket,
+      project: widget.project,
+      oldStatus: oldStatus,
+      newStatus: newStatus,
+    );
+    
+    _refreshTickets();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ticket status changed to ${_formatStatus(newStatus)}'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Icon _getStatusIcon(String status) {
+    switch (status) {
+      case 'todo':
+        return const Icon(Icons.circle_outlined, color: Colors.grey);
+      case 'in_progress':
+        return const Icon(Icons.play_arrow, color: Colors.orange);
+      case 'in_review':
+        return const Icon(Icons.visibility, color: Colors.purple);
+      case 'done':
+        return const Icon(Icons.check_circle, color: Colors.green);
+      default:
+        return const Icon(Icons.circle);
+    }
   }
 
   void _showDeleteConfirmation(Ticket ticket) {
@@ -1588,15 +1638,19 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         children: [
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                _navigateToEditTicketPage(ticket);
-              },
+              onPressed: ticket.status == 'done'
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      _navigateToEditTicketPage(ticket);
+                    },
               icon: const Icon(Icons.edit),
               label: const Text('Edit Ticket'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: const Color(0xFF1E1E1E),
+                disabledBackgroundColor: Colors.grey.shade300,
+                disabledForegroundColor: Colors.grey.shade600,
                 elevation: 0,
                 side: BorderSide(color: Colors.grey.shade300),
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1609,21 +1663,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: (ticket.status == 'todo' || ticket.status == 'in_progress') && !ticket.allAssigneesDone
+              onPressed: ticket.status == 'done'
                   ? null
                   : () {
                       Navigator.pop(context);
                       _showChangeStatusDialog(ticket);
                     },
               icon: const Icon(Icons.change_circle_outlined),
-              label: (ticket.status == 'todo' || ticket.status == 'in_progress')
-                  ? const Text('Move to Next Status')
-                  : const Text('Change Status'),
+              label: const Text('Change Status'),
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    (ticket.status == 'todo' || ticket.status == 'in_progress') && !ticket.allAssigneesDone
-                        ? Colors.grey.shade400
-                        : const Color(0xFF1E1E1E),
+                backgroundColor: const Color(0xFF1E1E1E),
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: Colors.grey.shade400,
                 disabledForegroundColor: Colors.white,
@@ -1660,6 +1709,26 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         ticket.copyWith(membersDone: updatedMembersDone);
                     _projectManager.updateTicket(
                         ticket.projectId, ticket.ticketNumber, updatedTicket);
+
+                    // Send notification to PM
+                    _notificationService.notifyPMTicketReady(
+                      ticket: updatedTicket,
+                      project: widget.project,
+                      action: 'marked_done',
+                    );
+
+                    // Check if this is the last assignee
+                    final remainingAssignees = updatedTicket.assignedTo
+                        .where((email) => !updatedTicket.membersDone.contains(email))
+                        .toList();
+
+                    if (remainingAssignees.length == 1) {
+                      _notificationService.notifyLastAssignee(
+                        ticket: updatedTicket,
+                        project: widget.project,
+                        lastAssigneeEmail: remainingAssignees.first,
+                      );
+                    }
 
                     Navigator.pop(context);
                     _refreshTickets();
@@ -1711,6 +1780,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
               _projectManager.updateTicket(
                   ticket.projectId, ticket.ticketNumber, updatedTicket);
+
+              // Send notification to PM
+              _notificationService.notifyPMTicketReady(
+                ticket: updatedTicket,
+                project: widget.project,
+                action: 'submitted_review',
+              );
 
               Navigator.pop(context);
               _refreshTickets();

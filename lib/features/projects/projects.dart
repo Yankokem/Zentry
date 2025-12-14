@@ -19,6 +19,7 @@ export 'models/team_member_model.dart';
 // Services
 export 'services/project_manager.dart';
 export 'services/task_manager.dart';
+export 'services/project_notification_service.dart';
 
 // Widgets
 export 'widgets/project_card.dart';

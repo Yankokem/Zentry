@@ -1241,11 +1241,24 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   void _showAddDialog() {
-    Navigator.pushNamed(context, '/add-wish');
+    Navigator.pushNamed(
+      context,
+      '/add-wish',
+      arguments: {
+        'controller': _controller,
+      },
+    );
   }
 
   void _showEditDialog(Wish item) {
-    Navigator.pushNamed(context, '/add-wish');
+    Navigator.pushNamed(
+      context,
+      '/add-wish',
+      arguments: {
+        'controller': _controller,
+        'itemToEdit': item,
+      },
+    );
   }
 
   void _showAddCategoryDialog() {

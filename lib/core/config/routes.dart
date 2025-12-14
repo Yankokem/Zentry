@@ -32,6 +32,7 @@ class AppRoutes {
 
   // Wishlist
   static const String wishlist = '/wishlist';
+  static const String addWish = '/add-wish';
 
   // Notifications
   static const String notifications = '/notifications';
@@ -122,6 +123,15 @@ class AppRoutes {
           builder: (_) => WishlistPage(
             showModalForWishId: args?['showModalForWishId'] as String?,
             highlightWishId: args?['highlightWishId'] as String?,
+          ),
+        );
+
+      case addWish:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => AddWishlistScreen(
+            controller: args?['controller'] as WishlistController,
+            itemToEdit: args?['itemToEdit'] as Wish?,
           ),
         );
 

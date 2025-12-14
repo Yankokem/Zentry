@@ -86,7 +86,18 @@ class AddMenuWidget extends StatelessWidget {
             color: Colors.orange,
             onTap: () {
               Navigator.pop(context);
-              Navigator.pushNamed(context, '/add-wish');
+              if (wishlistController != null) {
+                Navigator.pushNamed(
+                  context,
+                  '/add-wish',
+                  arguments: {
+                    'controller': wishlistController,
+                  },
+                );
+              } else {
+                // If no controller provided, navigate to wishlist page first
+                Navigator.pushNamed(context, '/wishlist');
+              }
             },
           ),
           const SizedBox(height: 24),
