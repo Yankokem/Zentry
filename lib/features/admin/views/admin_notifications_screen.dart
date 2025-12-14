@@ -277,14 +277,39 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
       case AdminNotificationType.newBugReport:
         // Show a preview of the description if available
         final description = notification.metadata['description'] ?? notification.message;
-        return description.length > 80 ? '${description.substring(0, 80)}...' : description;
+        final plainText = _extractPlainTextFromDelta(description);
+        return plainText.length > 80 ? '${plainText.substring(0, 80)}...' : plainText;
       case AdminNotificationType.newAppeal:
       case AdminNotificationType.urgentAppeal:
         // Show a preview of the appeal message
         final message = notification.metadata['appealMessage'] ?? notification.message;
-        return message.length > 80 ? '${message.substring(0, 80)}...' : message;
+        final plainText = _extractPlainTextFromDelta(message);
+        return plainText.length > 80 ? '${plainText.substring(0, 80)}...' : plainText;
       default:
         return notification.message;
+    }
+  }
+
+  /// Extract plain text from Delta JSON format
+  String _extractPlainTextFromDelta(String deltaJson) {
+    try {
+      // If it doesn't look like JSON, return as-is
+      if (!deltaJson.contains('{') || !deltaJson.contains('insert')) {
+        return deltaJson;
+      }
+      
+      // Simple regex to extract text between "insert":"..." 
+      final regex = RegExp(r'"insert":"([^"]*)"');
+      final matches = regex.allMatches(deltaJson);
+      final extractedTexts = matches.map((m) => m.group(1) ?? '').toList();
+      var result = extractedTexts.join('').trim();
+      
+      // Remove escaped newlines and other whitespace artifacts
+      result = result.replaceAll('\\n', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+      
+      return result;
+    } catch (e) {
+      return deltaJson;
     }
   }
 
