@@ -1433,11 +1433,37 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             const SizedBox(height: 16),
             ...statuses.map((status) {
               final isCurrentStatus = ticket.status == status;
+              
+              // Determine if this status option should be disabled
+              bool isDisabled = false;
+              String? disabledReason;
+              
+              // PM can only move to In Progress if assignees marked as done
+              if (ticket.status == 'todo' && status == 'in_progress' && !ticket.allAssigneesDone) {
+                isDisabled = true;
+                disabledReason = 'Assignees must mark as done first';
+              }
+              // PM can only move to In Review if ticket was submitted for review
+              else if (ticket.status == 'in_progress' && status == 'in_review' && !ticket.allAssigneesDone) {
+                isDisabled = true;
+                disabledReason = 'Assignees must submit for review first';
+              }
+              
               return ListTile(
                 leading: _getStatusIcon(status),
                 title: Text(_formatStatus(status)),
+                subtitle: isDisabled && disabledReason != null
+                    ? Text(
+                        disabledReason,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      )
+                    : null,
                 trailing: isCurrentStatus ? const Icon(Icons.check) : null,
-                onTap: isCurrentStatus
+                enabled: !isDisabled && !isCurrentStatus,
+                onTap: isCurrentStatus || isDisabled
                     ? null
                     : () async {
                         Navigator.pop(context);
@@ -1512,7 +1538,20 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
     
     // Update ticket status
-    final updatedTicket = ticket.copyWith(status: newStatus);
+    Ticket updatedTicket;
+    
+    // ALWAYS reset membersDone when PM changes status (except when moving to Done)
+    // This ensures assignees must mark as done/submit for review at each stage
+    if (newStatus != 'done') {
+      updatedTicket = ticket.copyWith(
+        status: newStatus,
+        membersDone: [], // Clear so assignees must re-submit at each stage
+      );
+    } else {
+      // When moving to Done, keep membersDone as is
+      updatedTicket = ticket.copyWith(status: newStatus);
+    }
+    
     await _projectManager.updateTicket(
       ticket.projectId,
       ticket.ticketNumber,
@@ -1665,10 +1704,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             child: ElevatedButton.icon(
               onPressed: ticket.status == 'done'
                   ? null
-                  : () {
-                      Navigator.pop(context);
-                      _showChangeStatusDialog(ticket);
-                    },
+                  : (ticket.status == 'todo' || ticket.status == 'in_progress') && !ticket.allAssigneesDone
+                      ? null
+                      : () {
+                          Navigator.pop(context);
+                          _showChangeStatusDialog(ticket);
+                        },
               icon: const Icon(Icons.change_circle_outlined),
               label: const Text('Change Status'),
               style: ElevatedButton.styleFrom(

@@ -130,14 +130,46 @@ class _CalendarDialogState extends State<CalendarDialog> {
                 calendarBuilders: CalendarBuilders(
                   markerBuilder: (context, date, events) {
                     if (events.isNotEmpty) {
+                      // Get tickets for this date
+                      final ticketsForDate = _getTicketsForDate(date);
+                      if (ticketsForDate.isEmpty) return null;
+                      
+                      // Determine marker color based on ticket status and deadline
+                      Color markerColor = Colors.grey; // Default for pending
+                      
+                      // Check if any ticket is late (past deadline and not in review or done)
+                      final now = DateTime.now();
+                      final isLate = ticketsForDate.any((ticket) {
+                        if (ticket.deadline == null) return false;
+                        final isPastDeadline = ticket.deadline!.isBefore(now);
+                        final isNotCompleted = ticket.status != 'in_review' && ticket.status != 'done';
+                        return isPastDeadline && isNotCompleted;
+                      });
+                      
+                      if (isLate) {
+                        markerColor = Colors.red; // Late
+                      } else {
+                        // Check status priority: done > in_review > pending
+                        final hasDone = ticketsForDate.any((t) => t.status == 'done');
+                        final hasInReview = ticketsForDate.any((t) => t.status == 'in_review');
+                        
+                        if (hasDone) {
+                          markerColor = Colors.green; // Done
+                        } else if (hasInReview) {
+                          markerColor = Colors.purple; // In Review
+                        } else {
+                          markerColor = Colors.grey; // Pending (todo or in_progress)
+                        }
+                      }
+                      
                       return Positioned(
                         right: 1,
                         bottom: 1,
                         child: Container(
                           width: 6,
                           height: 6,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
+                          decoration: BoxDecoration(
+                            color: markerColor,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -148,11 +180,17 @@ class _CalendarDialogState extends State<CalendarDialog> {
                 ),
               ),
             const SizedBox(height: 16),
-            Text(
-              'Red dots indicate ticket deadlines',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
-                  ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildLegendItem(Colors.grey, 'Pending (To-Do / In Progress)'),
+                const SizedBox(height: 4),
+                _buildLegendItem(Colors.purple, 'In Review'),
+                const SizedBox(height: 4),
+                _buildLegendItem(Colors.green, 'Done'),
+                const SizedBox(height: 4),
+                _buildLegendItem(Colors.red, 'Late (Past Deadline)'),
+              ],
             ),
             if (_selectedDay != null) ...[
               const SizedBox(height: 16),
@@ -187,6 +225,29 @@ class _CalendarDialogState extends State<CalendarDialog> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.grey.shade700,
+              ),
+        ),
+      ],
     );
   }
 }
