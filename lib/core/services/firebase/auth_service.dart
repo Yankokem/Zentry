@@ -146,6 +146,58 @@ class AuthService {
     }
   }
 
+  /// Re-authenticate the current user using Google OAuth.
+  /// On mobile/desktop this uses the GoogleSignIn flow and calls
+  /// `reauthenticateWithCredential` on the current user with the
+  /// obtained OAuth credential. On web it uses `signInWithPopup`.
+  Future<void> reauthenticateWithGoogle() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      if (kIsWeb) {
+        GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        googleProvider.setCustomParameters({'prompt': 'select_account'});
+
+        // signInWithPopup will refresh the authentication for current session
+        final UserCredential cred = await _auth.signInWithPopup(googleProvider);
+
+        // If the re-authenticated email doesn't match the current user's email,
+        // throw an error to avoid accidental account switch.
+        if ((cred.user?.email ?? '') != (user.email ?? '')) {
+          throw Exception('Selected Google account does not match your current account');
+        }
+
+        return;
+      }
+
+      // For mobile/desktop, trigger Google Sign-In to obtain tokens
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        throw Exception('Google sign-in was cancelled');
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      if (googleAuth.idToken == null) {
+        throw Exception('Failed to get Google ID token. Check Firebase Console configuration.');
+      }
+
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Reauthenticate the current user
+      await user.reauthenticateWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      throw Exception('Google re-authentication failed: ${e.toString()}');
+    }
+  }
+
   Future<void> signOut() async {
     if (!kIsWeb) {
       // On mobile/desktop, sign out and disconnect the GoogleSignIn

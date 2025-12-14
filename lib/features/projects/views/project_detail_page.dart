@@ -24,8 +24,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   final ProjectManager _projectManager = ProjectManager();
   final UserService _userService = UserService();
   Map<String, Map<String, String>> _userDetails = {};
-  bool _isLoadingUsers = true;
   String? _highlightedTicketId;
+  bool _isLoadingUsers = false;
 
   @override
   void initState() {
@@ -137,12 +137,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     
     // Default to Member if no role assigned
     return 'Member';
-  }
-
-  double _calculateAvatarStackWidth() {
-    final count = widget.project.teamMembers.length;
-    // Each avatar overlaps by 10px (20px spacing on 30px diameter)
-    return count > 0 ? (count - 1) * 20.0 + 30.0 : 30.0;
   }
 
   double _calculateAvatarStackWidthWithButton() {
@@ -434,81 +428,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         fontWeight: FontWeight.w600,
                         color: roleColor.withOpacity(0.8),
                       ),
-                    ),
-                  ),
-                  if (isPending) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.orange.shade300),
-                      ),
-                      child: Text(
-                        'Pending',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.orange.shade700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              Text(
-                email,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMemberTile(String displayName, String email, String profileUrl) {
-    // Check if member is pending
-    final isPending = widget.project.isMemberPending(email);
-
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundImage:
-              profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
-          backgroundColor:
-              isPending ? Colors.orange.shade100 : Colors.grey.shade300,
-          child: profileUrl.isEmpty
-              ? Text(
-                  displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: isPending ? Colors.orange : null,
-                  ),
-                )
-              : null,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    displayName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
                     ),
                   ),
                   if (isPending) ...[
@@ -1124,26 +1043,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
-  void _showAddTicketDialog() {
-    // Only allow project managers to add tickets
-    if (!_isCurrentUserProjectManager()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Only project managers can create tickets'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    TicketDialogs.showAddTicketDialog(context, widget.project, _refreshTickets);
-  }
-
-  void _showEditTicketDialog(Ticket ticket) {
-    TicketDialogs.showEditTicketDialog(
-        context, ticket, widget.project, _refreshTickets);
-  }
-
   Color _getColorForEmail(String email) {
     final colors = [
       Colors.blue.shade300,
@@ -1500,48 +1399,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ),
       ),
     );
-  }
-
-  String? _getRoleForEmail(String email) {
-    // Check if this email belongs to the project creator
-    // The project.userId contains the UID of the creator
-    // We need to find the creator's email from _userDetails or teamMemberDetails
-
-    // First, find if this email's user is the project creator by checking their UID
-    for (final member in widget.project.teamMemberDetails) {
-      if (member.email == email) {
-        // This person is in the team - check if they're the creator
-        // We'll need to verify by checking if their UID matches project.userId
-        // For now, let's check from user details
-        final details = _userDetails[email] ?? {};
-        // We can't directly compare UID here, so we'll use a different approach
-        break;
-      }
-    }
-
-    // Check if this email is the current user and they are the project creator
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser != null && currentUser.uid == widget.project.userId) {
-      // Current user is the project creator
-      // Check if the email being checked is the current user's email
-      if (currentUser.email == email) {
-        return 'Project Manager';
-      }
-    }
-
-    // Find explicit roles from project roles
-    for (final role in widget.project.roles) {
-      if (role.members.contains(email)) {
-        return role.name;
-      }
-    }
-
-    // If they're in the team but not the creator and no explicit role, they're a member
-    if (widget.project.teamMembers.contains(email)) {
-      return 'Member';
-    }
-
-    return null;
   }
 
   void _showChangeStatusDialog(Ticket ticket) {

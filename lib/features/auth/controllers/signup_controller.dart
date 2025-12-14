@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:zentry/core/core.dart';
+import 'package:zentry/core/utils/password_validator.dart';
 import 'package:zentry/features/admin/services/admin_notification_service.dart';
 
 class SignupController {
@@ -42,8 +43,10 @@ class SignupController {
       return false;
     }
 
-    if (passwordController.text.length < 8) {
-      _errorMessage = 'Password must be at least 8 characters';
+    // Validate password strength
+    final passwordError = PasswordValidator.validatePassword(passwordController.text);
+    if (passwordError != null) {
+      _errorMessage = passwordError;
       return false;
     }
 

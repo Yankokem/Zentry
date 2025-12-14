@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zentry/core/core.dart';
+import 'package:zentry/core/utils/password_validator.dart';
 import 'package:zentry/features/auth/auth.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -161,13 +162,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               ),
                             ),
                             validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your new password';
-                              }
-                              if (value.length < 8) {
-                                return 'Password must be at least 8 characters';
-                              }
-                              return null;
+                              return PasswordValidator.validatePassword(value);
                             },
                           ),
                         ),

@@ -549,10 +549,6 @@ class _AddProjectPageState extends State<AddProjectPage> {
               final project = await _firestoreService
                   .getProjectById(widget.projectToEdit!.id);
               if (project != null && project.totalTickets > 0) {
-                final percentage =
-                    (project.completedTickets / project.totalTickets * 100)
-                        .round();
-
                 // Notify all team members about completion
                 for (final memberEmail in _teamMembers) {
                   final memberDoc = await FirebaseFirestore.instance

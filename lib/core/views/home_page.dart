@@ -271,10 +271,6 @@ class _HomePageState extends State<HomePage> {
           final isAssignedToCurrentUser = currentUserEmail != null && 
               ticket.assignedTo.any((email) => email.toLowerCase() == currentUserEmail);
           
-          // Check if current user has marked this ticket as done
-          final userHasMarkedDone = currentUserEmail != null && 
-              ticket.membersDone.any((email) => email.toLowerCase() == currentUserEmail);
-
           // Check if current user is the project owner/creator
           final isProjectOwner = activeProjects.any((p) => p.id == projectId && p.userId == _currentUserId);
 

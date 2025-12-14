@@ -111,21 +111,6 @@ class _ProjectCardState extends State<ProjectCard> {
     }
   }
 
-  String _getTeamMembersDisplay() {
-    if (_isLoadingUsers) return 'Loading...';
-
-    final displayNames = widget.project.teamMembers.map((email) {
-      final details = _userDetails[email];
-      return _userService.getDisplayName(details ?? {}, email);
-    }).toList();
-
-    // Show only first 2 members with "+X others" format
-    final firstTwo = displayNames.take(2).join(', ');
-    final remaining = displayNames.length - 2;
-
-    return remaining > 0 ? '$firstTwo, and $remaining others' : firstTwo;
-  }
-
   double _calculateStackWidth() {
     // Filter out the project creator for workspace projects
     final currentUser = FirebaseAuth.instance.currentUser;

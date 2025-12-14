@@ -1,7 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:zentry/core/core.dart';
+import 'package:zentry/core/utils/password_validator.dart';
 import 'package:zentry/features/auth/auth.dart';
+
+/// Formatter to capitalize the first letter of each word
+class CapitalizeWordsFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    final List<String> words = newValue.text.split(' ');
+    final List<String> capitalizedWords = words.map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).toList();
+
+    final String capitalizedText = capitalizedWords.join(' ');
+
+    return newValue.copyWith(
+      text: capitalizedText,
+      selection: TextSelection.fromPosition(
+        TextPosition(offset: capitalizedText.length),
+      ),
+    );
+  }
+}
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -153,6 +183,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   controller: _controller.firstNameController,
                   keyboardType: TextInputType.name,
                   textCapitalization: TextCapitalization.sentences,
+                  inputFormatters: [CapitalizeWordsFormatter()],
                   decoration: const InputDecoration(
                     labelText: 'First Name',
                     hintText: 'Enter your first name',
@@ -176,6 +207,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   controller: _controller.lastNameController,
                   keyboardType: TextInputType.name,
                   textCapitalization: TextCapitalization.sentences,
+                  inputFormatters: [CapitalizeWordsFormatter()],
                   decoration: const InputDecoration(
                     labelText: 'Last Name',
                     hintText: 'Enter your last name',
@@ -236,13 +268,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
-                    if (value.length < AppConstants.minPasswordLength) {
-                      return 'Password must be at least ${AppConstants.minPasswordLength} characters';
-                    }
-                    return null;
+                    return PasswordValidator.validatePassword(value);
                   },
                 ),
                 

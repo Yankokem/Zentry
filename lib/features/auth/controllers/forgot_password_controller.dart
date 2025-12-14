@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zentry/core/core.dart';
+import 'package:zentry/core/utils/password_validator.dart';
 
 class ForgotPasswordController {
   final AuthService _authService = AuthService();
@@ -36,8 +37,10 @@ class ForgotPasswordController {
       return false;
     }
 
-    if (newPasswordController.text.length < 8) {
-      _errorMessage = 'Password must be at least 8 characters';
+    // Validate password strength
+    final passwordError = PasswordValidator.validatePassword(newPasswordController.text);
+    if (passwordError != null) {
+      _errorMessage = passwordError;
       _successMessage = null;
       return false;
     }
@@ -47,8 +50,8 @@ class ForgotPasswordController {
     _successMessage = null;
 
     try {
-      // Verify the OOB code is valid
-      final email = await _auth.verifyPasswordResetCode(oobCode);
+      // Verify the OOB code is valid and get the email
+      await _auth.verifyPasswordResetCode(oobCode);
       
       // Confirm the password reset with the OOB code
       await _auth.confirmPasswordReset(
@@ -84,8 +87,10 @@ class ForgotPasswordController {
       return false;
     }
 
-    if (newPasswordController.text.length < 8) {
-      _errorMessage = 'Password must be at least 8 characters';
+    // Validate password strength
+    final passwordError = PasswordValidator.validatePassword(newPasswordController.text);
+    if (passwordError != null) {
+      _errorMessage = passwordError;
       _successMessage = null;
       return false;
     }

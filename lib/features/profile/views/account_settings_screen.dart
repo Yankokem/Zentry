@@ -6,6 +6,7 @@ import 'package:country_picker/country_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:zentry/core/core.dart';
+import 'package:zentry/core/utils/password_validator.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   const AccountSettingsScreen({super.key});
@@ -209,7 +210,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     }
   }
 
-  Future<void> _saveChanges() async {
+  Future<void> _saveChanges({bool isRetry = false}) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
@@ -254,8 +255,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           throw Exception('New passwords do not match');
         }
         
-        if (_newPasswordController.text.trim().length < 6) {
-          throw Exception('Password must be at least 6 characters');
+        // Validate password strength
+        final passwordError = PasswordValidator.validatePassword(_newPasswordController.text.trim());
+        if (passwordError != null) {
+          throw Exception(passwordError);
         }
         
         if (_hasPassword) {
@@ -270,12 +273,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             password: _currentPasswordController.text.trim(),
           );
           await user.reauthenticateWithCredential(credential);
-        } else if (_isGoogleUser) {
-          // Google user setting password for the first time
-          // Need to re-authenticate with Google before adding password
-          final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-          await user.reauthenticateWithProvider(googleProvider);
         }
+        // Note: Google users can add a password without re-authentication
         
         // Update to new password
         await user.updatePassword(_newPasswordController.text.trim());
@@ -317,8 +316,85 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
+        // More robust check for requires recent login
+        final bool requiresRecentLogin =
+            (e is FirebaseAuthException && e.code == 'requires-recent-login') ||
+            e.toString().toLowerCase().contains('requires-recent-login') ||
+            e.toString().toLowerCase().contains('requires recent');
+
+        if (requiresRecentLogin && !isRetry) {
+          _showReauthenticationDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error saving changes: $e')),
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  void _showReauthenticationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Re-authentication Required'),
+        content: const Text(
+          'Setting a password is a sensitive operation. You can re-authenticate with Google now (recommended) or log in again manually.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Try in-app re-authentication
+              await _handleInAppReauthentication();
+            },
+            child: const Text('Re-authenticate Now'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _authService.signOut();
+              if (mounted) {
+                Navigator.pushReplacementNamed(context, AppRoutes.login);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please log in with Google again to set your password'),
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+              }
+            },
+            child: const Text('Log In Again'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleInAppReauthentication() async {
+    setState(() => _isSaving = true);
+    try {
+      await _authService.reauthenticateWithGoogle();
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving changes: $e')),
+          const SnackBar(content: Text('Re-authenticated successfully. Retrying save...')),
+        );
+      }
+
+      // Retry the save flow once after successful re-authentication
+      await _saveChanges(isRetry: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Re-authentication failed: $e')),
         );
       }
     } finally {
@@ -747,7 +823,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     controller: _newPasswordController,
                     decoration: InputDecoration(
                       labelText: 'New Password',
-                      hintText: 'At least 6 characters',
+                      hintText: '8+ chars, uppercase, lowercase, number & special char',
                       prefixIcon: const Icon(Icons.lock),
                       border: OutlineInputBorder(
                         borderRadius:

@@ -91,7 +91,6 @@ class UserService {
   String _getGoogleProfilePictureUrl(String email) {
     // Use Gravatar as a reliable fallback source for profile pictures
     // Gravatar is commonly used and has good coverage
-    final emailLower = email.toLowerCase().trim();
     // In a real app, you might want to compute MD5 hash, but for now we'll use a simpler approach
     // that relies on the profilePictureUrl from Firestore or user initialization
     return '';

@@ -22,8 +22,8 @@ class _WishlistPageState extends State<WishlistPage> {
   String _selectedOwnership = 'personal'; // Default to 'personal'
   final UserService _userService = UserService();
   Map<String, Map<String, String>> _userDetails = {};
-  bool _isLoadingUsers = true;
   String? _highlightedWishId;
+  bool _isLoadingUsers = false;
 
   @override
   void initState() {
@@ -86,64 +86,6 @@ class _WishlistPageState extends State<WishlistPage> {
         _isLoadingUsers = false;
       });
     }
-  }
-
-  double _calculateSharedWithStackWidth(int count) {
-    // Each avatar overlaps by 8px (18px spacing on 28px diameter)
-    return count > 0 ? (count - 1) * 18.0 + 28.0 : 28.0;
-  }
-
-  List<Widget> _buildSharedWithAvatarStack(List<String> sharedWith) {
-    final avatarWidgets = <Widget>[];
-
-    for (int i = 0; i < sharedWith.length; i++) {
-      final email = sharedWith[i];
-      final details = _userDetails[email] ?? {};
-      final fullName = details['fullName'] ?? '';
-      final displayName = fullName.isNotEmpty
-          ? fullName
-          : _userService.getDisplayName(details, email);
-      final profileUrl = details['profilePictureUrl'] ?? '';
-
-      avatarWidgets.add(
-        Positioned(
-          left: i * 22.0,
-          child: Tooltip(
-            message: displayName,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: CircleAvatar(
-                radius: 16,
-                backgroundImage:
-                    profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
-                onBackgroundImageError: profileUrl.isNotEmpty
-                    ? (exception, stackTrace) {
-                        print('Error loading profile image for $email: $exception');
-                      }
-                    : null,
-                backgroundColor: Colors.grey.shade300,
-                child: profileUrl.isEmpty
-                    ? Text(
-                        displayName.isNotEmpty
-                            ? displayName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : null,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return avatarWidgets;
   }
 
   @override
@@ -1299,24 +1241,11 @@ class _WishlistPageState extends State<WishlistPage> {
   }
 
   void _showAddDialog() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddWishlistScreen(controller: _controller!),
-      ),
-    );
+    Navigator.pushNamed(context, '/add-wish');
   }
 
   void _showEditDialog(Wish item) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddWishlistScreen(
-          controller: _controller!,
-          itemToEdit: item,
-        ),
-      ),
-    );
+    Navigator.pushNamed(context, '/add-wish');
   }
 
   void _showAddCategoryDialog() {
