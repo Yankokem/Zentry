@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloudinary_public/cloudinary_public.dart';
 
 /// Upload type enum to specify which preset to use
@@ -54,6 +55,12 @@ class CloudinaryService {
   /// 
   /// Note: For unsigned presets, do not specify publicId or folder.
   /// Cloudinary will auto-generate unique IDs and use preset folder settings.
+  /// Upload an image file to Cloudinary
+  /// 
+  /// [file] - The image file to upload
+  /// [uploadType] - The type of upload (determines which preset to use)
+  /// 
+  /// Returns the secure URL of the uploaded image
   Future<String> uploadImage(
     File file, {
     required CloudinaryUploadType uploadType,
@@ -64,10 +71,6 @@ class CloudinaryService {
         throw Exception('CloudinaryService not initialized. Call initialize() first.');
       }
 
-      // For unsigned presets:
-      // - Don't specify publicId (Cloudinary auto-generates)
-      // - Don't specify folder (use preset's folder setting)
-      // - Don't add extra parameters that unsigned presets don't support
       final response = await cloudinary.uploadFile(
         CloudinaryFile.fromFile(
           file.path,
@@ -77,10 +80,49 @@ class CloudinaryService {
 
       return response.secureUrl;
     } on CloudinaryException catch (e) {
-      // Cloudinary-specific errors
       throw Exception('Cloudinary error: ${e.message}');
     } catch (e) {
-      // Provide more detailed error information
+      throw Exception('Failed to upload image to Cloudinary: $e');
+    }
+  }
+
+  /// Upload an XFile (from image_picker) to Cloudinary
+  /// Supports both Web and Mobile
+  Future<String> uploadXFile(
+    dynamic xfile, { // Using dynamic to avoid importing image_picker if not needed, but ideally should be XFile
+    required CloudinaryUploadType uploadType,
+  }) async {
+    try {
+      final cloudinary = _cloudinaryInstances[uploadType];
+      if (cloudinary == null) {
+        throw Exception('CloudinaryService not initialized. Call initialize() first.');
+      }
+
+      CloudinaryFile cloudinaryFile;
+      
+      // Check if it's web or if we need to use bytes
+      // We assume xfile is XFile from image_picker
+      if (xfile.runtimeType.toString().contains('XFile')) {
+        final bytes = await xfile.readAsBytes();
+        cloudinaryFile = CloudinaryFile.fromByteData(
+          ByteData.view(bytes.buffer),
+          identifier: xfile.name,
+          resourceType: CloudinaryResourceType.Image,
+        );
+      } else {
+        // Fallback for File or other types
+        // If it's File (dart:io), use path
+        cloudinaryFile = CloudinaryFile.fromFile(
+          xfile.path,
+          resourceType: CloudinaryResourceType.Image,
+        );
+      }
+
+      final response = await cloudinary.uploadFile(cloudinaryFile);
+      return response.secureUrl;
+    } on CloudinaryException catch (e) {
+      throw Exception('Cloudinary error: ${e.message}');
+    } catch (e) {
       throw Exception('Failed to upload image to Cloudinary: $e');
     }
   }

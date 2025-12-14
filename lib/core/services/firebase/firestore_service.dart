@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:zentry/features/projects/projects.dart';
 
@@ -677,5 +678,63 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => Ticket.fromMap(doc.data())).toList());
+  }
+
+  // Listen to all tickets for a user across all their projects
+  // This combines tickets from all projects the user owns or is a member of
+  Stream<List<Ticket>> listenToUserTickets(String userId, String userEmail) {
+    // Controller to emit combined tickets
+    final controller = StreamController<List<Ticket>>();
+    
+    // Track subscriptions to cancel them
+    StreamSubscription<List<Project>>? projectsSub;
+    final ticketSubs = <String, StreamSubscription<List<Ticket>>>{};
+    final projectTickets = <String, List<Ticket>>{}; // Cache tickets by projectId
+
+    // Helper to emit current state
+    void emit() {
+      if (controller.isClosed) return;
+      final all = projectTickets.values.expand((x) => x).toList();
+      controller.add(all);
+    }
+
+    // Listen to projects
+    projectsSub = getUserProjectsStream(userId, userEmail).listen((projects) {
+      // Identify projects that were removed
+      final currentIds = projects.map((p) => p.id).toSet();
+      final removedIds = ticketSubs.keys.where((id) => !currentIds.contains(id)).toList();
+
+      // Cancel removed subscriptions
+      for (final id in removedIds) {
+        ticketSubs[id]?.cancel();
+        ticketSubs.remove(id);
+        projectTickets.remove(id);
+      }
+
+      // Add new subscriptions
+      for (final project in projects) {
+        if (!ticketSubs.containsKey(project.id)) {
+          ticketSubs[project.id] = listenToProjectTickets(project.id).listen((tickets) {
+            projectTickets[project.id] = tickets;
+            emit();
+          });
+        }
+      }
+      
+      // Emit immediately if we have cached data
+      // Note: New projects will emit when their ticket stream sends first event
+      if (projectTickets.isNotEmpty || projects.isEmpty) {
+        emit();
+      }
+    });
+
+    controller.onCancel = () {
+      projectsSub?.cancel();
+      for (final sub in ticketSubs.values) {
+        sub.cancel();
+      }
+    };
+
+    return controller.stream;
   }
 }

@@ -692,6 +692,8 @@ class AppNotification {
         return Icons.warning;
       case 'task_status_changed':
         return Icons.sync;
+      case 'project_ticket':
+        return Icons.assignment;
       case 'wishlist_update':
         return Icons.card_giftcard;
       case 'wishlist_invitation':
@@ -729,6 +731,19 @@ class AppNotification {
         return Colors.red;
       case 'task_status_changed':
         return Colors.purple;
+      case 'project_ticket':
+        if (data.containsKey('newStatus')) {
+          final status = data['newStatus'];
+          if (status == 'in_progress') return Colors.orange;
+          if (status == 'in_review') return Colors.purple;
+          if (status == 'done') return Colors.green;
+          if (status == 'todo') return Colors.grey;
+        } else if (data.containsKey('action')) {
+          final action = data['action'];
+          if (action == 'marked_done') return Colors.green;
+          if (action == 'submitted_review') return Colors.purple;
+        }
+        return Colors.blue;
       case 'wishlist_update':
         return Colors.pink;
       case 'wishlist_invitation':

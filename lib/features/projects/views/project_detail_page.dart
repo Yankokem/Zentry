@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:intl/intl.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/features/projects/projects.dart';
@@ -807,8 +809,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -851,8 +854,63 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               ),
             ),
 
+            const SizedBox(height: 24),
+
+            // Details Section (Priority, Status, Deadline)
+            _buildDetailRow(
+                Icons.flag_outlined, 'Priority', ticket.priority.toUpperCase()),
+            const SizedBox(height: 12),
+
+            _buildDetailRow(Icons.assignment_outlined, 'Status',
+                _formatStatus(ticket.status)),
+            const SizedBox(height: 12),
+
+            // Deadline
+            if (ticket.deadline != null) ...[
+              _buildDetailRow(
+                Icons.calendar_today_outlined,
+                'Deadline',
+                DateFormat('MMM d, yyyy h:mm a').format(ticket.deadline!),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Assignees Section
+            Row(
+              children: [
+                Icon(Icons.person_outline,
+                    size: 20, color: Colors.grey.shade600),
+                const SizedBox(width: 12),
+                Text(
+                  'Assignees',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 32),
+              child: InkWell(
+                onTap: () => _showAssigneesModal(
+                    ticket.assignedTo, ticket.status, ticket),
+                child: _buildAssigneeAvatarStack(
+                  ticket.assignedTo,
+                  onViewMore: () => _showAssigneesModal(
+                      ticket.assignedTo, ticket.status, ticket),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+            const Divider(),
             const SizedBox(height: 16),
 
+            // Content Section (Images + Description)
+            
             // Image Carousel (if images exist)
             if (ticket.imageUrls.isNotEmpty) ...[
               SizedBox(
@@ -917,56 +975,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               const SizedBox(height: 16),
             ],
 
-            // Description
-            Text(
-              _getPlainTextFromDescription(ticket.description),
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey.shade700,
-                height: 1.5,
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Details
-            _buildDetailRow(
-                Icons.flag_outlined, 'Priority', ticket.priority.toUpperCase()),
-            const SizedBox(height: 12),
-
-            _buildDetailRow(Icons.assignment_outlined, 'Status',
-                _formatStatus(ticket.status)),
-            const SizedBox(height: 12),
-
-            // Status Section
-            Row(
-              children: [
-                Icon(Icons.person_outline,
-                    size: 20, color: Colors.grey.shade600),
-                const SizedBox(width: 12),
-                Text(
-                  'Assignees',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.only(left: 32),
-              child: InkWell(
-                onTap: () => _showAssigneesModal(
-                    ticket.assignedTo, ticket.status, ticket),
-                child: _buildAssigneeAvatarStack(
-                  ticket.assignedTo,
-                  onViewMore: () => _showAssigneesModal(
-                      ticket.assignedTo, ticket.status, ticket),
-                ),
-              ),
-            ),
+            // Description (Rich Text)
+            _buildTicketDescription(ticket),
 
             const SizedBox(height: 24),
 
@@ -975,7 +985,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
             const SizedBox(height: 12),
 
-            // Delete Button
             // Delete Button - Only for Project Creator
             if (FirebaseAuth.instance.currentUser?.uid ==
                 widget.project.userId) ...[
@@ -999,13 +1008,80 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 ),
               ),
             ],
-
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+            const SizedBox(height: 24),
           ],
         ),
       ),
+    ),
     );
   }
+
+  Widget _buildTicketDescription(Ticket ticket) {
+    if (ticket.richDescription != null && ticket.richDescription!.isNotEmpty) {
+      try {
+        final json = jsonDecode(ticket.richDescription!);
+        
+        // Override link colors in the Delta
+        if (json is List) {
+          for (var op in json) {
+            if (op is Map && op['attributes'] != null) {
+              final attrs = op['attributes'] as Map;
+              // If it's a link, ensure it's blue
+              if (attrs.containsKey('link')) {
+                attrs['color'] = '#0000FF'; // Blue color
+              }
+            }
+          }
+        }
+        
+        final doc = quill.Document.fromJson(json);
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: Colors.blue,
+            ),
+            textTheme: Theme.of(context).textTheme.apply(
+              bodyColor: Colors.black,
+              displayColor: Colors.black,
+            ).copyWith(
+              bodyMedium: TextStyle(
+                color: Colors.black,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+          child: DefaultTextStyle(
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 15,
+              height: 1.5,
+            ),
+            child: quill.QuillEditor.basic(
+              controller: quill.QuillController(
+                document: doc,
+                selection: const TextSelection.collapsed(offset: 0),
+                readOnly: true,
+              ),
+            ),
+          ),
+        );
+      } catch (e) {
+        debugPrint('Error parsing rich description: $e');
+      }
+    }
+    
+    // Fallback to plain text
+    return Text(
+      _getPlainTextFromDescription(ticket.description),
+      style: TextStyle(
+        fontSize: 15,
+        color: Colors.grey.shade700,
+        height: 1.5,
+      ),
+    );
+  }
+
+
 
   void _navigateToAddTicketPage() {
     Navigator.push(

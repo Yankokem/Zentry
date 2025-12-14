@@ -71,6 +71,9 @@ class _RichTextEditorState extends State<RichTextEditor> {
                   padding: const EdgeInsets.all(12.0),
                   child: Theme(
                     data: Theme.of(context).copyWith(
+                      colorScheme: Theme.of(context).colorScheme.copyWith(
+                        primary: Colors.blue,
+                      ),
                       textSelectionTheme: const TextSelectionThemeData(
                         cursorColor: Colors.black,
                       ),
@@ -435,6 +438,54 @@ class RichTextEditorController {
 
   RichTextEditorController() {
     _quillController = quill.QuillController.basic();
+    
+    // Listen for document changes and override link colors to blue
+    _quillController.addListener(_overrideLinkColors);
+  }
+  
+  void _overrideLinkColors() {
+    try {
+      final delta = _quillController.document.toDelta();
+      bool needsUpdate = false;
+      final newOps = <Map<String, dynamic>>[];
+      
+      for (var op in delta.toJson()) {
+        if (op is Map) {
+          final opMap = Map<String, dynamic>.from(op);
+          
+          if (opMap['attributes'] != null) {
+            final attrs = Map<String, dynamic>.from(opMap['attributes'] as Map);
+            
+            // If it's a link with a non-blue color, change it to blue
+            if (attrs.containsKey('link')) {
+              final currentColor = attrs['color'];
+              if (currentColor != '#0000FF' && currentColor != null) {
+                attrs['color'] = '#0000FF';
+                needsUpdate = true;
+              } else if (currentColor == null) {
+                // If no color specified, set to blue
+                attrs['color'] = '#0000FF';
+                needsUpdate = true;
+              }
+            }
+            
+            opMap['attributes'] = attrs;
+          }
+          
+          newOps.add(opMap);
+        }
+      }
+      
+      // Only update if we changed something, and prevent infinite loop
+      if (needsUpdate) {
+        _quillController.removeListener(_overrideLinkColors);
+        final newDoc = quill.Document.fromJson(newOps);
+        _quillController.document = newDoc;
+        _quillController.addListener(_overrideLinkColors);
+      }
+    } catch (e) {
+      // Ignore errors during color override
+    }
   }
 
   /// Get the plain text content (without formatting)
@@ -444,7 +495,22 @@ class RichTextEditorController {
 
   /// Get the content as JSON (preserves formatting)
   String getJsonContent() {
-    return json.encode(_quillController.document.toDelta().toJson());
+    final deltaJson = _quillController.document.toDelta().toJson();
+    
+    // Override link colors to blue to prevent yellow links
+    if (deltaJson is List) {
+      for (var op in deltaJson) {
+        if (op is Map && op['attributes'] != null) {
+          final attrs = op['attributes'] as Map;
+          // If it's a link, set color to blue
+          if (attrs.containsKey('link')) {
+            attrs['color'] = '#0000FF'; // Blue
+          }
+        }
+      }
+    }
+    
+    return json.encode(deltaJson);
   }
 
   /// Set plain text content (removes any existing formatting)
@@ -479,6 +545,7 @@ class RichTextEditorController {
 
   /// Dispose the controller
   void dispose() {
+    _quillController.removeListener(_overrideLinkColors);
     _quillController.dispose();
   }
 }

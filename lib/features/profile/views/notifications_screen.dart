@@ -682,9 +682,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'task_deadline':
       case 'task_overdue':
       case 'task_status_changed':
+      case 'project_ticket':
         // Navigate to project detail with highlighted ticket
         final projectId = notification.data['projectId'];
-        final taskId = notification.data['taskId'];
+        // Use taskId for task_* types, ticketNumber for project_ticket type
+        final taskId = notification.data['taskId'] ?? notification.data['ticketNumber'];
+        
         if (projectId != null && taskId != null) {
           try {
             final project = await _firestoreService.getProjectById(projectId);
@@ -695,7 +698,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 MaterialPageRoute(
                   builder: (_) => ProjectDetailPage(
                     project: project,
-                    highlightTicketId: taskId,
+                    highlightTicketId: taskId.toString(),
                   ),
                 ),
               );

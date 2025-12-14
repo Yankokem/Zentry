@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:zentry/core/core.dart';
 import 'package:zentry/features/projects/projects.dart';
@@ -182,12 +183,18 @@ class ProjectNotificationService {
         'body': body,
         'type': type,
         'data': data ?? {},
-        'read': false,
+        'isRead': false,
         'createdAt': FieldValue.serverTimestamp(),
-        'userId': recipientUid,
       };
 
-      await _firestore.collection('notifications').add(notification);
+      // Write to the correct path: notifications/users/{userId}
+      // This matches what NotificationManager listens to
+      await _firestore
+          .collection('notifications')
+          .doc('users')
+          .collection(recipientUid)
+          .add(notification);
+          
     } catch (e) {
       print('❌ Error creating notification: $e');
       rethrow;

@@ -45,11 +45,17 @@ class _HomePageState extends State<HomePage> {
   int _completedTasksThisWeek = 0;
   Map<DateTime, List<DateTicket>> _ticketsByDate = {};
 
-  // Cache for project tickets to avoid constant recalculation
-  final Map<String, List<Ticket>> _projectTicketsCache = {};
-  // Track individual subscriptions to cancel them properly
-  final List<StreamSubscription> _ticketSubscriptions = [];
-  Timer? _debounceTimer;
+
+
+  @override
+  void dispose() {
+    _journalSubscription?.cancel();
+    _authSubscription?.cancel();
+    _projectsSubscription?.cancel();
+    _ticketsSubscription?.cancel();
+    _wishesSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -63,6 +69,12 @@ class _HomePageState extends State<HomePage> {
     _authSubscription?.cancel();
     _authSubscription = _authService.authStateChanges.listen((user) {
       if (user != null) {
+        // Ensure user details are up to date for filtering
+        setState(() {
+          _currentUserEmail = user.email;
+          _currentUserId = user.uid;
+        });
+        
         _subscribeToTicketsStream();
         _journalSubscription?.cancel();
         _journalSubscription =
@@ -108,8 +120,6 @@ class _HomePageState extends State<HomePage> {
         _ticketsSubscription = null;
         _wishesSubscription?.cancel();
         _wishesSubscription = null;
-        _debounceTimer?.cancel();
-        _debounceTimer = null;
 
         if (mounted) {
           setState(() {
@@ -133,75 +143,52 @@ class _HomePageState extends State<HomePage> {
       final user = _authService.currentUser;
       if (user == null) return;
 
-      // Create a combined stream of all project tickets
-      // by listening to projects and then subscribing to their tickets
+      // 1. Subscribe to Projects (for names and recent projects list)
       _projectsSubscription?.cancel();
       _projectsSubscription = _firestoreService
           .getUserProjectsStream(user.uid, user.email ?? '')
-          .listen((projects) async {
+          .listen((projects) {
         if (!mounted) return;
 
-        // Merge all ticket streams from active projects
         final activeProjects = projects
             .where((p) => p.status != 'completed')
             .toList()
           ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-        // Take only the 4 most recent active projects
-        final limitedProjects = activeProjects.take(4).toList();
-
-        // Subscribe to real-time ticket updates for all active projects
-        // Cancel previous subscriptions
-        for (var sub in _ticketSubscriptions) {
-          sub.cancel();
-        }
-        _ticketSubscriptions.clear();
-        _projectTicketsCache.clear();
-
-        // If no active projects, just update state
-        if (activeProjects.isEmpty) {
-          if (mounted) {
-            setState(() {
-              _ticketsByDate = {};
-              _recentProjects = [];
-              _activeProjects = 0;
-              _tasksDueToday = 0;
-              _completedTasksThisWeek = 0;
-              _isLoading = false;
-            });
-          }
-          return;
-        }
-
-        // Subscribe to each project's ticket stream
-        for (var project in activeProjects) {
-          final sub = _firestoreService
-              .listenToProjectTickets(project.id)
-              .listen((tickets) {
-            if (!mounted) return;
-
-            // Update cache for this project
-            _projectTicketsCache[project.id] = tickets;
-
-            // Debounce the update: wait for 300ms of silence before processing
-            _debounceTimer?.cancel();
-            _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-              if (mounted) {
-                _processTicketUpdates(activeProjects, limitedProjects);
-              }
-            });
-          });
-
-          _ticketSubscriptions.add(sub);
+        setState(() {
+          _recentProjects = activeProjects.take(4).toList();
+          _activeProjects = activeProjects.length;
+        });
+        
+        // Trigger processing if we have tickets but needed project names
+        if (_allTickets.isNotEmpty) {
+           _processTicketUpdates(activeProjects, _allTickets); 
         }
       }, onError: (err) {
         debugPrint('Projects stream error: $err');
+      });
+
+      // 2. Subscribe to ALL Tickets (Real-time updates for everything)
+      _ticketsSubscription?.cancel();
+      _ticketsSubscription = _firestoreService
+          .listenToUserTickets(user.uid, user.email ?? '')
+          .listen((tickets) {
+        if (!mounted) return;
+        
+        // Get current projects for name lookup
+        final projects = _recentProjects; 
+        
+        _processTicketUpdates(projects, tickets);
+        
+      }, onError: (err) {
+        debugPrint('Tickets stream error: $err');
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
         }
       });
+      
     } catch (e) {
       debugPrint('Error subscribing to tickets: $e');
       if (mounted) {
@@ -212,137 +199,142 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // Store all tickets to allow reprocessing when projects change
+  List<Ticket> _allTickets = [];
+
   void _processTicketUpdates(
-      List<Project> activeProjects, List<Project> limitedProjects) {
-    // Recalculate aggregates from cache
+      List<Project> activeProjects, List<Ticket> tickets) {
+    
+    // Update local cache
+    _allTickets = tickets;
+      
+    // Recalculate aggregates
     Map<DateTime, List<DateTicket>> ticketsByDate = {};
     int tasksDueToday = 0;
     int completedThisWeek = 0;
 
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
-    final weekStart =
-        DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1));
 
-    // Iterate over all cached tickets from all projects
-    _projectTicketsCache.forEach((projectId, projectTickets) {
-      // Find project name for these tickets
+
+    // Process all tickets
+    for (var ticket in tickets) {
+      // Find project name
       final projectTitle = activeProjects
-          .firstWhere((p) => p.id == projectId,
-              orElse: () => activeProjects.isNotEmpty
-                  ? activeProjects.first
-                  : Project(
-                      id: 'unknown',
-                      userId: '',
-                      title: 'Unknown',
-                      description: '',
-                      teamMembers: [],
-                      status: 'active',
-                      totalTickets: 0,
-                      completedTickets: 0,
-                      createdAt: DateTime.now(),
-                      updatedAt: DateTime.now(),
-                    )) // Fallback safe
+          .firstWhere((p) => p.id == ticket.projectId,
+              orElse: () => Project(
+                    id: 'unknown',
+                    userId: '',
+                    title: 'Unknown Project',
+                    description: '',
+                    teamMembers: [],
+                    status: 'active',
+                    totalTickets: 0,
+                    completedTickets: 0,
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                  ))
           .title;
 
-      for (var ticket in projectTickets) {
-        if (ticket.deadline != null) {
-          var deadline = ticket.deadline!;
+      if (ticket.deadline != null) {
+        var deadline = ticket.deadline!;
 
-          // Set default time to 11:59 PM if no time is set
-          if (deadline.hour == 0 &&
-              deadline.minute == 0 &&
-              deadline.second == 0) {
-            deadline = DateTime(
-              deadline.year,
-              deadline.month,
-              deadline.day,
-              23,
-              59,
-            );
-          }
-
-          final deadlineDate =
-              DateTime(deadline.year, deadline.month, deadline.day);
-
-          // Determine ticket status based on USER'S completion status
-          TicketStatus ticketStatus;
-          final currentUserEmail = _currentUserEmail?.toLowerCase();
-          final isAssignedToCurrentUser = currentUserEmail != null && 
-              ticket.assignedTo.any((email) => email.toLowerCase() == currentUserEmail);
-          
-          // Check if current user is the project owner/creator
-          final isProjectOwner = activeProjects.any((p) => p.id == projectId && p.userId == _currentUserId);
-
-          // Process if: assigned to user OR user is project owner (for in_review/done status visibility)
-          if (!isAssignedToCurrentUser && !isProjectOwner) continue;
-
-          // Status logic for current user:
-          // 1. If ticket is 'done' -> Done (PM moved it to Done)
-          // 2. If ticket is 'in_review' -> In Review (PM moved to In Review, waiting for review)
-          // 3. If deadline passed and status is 'todo' or 'in_progress' -> Late
-          // 4. If status is 'todo' or 'in_progress' -> Pending
-          
-          if (ticket.status == 'done') {
-            // Only mark as Done when PM moves ticket to Done status
-            ticketStatus = TicketStatus.done;
-          } else if (ticket.status == 'in_review') {
-            // In Review means assignee's work is done, waiting for PM review
-            ticketStatus = TicketStatus.inReview;
-          } else if (deadlineDate.isBefore(todayDate) && 
-                     (ticket.status == 'todo' || ticket.status == 'in_progress')) {
-            // Late only if deadline passed and still in todo/in-progress
-            ticketStatus = TicketStatus.late;
-          } else {
-            // Future deadline or today, not done yet (status is todo or in_progress)
-            ticketStatus = TicketStatus.pending;
-          }
-
-          // Add ticket to the map
-          final dateTicket = DateTicket(
-            title: ticket.title,
-            status: ticketStatus,
-            deadline: deadline,
-            ticketId: ticket.ticketNumber,
-            projectName: projectTitle,
-            projectId: projectId,
+        // Set default time to 11:59 PM if no time is set
+        if (deadline.hour == 0 &&
+            deadline.minute == 0 &&
+            deadline.second == 0) {
+          deadline = DateTime(
+            deadline.year,
+            deadline.month,
+            deadline.day,
+            23,
+            59,
           );
+        }
 
-          if (ticketsByDate.containsKey(deadlineDate)) {
-            ticketsByDate[deadlineDate]!.add(dateTicket);
-          } else {
-            ticketsByDate[deadlineDate] = [dateTicket];
-          }
+        final deadlineDate =
+            DateTime(deadline.year, deadline.month, deadline.day);
 
-          // Count pending tasks - only for assigned tasks, not all project tickets
-          if (isAssignedToCurrentUser && ticketStatus == TicketStatus.pending) {
-            tasksDueToday++;
-          }
+        // Determine ticket status based on USER'S completion status
+        TicketStatus ticketStatus;
+        final currentUserEmail = _currentUserEmail?.toLowerCase();
+        final isAssignedToCurrentUser = currentUserEmail != null && 
+            ticket.assignedTo.any((email) => email.toLowerCase() == currentUserEmail);
+        
+        // Check if current user is the project owner/creator
+        final isProjectOwner = activeProjects.any((p) => p.id == ticket.projectId && p.userId == _currentUserId);
 
-          // Count completed tasks this week - only when ticket status is 'done'
-          if (isAssignedToCurrentUser && ticket.status == 'done' && ticket.updatedAt.isAfter(weekStart)) {
-            completedThisWeek++;
+        // Process if: assigned to user OR user is project owner
+        if (!isAssignedToCurrentUser && !isProjectOwner) continue;
+
+        // Determine basic status first
+        if (ticket.status == 'done') {
+          ticketStatus = TicketStatus.done;
+        } else if (ticket.status == 'in_review') {
+          ticketStatus = TicketStatus.inReview;
+        } else if (deadlineDate.isBefore(todayDate) && 
+                   (ticket.status == 'todo' || ticket.status == 'in_progress')) {
+          ticketStatus = TicketStatus.late;
+        } else {
+          ticketStatus = TicketStatus.pending;
+        }
+
+        // VISIBILITY RULES:
+        // 1. Assignees see everything assigned to them.
+        // 2. PMs see everything EXCEPT "Pending" (Todo/In Progress) tasks that are NOT assigned to them.
+        //    (PMs only need to see what's ready for review, done, or late)
+        
+        bool shouldShow = false;
+        
+        if (isAssignedToCurrentUser) {
+          // Assignee sees all their tasks
+          shouldShow = true;
+        } else if (isProjectOwner) {
+          // PM sees: Done, In Review, Late
+          // PM hides: Pending (Todo/In Progress) unless they are also assigned (covered above)
+          if (ticketStatus != TicketStatus.pending) {
+            shouldShow = true;
           }
         }
-      }
-    });
 
-    // Only call setState if actual data has changed
-    final stateChanged = 
-        _ticketsByDate.length != ticketsByDate.length ||
-        _tasksDueToday != tasksDueToday ||
-        _completedTasksThisWeek != completedThisWeek ||
-        _activeProjects != activeProjects.length ||
-        _recentProjects.length != limitedProjects.length ||
-        _isLoading == true;
-    
-    if (stateChanged && mounted) {
+        if (!shouldShow) continue;
+
+        // Add ticket to the map
+        final dateTicket = DateTicket(
+          title: ticket.title,
+          status: ticketStatus,
+          deadline: deadline,
+          ticketId: ticket.ticketNumber,
+          projectName: projectTitle,
+          projectId: ticket.projectId,
+        );
+
+        if (ticketsByDate.containsKey(deadlineDate)) {
+          ticketsByDate[deadlineDate]!.add(dateTicket);
+        } else {
+          ticketsByDate[deadlineDate] = [dateTicket];
+        }
+
+        // Count pending tasks - only for assigned tasks
+        // PMs don't count others' pending tasks in their personal KPI
+        if (isAssignedToCurrentUser && ticketStatus == TicketStatus.pending) {
+          tasksDueToday++;
+        }
+
+        // Count completed tasks - match calendar visibility
+        // If it's on the calendar as Done, count it.
+        if (ticketStatus == TicketStatus.done) {
+          completedThisWeek++;
+        }
+      }
+    }
+
+    // Only call setState if actual data has changed or loading
+    if (mounted) {
       setState(() {
         _ticketsByDate = ticketsByDate;
         _tasksDueToday = tasksDueToday;
         _completedTasksThisWeek = completedThisWeek;
-        _activeProjects = activeProjects.length;
-        _recentProjects = limitedProjects;
         _isLoading = false;
       });
     }
@@ -357,19 +349,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  @override
-  void dispose() {
-    _authSubscription?.cancel();
-    _journalSubscription?.cancel();
-    _projectsSubscription?.cancel();
-    _debounceTimer?.cancel();
-    // Cancel all individual ticket subscriptions
-    for (var sub in _ticketSubscriptions) {
-      sub.cancel();
-    }
-    _ticketSubscriptions.clear();
-    super.dispose();
-  }
+
 
   Future<void> _loadUserName() async {
     try {

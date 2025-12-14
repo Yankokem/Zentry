@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
@@ -32,7 +33,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
   String selectedPriority = 'medium';
   String selectedStatus = 'todo';
   List<String> selectedAssignees = [];
-  List<File> _selectedImages = [];
+  List<XFile> _selectedImages = [];
   DateTime? selectedDeadline;
   bool _isSaving = false;
 
@@ -226,10 +227,15 @@ class _AddTicketPageState extends State<AddTicketPage> {
                                       ),
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(10),
-                                        child: Image.file(
-                                          _selectedImages[index],
-                                          fit: BoxFit.cover,
-                                        ),
+                                        child: kIsWeb
+                                            ? Image.network(
+                                                _selectedImages[index].path,
+                                                fit: BoxFit.cover,
+                                              )
+                                            : Image.file(
+                                                File(_selectedImages[index].path),
+                                                fit: BoxFit.cover,
+                                              ),
                                       ),
                                     ),
                                     Positioned(
@@ -808,7 +814,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
 
       if (images.isNotEmpty) {
         setState(() {
-          _selectedImages = images.map((img) => File(img.path)).toList();
+          _selectedImages = images;
         });
       }
     } catch (e) {
@@ -826,7 +832,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
     try {
       final List<String> uploadedUrls = [];
       for (final image in _selectedImages) {
-        final imageUrl = await _cloudinaryService.uploadImage(
+        final imageUrl = await _cloudinaryService.uploadXFile(
           image,
           uploadType: CloudinaryUploadType.projectImage,
         );

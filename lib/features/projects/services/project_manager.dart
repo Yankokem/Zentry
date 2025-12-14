@@ -101,4 +101,12 @@ class ProjectManager {
   Stream<List<Ticket>> listenToProjectTickets(String projectId) {
     return _firestoreService.listenToProjectTickets(projectId);
   }
+
+  // Listen to all tickets for current user across all projects
+  Stream<List<Ticket>> listenToUserTickets() {
+    if (_currentUserId == null || _currentUserEmail == null) {
+      throw Exception('User not authenticated');
+    }
+    return _firestoreService.listenToUserTickets(_currentUserId!, _currentUserEmail!);
+  }
 }

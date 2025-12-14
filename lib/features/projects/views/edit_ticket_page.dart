@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 
 import 'package:zentry/core/core.dart';
@@ -327,7 +328,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
   String selectedPriority = '';
   String selectedStatus = '';
   List<String> selectedAssignees = [];
-  List<File> _selectedImages = [];
+  List<XFile> _selectedImages = [];
   List<String> _uploadedImageUrls = [];
   DateTime? selectedDeadline;
 
@@ -536,10 +537,15 @@ class _EditTicketPageState extends State<EditTicketPage> {
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(10),
                                         child: isNewImage
-                                            ? Image.file(
-                                                _selectedImages[index],
-                                                fit: BoxFit.cover,
-                                              )
+                                            ? (kIsWeb
+                                                ? Image.network(
+                                                    _selectedImages[index].path,
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                : Image.file(
+                                                    File(_selectedImages[index].path),
+                                                    fit: BoxFit.cover,
+                                                  ))
                                             : Image.network(
                                                 _uploadedImageUrls[index - _selectedImages.length],
                                                 fit: BoxFit.cover,
@@ -1199,7 +1205,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
 
       if (images.isNotEmpty) {
         setState(() {
-          _selectedImages = images.map((img) => File(img.path)).toList();
+          _selectedImages = images;
         });
       }
     } catch (e) {
@@ -1217,7 +1223,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
     try {
       final List<String> uploadedUrls = [];
       for (final image in _selectedImages) {
-        final imageUrl = await _cloudinaryService.uploadImage(
+        final imageUrl = await _cloudinaryService.uploadXFile(
           image,
           uploadType: CloudinaryUploadType.projectImage,
         );
