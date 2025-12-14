@@ -60,6 +60,17 @@ class AppRoutes {
           builder: (_) => const SignupScreen(),
         );
 
+      case forgotPassword:
+        final email = settings.arguments is Map
+            ? (settings.arguments as Map)['email'] as String?
+            : settings.arguments as String?;
+        final oobCode = settings.arguments is Map
+            ? (settings.arguments as Map)['oobCode'] as String?
+            : null;
+        return MaterialPageRoute(
+          builder: (_) => ForgotPasswordScreen(email: email, oobCode: oobCode),
+        );
+
       case home:
         return MaterialPageRoute(
           builder: (_) => const HomeScreen(),

@@ -123,6 +123,10 @@ class GoogleSignInController with ChangeNotifier {
       // Create or update user document in Firestore
       await _firestoreService.createGoogleUserDocument(user);
 
+      // Update last active to mark user as online
+      final adminService = AdminService();
+      await adminService.updateLastActive(user.uid);
+
       // User document created/updated in Firestore
 
       _isLoading = false;

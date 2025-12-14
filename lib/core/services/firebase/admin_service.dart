@@ -359,13 +359,14 @@ class AdminService {
   }
 
   /// Initialize user metadata when user signs up
+  /// Note: lastActive is NOT set here - only set when user logs in
   Future<void> initializeUserMetadata(String userId) async {
     try {
       await _firestore.collection(userMetadataCollection).doc(userId).set({
         'status': 'active',
-        'lastActive': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        // lastActive is intentionally NOT set on signup - only on login
       });
     } catch (e) {
       throw Exception('Failed to initialize user metadata: $e');

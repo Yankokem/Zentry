@@ -152,7 +152,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 TextFormField(
                   controller: _controller.firstNameController,
                   keyboardType: TextInputType.name,
-                  textCapitalization: TextCapitalization.words,
+                  textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'First Name',
                     hintText: 'Enter your first name',
@@ -175,7 +175,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 TextFormField(
                   controller: _controller.lastNameController,
                   keyboardType: TextInputType.name,
-                  textCapitalization: TextCapitalization.words,
+                  textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'Last Name',
                     hintText: 'Enter your last name',

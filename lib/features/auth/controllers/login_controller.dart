@@ -93,6 +93,9 @@ class LoginController {
         return false;
       }
 
+      // Update last active to mark user as online
+      await adminService.updateLastActive(userId);
+
       _isLoading = false;
       return true;
     } catch (e) {
