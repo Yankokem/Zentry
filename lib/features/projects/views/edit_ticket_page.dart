@@ -929,15 +929,15 @@ class _EditTicketPageState extends State<EditTicketPage> {
       final addedAssignees = newAssignees.difference(oldAssignees);
       final removedAssignees = oldAssignees.difference(newAssignees);
 
-      // Track status change
-      final statusChanged = widget.ticket.status != selectedStatus;
-
       // Upload images if selected
       List<String> imageUrls = List.from(_uploadedImageUrls);
       if (_selectedImages.isNotEmpty) {
         imageUrls.addAll(await _uploadTicketImages());
       }
 
+      // Reset member progress if status changed
+      final shouldResetProgress = selectedStatus != widget.ticket.status;
+      
       final updatedTicket = widget.ticket.copyWith(
         title: titleController.text,
         description: _descriptionController.getJsonContent(),
@@ -946,6 +946,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
         priority: selectedPriority,
         status: selectedStatus,
         assignedTo: selectedAssignees,
+        membersDone: shouldResetProgress ? [] : widget.ticket.membersDone,
         deadline: selectedDeadline,
       );
 
@@ -1028,7 +1029,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
       }
 
       // Send notifications for status change to all assignees (except the person who made the change)
-      if (statusChanged) {
+      if (shouldResetProgress) {
         try {
           final firestoreService = FirestoreService();
           final currentUserData =

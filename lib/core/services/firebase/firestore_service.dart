@@ -131,7 +131,7 @@ class FirestoreService {
     } catch (e) {
       throw Exception('Failed to create project: $e');
     }
-  }
+  } 
 
   // Get all projects for a user (both owned and shared)
   Future<List<Project>> getUserProjects(String userId, String userEmail) async {

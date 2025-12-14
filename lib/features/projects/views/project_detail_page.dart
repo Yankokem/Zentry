@@ -1567,11 +1567,22 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   Widget _buildStatusOption(
       String statusValue, String statusLabel, Color color, Ticket ticket) {
     final isCurrentStatus = ticket.status == statusValue;
+    
+    // Determine if this status option should be disabled
+    bool isDisabled = false;
+    if (ticket.status == 'todo' && statusValue == 'in_progress' && !ticket.allAssigneesDone) {
+      isDisabled = true;
+    } else if (ticket.status == 'in_progress' && statusValue == 'in_review' && !ticket.allAssigneesDone) {
+      isDisabled = true;
+    }
 
     return InkWell(
-      onTap: () {
+      onTap: isDisabled ? null : () {
         if (!isCurrentStatus) {
-          final updatedTicket = ticket.copyWith(status: statusValue);
+          final updatedTicket = ticket.copyWith(
+            status: statusValue,
+            membersDone: [], // Reset member progress when status changes
+          );
           _projectManager.updateTicket(
               ticket.projectId, ticket.ticketNumber, updatedTicket);
           Navigator.pop(context);
@@ -1589,10 +1600,18 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isCurrentStatus ? color.withOpacity(0.2) : Colors.grey.shade50,
+          color: isCurrentStatus 
+              ? color.withOpacity(0.2) 
+              : isDisabled 
+                  ? Colors.grey.shade100 
+                  : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isCurrentStatus ? color : Colors.grey.shade200,
+            color: isCurrentStatus 
+                ? color 
+                : isDisabled 
+                    ? Colors.grey.shade300 
+                    : Colors.grey.shade200,
             width: 2,
           ),
         ),
@@ -1612,12 +1631,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: isCurrentStatus ? FontWeight.bold : FontWeight.w500,
-                color: const Color(0xFF1E1E1E),
+                color: isDisabled 
+                    ? Colors.grey.shade400 
+                    : const Color(0xFF1E1E1E),
               ),
             ),
             const Spacer(),
             if (isCurrentStatus)
-              Icon(Icons.check_circle, color: color, size: 24),
+              Icon(Icons.check_circle, color: color, size: 24)
+            else if (isDisabled)
+              Icon(Icons.lock, color: Colors.grey.shade400, size: 20),
           ],
         ),
       ),
@@ -1729,19 +1752,19 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: ticket.status == 'todo' && !ticket.allAssigneesDone
+              onPressed: (ticket.status == 'todo' || ticket.status == 'in_progress') && !ticket.allAssigneesDone
                   ? null
                   : () {
                       Navigator.pop(context);
                       _showChangeStatusDialog(ticket);
                     },
               icon: const Icon(Icons.change_circle_outlined),
-              label: ticket.status == 'todo'
-                  ? const Text('Move to In Progress')
+              label: (ticket.status == 'todo' || ticket.status == 'in_progress')
+                  ? const Text('Move to Next Status')
                   : const Text('Change Status'),
               style: ElevatedButton.styleFrom(
                 backgroundColor:
-                    ticket.status == 'todo' && !ticket.allAssigneesDone
+                    (ticket.status == 'todo' || ticket.status == 'in_progress') && !ticket.allAssigneesDone
                         ? Colors.grey.shade400
                         : const Color(0xFF1E1E1E),
                 foregroundColor: Colors.white,
@@ -1824,9 +1847,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 updatedMembersDone.add(currentUser.email!);
               }
 
-              // Move to In Review
+              // Update ticket but keep status as in_progress (PM controls status change)
               final updatedTicket = ticket.copyWith(
-                status: 'in_review',
                 membersDone: updatedMembersDone,
               );
 
@@ -1838,7 +1860,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Submitted for review'),
+                  content: Text('Submitted for review - PM can now change status'),
                   backgroundColor: Colors.purple,
                 ),
               );
