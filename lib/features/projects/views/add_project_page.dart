@@ -90,27 +90,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null && currentUser.email == member) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'You are the project creator and cannot be added as a member'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Cannot Add Creator', 'You are the project creator and cannot be added as a member');
       }
       return;
     }
 
     if (_teamMembers.contains(member)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This email is already added to the team'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Already Added', 'This email is already added to the team');
       }
       return;
     }
@@ -124,32 +111,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
             _newMemberController.clear();
             _suggestedEmails.clear();
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Email added successfully'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          _showSuccessDialog('Email Added', 'Email added successfully');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No account found with this email'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          _showErrorDialog('Account Not Found', 'No account found with this email');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error checking account: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Error Checking Account', 'Error checking account: ${e.toString()}');
       }
     }
   }
@@ -195,14 +164,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null && currentUser.email == email) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'You are the project creator and cannot be added as a member'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Cannot Add Creator', 'You are the project creator and cannot be added as a member');
       }
       setState(() {
         _newMemberController.clear();
@@ -214,13 +176,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
     // Add immediately when email is selected from suggestions
     if (_teamMembers.contains(email)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This email is already added to the team'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Already Added', 'This email is already added to the team');
       }
       setState(() {
         _newMemberController.clear();
@@ -236,13 +192,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email added successfully'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSuccessDialog('Email Added', 'Email added successfully');
     }
   }
 
@@ -255,26 +205,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
   void _createRole() {
     final roleName = _newRoleController.text.trim();
     if (roleName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a role name'),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showErrorDialog('Role Name Required', 'Please enter a role name');
       return;
     }
 
     // Check if role already exists
     if (_roles
         .any((role) => role.name.toLowerCase() == roleName.toLowerCase())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This role already exists'),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showErrorDialog('Role Already Exists', 'This role already exists');
       return;
     }
 
@@ -284,26 +222,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
       _selectedRoleForAssignment = roleName;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Role created successfully'),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    _showSuccessDialog('Role Created', 'Role created successfully');
   }
 
   void _addMemberToRole(String roleName, String member) {
     final roleIndex = _roles.indexWhere((role) => role.name == roleName);
     if (roleIndex != -1) {
       if (_roles[roleIndex].members.contains(member)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This member already has this role'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Role Already Assigned', 'This member already has this role');
         return;
       }
 
@@ -312,13 +238,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
         _roles[roleIndex] = _roles[roleIndex].copyWith(members: updatedMembers);
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Member added to role'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSuccessDialog('Role Assigned', 'Role assigned successfully');
     }
   }
 
@@ -341,13 +261,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
       }
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Role deleted'),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    _showSuccessDialog('Role Deleted', 'Role deleted');
   }
 
   // Helper method to find role for a member
@@ -393,14 +307,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
       // Validate that workspace projects have at least one team member
       if (_selectedType == 'workspace' && _teamMembers.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Workspace projects require at least one team member'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Team Member Required', 'Workspace projects require at least one team member');
         return;
       }
 
@@ -641,6 +548,40 @@ class _AddProjectPageState extends State<AddProjectPage> {
         }
       }
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

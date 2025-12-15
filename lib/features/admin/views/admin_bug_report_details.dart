@@ -28,6 +28,40 @@ class _AdminBugReportDetailsScreenState
     _selectedStatus = widget.report.status;
   }
 
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM d, yyyy • hh:mm a');
@@ -390,15 +424,11 @@ class _AdminBugReportDetailsScreenState
         title: widget.report.title,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Report updated successfully')),
-      );
+      _showSuccessDialog('Report Updated', 'Report updated successfully');
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating report: $e')),
-      );
+      _showErrorDialog('Update Error', 'Error updating report: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() => _isUpdating = false);
@@ -428,9 +458,7 @@ class _AdminBugReportDetailsScreenState
     if (confirmed != true) return;
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Report deletion not yet implemented')),
-    );
+    _showErrorDialog('Not Implemented', 'Report deletion not yet implemented');
   }
 
   Color _getStatusColor(String status) {

@@ -52,22 +52,52 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       await Future.delayed(const Duration(seconds: 1));
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Message sent successfully! We\'ll get back to you soon.')),
-        );
+        _showSuccessDialog('Message Sent', 'Message sent successfully! We\'ll get back to you soon.');
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send message: $e')),
-        );
+        _showErrorDialog('Send Failed', 'Failed to send message: ${e.toString()}');
       }
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

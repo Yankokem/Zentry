@@ -110,9 +110,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading user data: $e')),
-        );
+        _showErrorDialog('Load Error', 'Error loading user data: ${e.toString()}');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -141,18 +139,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         if (e.toString().contains('MissingPluginException')) {
           errorMessage = 'Image picker plugin not initialized. Please restart the app.';
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {},
-            ),
-          ),
-        );
+        _showErrorDialog('Error', errorMessage);
       }
     }
   }
@@ -176,12 +163,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           _selectedImage = null; // Clear selected image since upload succeeded
         });
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile photo uploaded successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _showSuccessDialog('Profile Photo Uploaded', 'Profile photo uploaded successfully');
       }
       
       return imageUrl;
@@ -196,13 +178,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       }
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $errorMsg'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        _showErrorDialog('Upload Failed', 'Upload failed: ${errorMsg.toString()}');
       }
       
       // Re-throw so _saveChanges can handle it
@@ -238,13 +214,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       if (_emailController.text.trim() != user.email) {
         await user.verifyBeforeUpdateEmail(_emailController.text.trim());
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('Verification email sent. Please check your inbox.'),
-              duration: Duration(seconds: 5),
-            ),
-          );
+          _showSuccessDialog('Verification Sent', 'Verification email sent. Please check your inbox.');
         }
       }
 
@@ -280,9 +250,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         await user.updatePassword(_newPasswordController.text.trim());
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password updated successfully')),
-          );
+          _showSuccessDialog('Password Updated', 'Password updated successfully');
           // Update _hasPassword flag
           setState(() {
             _hasPassword = true;
@@ -309,9 +277,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       _showPasswordSection = false;
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account updated successfully')),
-        );
+        _showSuccessDialog('Account Updated', 'Account updated successfully');
         Navigator.pop(context);
       }
     } catch (e) {
@@ -325,9 +291,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         if (requiresRecentLogin && !isRetry) {
           _showReauthenticationDialog();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error saving changes: $e')),
-          );
+          _showErrorDialog('Save Error', 'Error saving changes: ${e.toString()}');
         }
       }
     } finally {
@@ -363,12 +327,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               await _authService.signOut();
               if (mounted) {
                 Navigator.pushReplacementNamed(context, AppRoutes.login);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please log in with Google again to set your password'),
-                    duration: Duration(seconds: 4),
-                  ),
-                );
               }
             },
             child: const Text('Log In Again'),
@@ -384,22 +342,52 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       await _authService.reauthenticateWithGoogle();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Re-authenticated successfully. Retrying save...')),
-        );
+        _showSuccessDialog('Re-authenticated', 'Re-authenticated successfully. Retrying save...');
       }
 
       // Retry the save flow once after successful re-authentication
       await _saveChanges(isRetry: true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Re-authentication failed: $e')),
-        );
+        _showErrorDialog('Re-auth Failed', 'Re-authentication failed: ${e.toString()}');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

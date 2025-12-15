@@ -58,9 +58,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking images: $e')),
-        );
+        _showErrorDialog('Image Error', 'Error picking images: ${e.toString()}');
       }
     }
   }
@@ -80,9 +78,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
       final authService = AuthService();
       final user = authService.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to submit a bug report')),
-        );
+        _showErrorDialog('Login Required', 'Please log in to submit a bug report');
         return;
       }
 
@@ -97,9 +93,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
           imageUrls.add(url);
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to upload image: $e')),
-            );
+            _showErrorDialog('Upload Error', 'Failed to upload image: ${e.toString()}');
           }
         }
       }
@@ -119,22 +113,52 @@ class _BugReportScreenState extends State<BugReportScreen> {
       await _bugReportService.submitBugReport(bugReport);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bug report submitted successfully!')),
-        );
+        _showSuccessDialog('Bug Report Submitted', 'Bug report submitted successfully!');
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit bug report: $e')),
-        );
+        _showErrorDialog('Submit Failed', 'Failed to submit bug report: ${e.toString()}');
       }
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

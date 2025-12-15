@@ -154,12 +154,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (nameController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter a feeling name'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      _showErrorDialog('Validation Error', 'Please enter a feeling name');
                       return;
                     }
 
@@ -185,21 +180,11 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                         _loadMoods();
                         // Auto-select the newly created mood
                         setState(() => _selectedMood = moodName);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Feeling created successfully'),
-                            backgroundColor: AppTheme.success,
-                          ),
-                        );
+                        _showSuccessDialog('Feeling created successfully', 'Your new feeling has been added successfully.');
                       }
                     } catch (e) {
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
+                        _showErrorDialog('Error', e.toString());
                       }
                     }
                   },
@@ -219,12 +204,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
 
   void _showDeleteMoodDialog(Mood mood) {
     if (mood.isDefault) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot delete default feelings'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      _showErrorDialog('Cannot Delete Default Feelings', 'Default feelings cannot be deleted. You can only delete custom feelings that you have created.');
       return;
     }
 
@@ -244,12 +224,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
                 await _moodService.deleteMood(mood.id!);
                 Navigator.pop(context);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Feeling deleted'),
-                      backgroundColor: AppTheme.success,
-                    ),
-                  );
+                  _showSuccessDialog('Feeling deleted', 'The feeling has been successfully deleted.');
                   // Reset to default mood if deleted mood was selected
                   if (_selectedMood == mood.name) {
                     setState(() => _selectedMood = 'happy');
@@ -258,11 +233,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
               } catch (e) {
                 Navigator.pop(context);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text('Error: $e'),
-                        backgroundColor: Colors.red),
-                  );
+                  _showErrorDialog('Error', e.toString());
                 }
               }
             },
@@ -293,9 +264,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking images: $e')),
-        );
+        _showErrorDialog('Error picking images', e.toString());
       }
     }
   }
@@ -315,9 +284,7 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
       return uploadedUrls;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading images: $e')),
-        );
+        _showErrorDialog('Error uploading images', e.toString());
       }
       return [];
     }
@@ -353,25 +320,13 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Journal entry added'),
-            backgroundColor: AppTheme.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showSuccessDialog('Journal entry added', 'Your journal entry has been successfully added.');
       }
     } catch (e) {
       setState(() => _isLoading = false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Error', e.toString());
       }
     }
   }
@@ -402,6 +357,40 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
     final minute = now.minute.toString().padLeft(2, '0');
     final period = now.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

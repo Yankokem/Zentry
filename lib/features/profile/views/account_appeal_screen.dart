@@ -70,9 +70,7 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking images: $e')),
-        );
+        _showErrorDialog('Image Error', 'Error picking images: ${e.toString()}');
       }
     }
   }
@@ -102,9 +100,7 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
       if (userId == null || userEmail == null) {
         final user = _authService.currentUser;
         if (user == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please log in to submit an appeal')),
-          );
+          _showErrorDialog('Login Required', 'Please log in to submit an appeal');
           return;
         }
         userId = user.uid;
@@ -128,9 +124,7 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
           evidenceUrls.add(url);
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to upload image: $e')),
-            );
+            _showErrorDialog('Upload Error', 'Failed to upload image: ${e.toString()}');
           }
         }
       }
@@ -170,9 +164,7 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
       await _appealService.submitAppeal(appeal);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Appeal submitted successfully!')),
-        );
+        _showSuccessDialog('Appeal Submitted', 'Appeal submitted successfully!');
         // Sign out the user after appeal submission is complete
         await _authService.signOut();
         if (mounted) {
@@ -181,15 +173,47 @@ class _AccountAppealScreenState extends State<AccountAppealScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit appeal: $e')),
-        );
+        _showErrorDialog('Submit Failed', 'Failed to submit appeal: ${e.toString()}');
       }
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

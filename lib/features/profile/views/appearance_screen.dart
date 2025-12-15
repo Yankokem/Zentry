@@ -11,6 +11,23 @@ class AppearanceScreen extends StatefulWidget {
 }
 
 class _AppearanceScreenState extends State<AppearanceScreen> {
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
@@ -28,9 +45,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
           TextButton(
             onPressed: () {
               settingsProvider.resetToDefaults();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Settings reset to defaults')),
-              );
+              _showSuccessDialog('Settings Reset', 'Settings reset to defaults');
             },
             child: Text(
               'Reset',

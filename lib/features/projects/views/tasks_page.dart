@@ -46,6 +46,40 @@ import 'package:zentry/features/projects/projects.dart';
       }).toList();
     }
 
+    void _showErrorDialog(String title, String message) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          icon: const Icon(Icons.error, color: Colors.red, size: 32),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    void _showSuccessDialog(String title, String message) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+
     @override
     Widget build(BuildContext context) {
       final filteredTasks = _getFilteredTasks();
@@ -134,27 +168,57 @@ import 'package:zentry/features/projects/projects.dart';
                           ],
                         ),
                       ] else ...[
-                        TextField(
-                          controller: _searchController,
-                          autofocus: true,
-                          style: const TextStyle(
-                            color: Color(0xFF1E1E1E),
-                            fontSize: 20,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Search tasks...',
-                            hintStyle: TextStyle(
-                              color: const Color(0xFF1E1E1E).withOpacity(0.5),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF1E1E1E).withOpacity(0.1),
                             ),
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
                           ),
-                          onChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                            });
-                          },
+                          child: TextField(
+                            controller: _searchController,
+                            autofocus: true,
+                            style: const TextStyle(
+                              color: Color(0xFF1E1E1E),
+                              fontSize: 18,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Search tasks...',
+                              hintStyle: TextStyle(
+                                color: const Color(0xFF1E1E1E).withOpacity(0.5),
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.search,
+                                color: Color(0xFF1E1E1E),
+                                size: 20,
+                              ),
+                              suffixIcon: IconButton(
+                                icon: const Icon(
+                                  Icons.clear,
+                                  color: Color(0xFF1E1E1E),
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _isSearching = false;
+                                    _searchQuery = '';
+                                    _searchController.clear();
+                                  });
+                                },
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = value;
+                              });
+                            },
+                          ),
                         ),
                       ],
                     ],
@@ -400,19 +464,7 @@ import 'package:zentry/features/projects/projects.dart';
             setState(() {
               _taskManager.removeTask(task);
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Task deleted'),
-                action: SnackBarAction(
-                  label: 'UNDO',
-                  onPressed: () {
-                    setState(() {
-                      _taskManager.addTask(task);
-                    });
-                  },
-                ),
-              ),
-            );
+            _showSuccessDialog('Task Deleted', 'Task deleted');
           },
           child: InkWell(
             onTap: () => _showTaskDetails(task),
@@ -791,9 +843,7 @@ import 'package:zentry/features/projects/projects.dart';
                       ));
                     });
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Task updated')),
-                    );
+                    _showSuccessDialog('Task Updated', 'Task updated');
                   }
                 },
                 child: const Text('Save'),
@@ -902,9 +952,7 @@ import 'package:zentry/features/projects/projects.dart';
                       });
                     });
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Task added')),
-                    );
+                    _showSuccessDialog('Task Added', 'Task added');
                   }
                 },
                 child: const Text('Add'),

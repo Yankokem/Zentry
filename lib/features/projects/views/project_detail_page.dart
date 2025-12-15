@@ -471,6 +471,40 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     );
   }
 
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1044,7 +1078,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               bodyColor: Colors.black,
               displayColor: Colors.black,
             ).copyWith(
-              bodyMedium: TextStyle(
+              bodyMedium: const TextStyle(
                 color: Colors.black,
                 decoration: TextDecoration.none,
               ),
@@ -1360,12 +1394,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     Navigator.pop(context);
                     _refreshTickets();
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Marked as done'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                    _showSuccessDialog('Marked as Done', 'Ticket marked as done');
                   },
                   icon: const Icon(Icons.check_circle),
                   label: const Text('Mark as Done'),
@@ -1645,12 +1674,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     _refreshTickets();
     
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ticket status changed to ${_formatStatus(newStatus)}'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      _showSuccessDialog('Status Updated', 'Ticket status changed to ${_formatStatus(newStatus)}');
     }
   }
 
@@ -1687,20 +1711,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               Navigator.pop(context);
               _refreshTickets();
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${ticket.ticketNumber} deleted'),
-                  backgroundColor: Colors.red,
-                  action: SnackBarAction(
-                    label: 'UNDO',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      _projectManager.addTicket(ticket);
-                      _refreshTickets();
-                    },
-                  ),
-                ),
-              );
+              _showSuccessDialog('Ticket Deleted', '${ticket.ticketNumber} deleted successfully');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -1850,12 +1861,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     Navigator.pop(context);
                     _refreshTickets();
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Marked as done'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                    _showSuccessDialog('Marked as Done', 'Ticket marked as done');
                   },
             icon: isAlreadyDone
                 ? const Icon(Icons.check_circle)
@@ -1908,12 +1914,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               Navigator.pop(context);
               _refreshTickets();
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Submitted for review - PM can now change status'),
-                  backgroundColor: Colors.purple,
-                ),
-              );
+              _showSuccessDialog('Submitted for Review', 'Submitted for review - PM can now change status');
             },
             icon: const Icon(Icons.rate_review),
             label: const Text('Submit for Review'),

@@ -42,16 +42,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (success) {
         if (!mounted) return;
         // Show success message and redirect to login
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password reset successfully! Please log in with your new password.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        _showSuccessDialog('Password Reset', 'Password reset successfully! Please log in with your new password.');
         // Redirect to login page
         Navigator.pushReplacementNamed(context, AppRoutes.login);
       }
     }
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

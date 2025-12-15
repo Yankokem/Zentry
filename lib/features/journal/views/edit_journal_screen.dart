@@ -90,9 +90,7 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
       return uploadedUrls;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading images: $e')),
-        );
+        _showErrorDialog('Error uploading images', e.toString());
       }
       return [];
     }
@@ -183,12 +181,7 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (nameController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter a feeling name'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      _showErrorDialog('Validation Error', 'Please enter a feeling name');
                       return;
                     }
 
@@ -212,9 +205,7 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
                       }
                     } catch (e) {
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                        );
+                        _showErrorDialog('Error', e.toString());
                       }
                     }
                   },
@@ -246,9 +237,7 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking images: $e')),
-        );
+        _showErrorDialog('Error picking images', e.toString());
       }
     }
   }
@@ -285,27 +274,49 @@ class _EditJournalScreenState extends State<EditJournalScreen> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Journal entry updated'),
-            backgroundColor: AppTheme.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showSuccessDialog('Journal entry updated', 'Your journal entry has been successfully updated.');
       }
     } catch (e) {
       setState(() => _isLoading = false);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Error', e.toString());
       }
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

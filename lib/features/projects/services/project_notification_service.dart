@@ -171,7 +171,7 @@ class ProjectNotificationService {
       // Get recipient's UID from email
       final recipientDetails =
           await _userService.getUserDetailsByEmail(recipientEmail);
-      if (recipientDetails == null || recipientDetails['uid'] == null) {
+      if (recipientDetails['uid'] == null) {
         print('⚠️ Could not find UID for email: $recipientEmail');
         return;
       }

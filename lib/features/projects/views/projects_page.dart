@@ -166,14 +166,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
                   await _projectManager.deleteProject(project.id);
                   Navigator.of(context).pop();
                   _loadProjects();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Project "${project.title}" deleted successfully')),
-                  );
+                  _showSuccessDialog('Project Deleted', 'Project "${project.title}" deleted successfully');
                 } catch (e) {
                   Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error deleting project: $e')),
-                  );
+                  _showErrorDialog('Delete Error', 'Error deleting project: ${e.toString()}');
                 }
               },
               child: const Text('Delete', style: TextStyle(color: Colors.red)),
@@ -206,6 +202,40 @@ class _ProjectsPageState extends State<ProjectsPage> {
         side: BorderSide(
           color: isSelected ? const Color(0xFF1E1E1E) : Colors.grey.shade300,
         ),
+      ),
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
       ),
     );
   }
@@ -322,27 +352,57 @@ class _ProjectsPageState extends State<ProjectsPage> {
                         ),
                       ),
                     ] else ...[
-                      TextField(
-                        controller: _searchController,
-                        autofocus: true,
-                        style: const TextStyle(
-                          color: Color(0xFF1E1E1E),
-                          fontSize: 20,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search projects...',
-                          hintStyle: TextStyle(
-                            color: const Color(0xFF1E1E1E).withOpacity(0.5),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF1E1E1E).withOpacity(0.1),
                           ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
                         ),
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
+                        child: TextField(
+                          controller: _searchController,
+                          autofocus: true,
+                          style: const TextStyle(
+                            color: Color(0xFF1E1E1E),
+                            fontSize: 18,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Search projects...',
+                            hintStyle: TextStyle(
+                              color: const Color(0xFF1E1E1E).withOpacity(0.5),
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.search,
+                              color: Color(0xFF1E1E1E),
+                              size: 20,
+                            ),
+                            suffixIcon: IconButton(
+                              icon: const Icon(
+                                Icons.clear,
+                                color: Color(0xFF1E1E1E),
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isSearching = false;
+                                  _searchQuery = '';
+                                  _searchController.clear();
+                                });
+                              },
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                        ),
                       ),
                     ],
                   ],
@@ -465,13 +525,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                   try {
                                     await _projectManager.togglePinProject(project.id, !project.isPinned);
                                     _loadProjects();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(project.isPinned ? 'Project unpinned' : 'Project pinned')),
-                                    );
+                                    _showSuccessDialog('Pin Toggled', project.isPinned ? 'Project unpinned' : 'Project pinned');
                                   } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Error toggling pin: $e')),
-                                    );
+                                    _showErrorDialog('Pin Error', 'Error toggling pin: ${e.toString()}');
                                   }
                                 },
                                 onStatusChanged: _loadProjects,

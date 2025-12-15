@@ -22,6 +22,40 @@ class _AdminAccountActionPageState extends State<AdminAccountActionPage> {
   String selectedDuration = '7 days';
   bool _isProcessing = false;
 
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSuspend = widget.action == 'suspend';
@@ -380,13 +414,7 @@ class _AdminAccountActionPageState extends State<AdminAccountActionPage> {
                               ? null
                               : () async {
                                   if (reasonController.text.trim().isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content:
-                                            Text('Please provide a reason'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
+                                    _showErrorDialog('Reason Required', 'Please provide a reason');
                                     return;
                                   }
 
@@ -402,19 +430,7 @@ class _AdminAccountActionPageState extends State<AdminAccountActionPage> {
                                         userEmail: widget.user['email'],
                                       );
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                                '${widget.user['name']} suspended for $selectedDuration'),
-                                            behavior: SnackBarBehavior.floating,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            backgroundColor: Colors.orange,
-                                          ),
-                                        );
+                                        _showSuccessDialog('User Suspended', '${widget.user['name']} suspended for $selectedDuration');
                                       }
                                     } else {
                                       await _adminService.updateUserStatus(
@@ -424,19 +440,7 @@ class _AdminAccountActionPageState extends State<AdminAccountActionPage> {
                                         userEmail: widget.user['email'],
                                       );
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                                '${widget.user['name']} has been banned'),
-                                            behavior: SnackBarBehavior.floating,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
+                                        _showSuccessDialog('User Banned', '${widget.user['name']} has been banned');
                                       }
                                     }
                                     if (mounted) {
@@ -444,13 +448,7 @@ class _AdminAccountActionPageState extends State<AdminAccountActionPage> {
                                     }
                                   } catch (e) {
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text('Error: $e'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
+                                      _showErrorDialog('Action Failed', 'Error: ${e.toString()}');
                                     }
                                   } finally {
                                     if (mounted) {

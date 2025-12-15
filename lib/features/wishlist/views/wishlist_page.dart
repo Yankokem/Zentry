@@ -165,6 +165,40 @@ class _WishlistPageState extends State<WishlistPage> {
     return _controller?.getCategoryColor(category) ?? Colors.grey;
   }
 
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show loading indicator if controller is not yet initialized
@@ -1170,14 +1204,9 @@ class _WishlistPageState extends State<WishlistPage> {
                 Navigator.pop(context);
                 final success = await _controller!.toggleCompleted(item);
                 if (success && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(isCompleted
-                          ? 'Item marked as not acquired'
-                          : 'Item marked as acquired!'),
-                      backgroundColor:
-                          isCompleted ? Colors.orange : Colors.green,
-                    ),
+                  _showSuccessDialog(
+                    isCompleted ? 'Item Marked as Not Acquired' : 'Item Marked as Acquired',
+                    isCompleted ? 'Item has been marked as not acquired.' : 'Item has been marked as acquired!'
                   );
                 }
               },
@@ -1224,9 +1253,7 @@ class _WishlistPageState extends State<WishlistPage> {
               Navigator.pop(context);
               final success = await _controller!.deleteWish(item);
               if (success && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Item deleted')),
-                );
+                _showSuccessDialog('Item Deleted', 'The item has been successfully deleted.');
               }
             },
             style: ElevatedButton.styleFrom(
@@ -1361,12 +1388,7 @@ class _WishlistPageState extends State<WishlistPage> {
                 ElevatedButton(
                   onPressed: () async {
                     if (nameController.text.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please fill in all fields'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      _showErrorDialog('Validation Error', 'Please fill in all fields');
                       return;
                     }
                     final String name = nameController.text.trim();
@@ -1384,16 +1406,7 @@ class _WishlistPageState extends State<WishlistPage> {
 
                     if (success && mounted) {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Category created successfully'),
-                          backgroundColor: Colors.green,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      );
+                      _showSuccessDialog('Category Created', 'Category created successfully');
                     }
                   },
                   style: ElevatedButton.styleFrom(

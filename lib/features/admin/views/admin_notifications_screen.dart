@@ -16,6 +16,40 @@ class AdminNotificationsScreen extends StatefulWidget {
 class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
   final AdminNotificationService _service = AdminNotificationService();
 
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -29,9 +63,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
             onPressed: () async {
               await _service.markAllAsRead();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('All notifications marked as read')),
-                );
+                _showSuccessDialog('Marked as Read', 'All notifications marked as read');
               }
             },
           ),
@@ -327,9 +359,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading bug report: $e')),
-        );
+        _showErrorDialog('Load Error', 'Error loading bug report: ${e.toString()}');
       }
     }
   }
@@ -348,9 +378,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading appeal: $e')),
-        );
+        _showErrorDialog('Load Error', 'Error loading appeal: ${e.toString()}');
       }
     }
   }

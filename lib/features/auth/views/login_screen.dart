@@ -69,21 +69,11 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else if (mounted) {
         // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_googleController.errorMessage),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorDialog('Google Sign In Failed', _googleController.errorMessage);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Google sign-in failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorDialog('Google Sign-in Failed', 'Failed to sign in with Google: $e');
       }
     }
   }
@@ -92,12 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _controller.emailController.text.trim().toLowerCase();
     
     if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your email first'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      _showErrorDialog('Error', 'Please enter your email first');
       return;
     }
 
@@ -119,24 +104,47 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pop(context); // Close loading dialog
 
       // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password reset email sent! Please check your email and click the link.'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 4),
-        ),
-      );
+      _showSuccessDialog('Password Reset', 'Password reset email sent! Please check your email and click the link.');
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showErrorDialog('Reset Failed', 'Failed to send password reset email: ${e.toString()}');
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

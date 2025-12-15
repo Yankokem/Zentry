@@ -21,6 +21,40 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   final String _userId = FirebaseAuth.instance.currentUser?.uid ?? '';
   final Map<String, String> _invitationResponses = {}; // notificationId -> 'accepted' or 'rejected'
 
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -43,12 +77,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 onPressed: () async {
                   await _notificationManager.markAllAsRead(_userId);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('All notifications marked as read'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
+                    _showSuccessDialog('Marked as Read', 'All notifications marked as read');
                   }
                 },
                 icon: const Icon(Icons.done_all, size: 18),
@@ -312,19 +341,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         setState(() {
           _invitationResponses[notification.id] = 'accepted';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invitation accepted!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        _showSuccessDialog('Invitation Accepted', 'Invitation accepted!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error accepting invitation: $e')),
-        );
+        _showErrorDialog('Accept Error', 'Error accepting invitation: ${e.toString()}');
       }
     }
   }
@@ -389,18 +410,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         setState(() {
           _invitationResponses[notification.id] = 'rejected';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invitation declined'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        _showSuccessDialog('Invitation Declined', 'Invitation declined');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error declining invitation: $e')),
-        );
+        _showErrorDialog('Decline Error', 'Error declining invitation: ${e.toString()}');
       }
     }
   }
@@ -418,19 +432,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       onDismissed: (direction) async {
         await _notificationManager.deleteNotification(_userId, notification.id);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Notification deleted'),
-              action: SnackBarAction(
-                label: 'Undo',
-                onPressed: () {
-                  // In a real implementation, you'd store the deleted notification
-                  // and restore it here
-                },
-              ),
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          _showSuccessDialog('Notification Deleted', 'Notification deleted');
         }
       },
       child: InkWell(
@@ -613,15 +615,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
               );
             } else if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Project not found')),
-              );
+              _showErrorDialog('Project Not Found', 'Project not found');
             }
           } catch (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error loading project: $e')),
-              );
+              _showErrorDialog('Project Load Error', 'Error loading project: ${e.toString()}');
             }
           }
         }
@@ -642,15 +640,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
               );
             } else if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Project not found')),
-              );
+              _showErrorDialog('Project Not Found', 'Project not found');
             }
           } catch (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error loading project: $e')),
-              );
+              _showErrorDialog('Project Load Error', 'Error loading project: ${e.toString()}');
             }
           }
         }
@@ -703,15 +697,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
               );
             } else if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Project not found')),
-              );
+              _showErrorDialog('Project Not Found', 'Project not found');
             }
           } catch (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error loading ticket: $e')),
-              );
+              _showErrorDialog('Ticket Load Error', 'Error loading ticket: ${e.toString()}');
             }
           }
         }

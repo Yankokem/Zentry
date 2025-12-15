@@ -68,12 +68,7 @@ class _SignupScreenState extends State<SignupScreen> {
       if (success) {
         if (!mounted) return;
         // Show success message and redirect to login
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created successfully! Please log in.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        _showSuccessDialog('Account Created', 'Account created successfully! Please log in.');
         // Redirect to login page
         Navigator.pushReplacementNamed(context, AppRoutes.login);
       }
@@ -98,21 +93,11 @@ class _SignupScreenState extends State<SignupScreen> {
       } else {
         // Show error message
         final errorMsg = result['error']?.toString() ?? _googleController.errorMessage;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorDialog('Sign Up Error', errorMsg.toString());
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Google sign-up failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorDialog('Google Sign Up Failed', 'Google sign-up failed: ${e.toString()}');
       }
     }
   }
@@ -142,6 +127,40 @@ class _SignupScreenState extends State<SignupScreen> {
               foregroundColor: Theme.of(context).primaryColor,
             ),
             child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
           ),
         ],
       ),

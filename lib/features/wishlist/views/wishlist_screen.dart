@@ -46,6 +46,40 @@ class _WishlistPageState extends State<WishlistPage> {
     }
   }
 
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredItems = _getFilteredItems();
@@ -670,11 +704,9 @@ class _WishlistPageState extends State<WishlistPage> {
                   _manager.updateItem(item, item.copyWith(completed: !isCompleted));
                 });
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(isCompleted ? 'Item marked as not acquired' : 'Item marked as acquired!'),
-                    backgroundColor: isCompleted ? Colors.orange : Colors.green,
-                  ),
+                _showSuccessDialog(
+                  isCompleted ? 'Item Marked as Not Acquired' : 'Item Marked as Acquired',
+                  isCompleted ? 'Item has been marked as not acquired.' : 'Item has been marked as acquired!'
                 );
               },
             ),
@@ -718,9 +750,7 @@ class _WishlistPageState extends State<WishlistPage> {
                 _manager.removeItem(item);
               });
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Item deleted')),
-              );
+              _showSuccessDialog('Item Deleted', 'The item has been successfully deleted.');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -958,16 +988,7 @@ class _WishlistPageState extends State<WishlistPage> {
                       });
                     });
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Wishlist item added'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    );
+                    _showSuccessDialog('Wishlist Item Added', 'Your wishlist item has been successfully added.');
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -1242,16 +1263,7 @@ class _WishlistPageState extends State<WishlistPage> {
                       ));
                     });
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Wishlist item updated'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    );
+                    _showSuccessDialog('Wishlist Item Updated', 'Your wishlist item has been successfully updated.');
                   }
                 },
                 style: ElevatedButton.styleFrom(

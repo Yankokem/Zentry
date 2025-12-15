@@ -48,13 +48,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
       // If not the project manager, show error and navigate back
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Only project managers can create tickets'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          _showErrorDialog('Access Denied', 'Only project managers can create tickets');
           Navigator.pop(context);
         }
       });
@@ -79,16 +73,50 @@ class _AddTicketPageState extends State<AddTicketPage> {
       case 'yellow':
         return const Color(0xFFF9ED69);
       case 'blue':
-        return Colors.blue.shade300;
+        return const Color(0xFF42A5F5);
       case 'green':
-        return Colors.green.shade300;
+        return const Color(0xFF66BB6A);
       case 'purple':
-        return Colors.purple.shade300;
+        return const Color(0xFFAB47BC);
       case 'red':
-        return Colors.red.shade300;
+        return const Color(0xFFEF5350);
       default:
         return const Color(0xFFF9ED69);
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -111,15 +139,24 @@ class _AddTicketPageState extends State<AddTicketPage> {
         ),
         actions: [
           TextButton(
-            onPressed: _saveTicket,
-            child: const Text(
-              'Save',
-              style: TextStyle(
-                color: Color(0xFF1E1E1E),
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-              ),
-            ),
+            onPressed: _isSaving ? null : _saveTicket,
+            child: _isSaving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF1E1E1E),
+                    ),
+                  )
+                : const Text(
+                    'Save',
+                    style: TextStyle(
+                      color: Color(0xFF1E1E1E),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -646,16 +683,19 @@ class _AddTicketPageState extends State<AddTicketPage> {
       if (_isSaving) return;
 
       if (selectedDeadline == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Please select a deadline for the ticket'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
+        _showErrorDialog('Deadline Required', 'Please select a deadline for the ticket');
+        return;
+      }
+
+      // Validate description is not empty
+      if (_descriptionController.getPlainText().trim().isEmpty) {
+        _showErrorDialog('Description Required', 'Please enter a description for the ticket');
+        return;
+      }
+
+      // Validate at least one assignee is selected
+      if (selectedAssignees.isEmpty) {
+        _showErrorDialog('Assignee Required', 'Please select at least one assignee for the ticket');
         return;
       }
 
@@ -666,19 +706,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
           .toList();
 
       if (pendingAssignees.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Cannot assign to pending members: ${pendingAssignees.join(", ")}. They must accept the project invitation first.',
-            ),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
+        _showErrorDialog('Pending Members', 'Cannot assign to pending members: ${pendingAssignees.join(", ")}. They must accept the project invitation first.');
         return;
       }
 
@@ -690,7 +718,12 @@ class _AddTicketPageState extends State<AddTicketPage> {
         // Upload images if selected
         List<String> imageUrls = [];
         if (_selectedImages.isNotEmpty) {
-          imageUrls = await _uploadTicketImages();
+          try {
+            imageUrls = await _uploadTicketImages();
+          } catch (e) {
+            _showErrorDialog('Image Upload Failed', 'Failed to upload images. Please try again or create ticket without images.');
+            return;
+          }
         }
 
         // Generate ticket number
@@ -721,7 +754,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
           try {
             final currentUserData =
                 await firestoreService.getUserData(currentUser.uid);
-            final currentUserName = currentUserData?['fullName'] ?? 'Someone';
+            final currentUserName = currentUserData?['firstName'] ?? currentUser.email ?? 'Someone';
 
             // Notify each assigned user (except current user)
             for (final assigneeEmail in selectedAssignees) {
@@ -753,19 +786,10 @@ class _AddTicketPageState extends State<AddTicketPage> {
 
         widget.refreshTickets();
 
-        // Show success message BEFORE popping
+        // Show success dialog and navigate back
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Ticket $ticketNumber created'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          );
           Navigator.pop(context);
+          _showSuccessDialog('Ticket Created', 'Your ticket $ticketNumber has been successfully created.');
         }
       } finally {
         if (mounted) {
@@ -819,9 +843,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking images: $e')),
-        );
+        _showErrorDialog('Image Error', 'Error picking images: ${e.toString()}');
       }
     }
   }
@@ -841,9 +863,7 @@ class _AddTicketPageState extends State<AddTicketPage> {
       return uploadedUrls;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading images: $e')),
-        );
+        _showErrorDialog('Upload Error', 'Error uploading images: ${e.toString()}');
       }
       return [];
     }

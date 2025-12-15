@@ -450,31 +450,29 @@ class RichTextEditorController {
       final newOps = <Map<String, dynamic>>[];
       
       for (var op in delta.toJson()) {
-        if (op is Map) {
-          final opMap = Map<String, dynamic>.from(op);
+        final opMap = Map<String, dynamic>.from(op);
+        
+        if (opMap['attributes'] != null) {
+          final attrs = Map<String, dynamic>.from(opMap['attributes'] as Map);
           
-          if (opMap['attributes'] != null) {
-            final attrs = Map<String, dynamic>.from(opMap['attributes'] as Map);
-            
-            // If it's a link with a non-blue color, change it to blue
-            if (attrs.containsKey('link')) {
-              final currentColor = attrs['color'];
-              if (currentColor != '#0000FF' && currentColor != null) {
-                attrs['color'] = '#0000FF';
-                needsUpdate = true;
-              } else if (currentColor == null) {
-                // If no color specified, set to blue
-                attrs['color'] = '#0000FF';
-                needsUpdate = true;
-              }
+          // If it's a link with a non-blue color, change it to blue
+          if (attrs.containsKey('link')) {
+            final currentColor = attrs['color'];
+            if (currentColor != '#0000FF' && currentColor != null) {
+              attrs['color'] = '#0000FF';
+              needsUpdate = true;
+            } else if (currentColor == null) {
+              // If no color specified, set to blue
+              attrs['color'] = '#0000FF';
+              needsUpdate = true;
             }
-            
-            opMap['attributes'] = attrs;
           }
           
-          newOps.add(opMap);
+          opMap['attributes'] = attrs;
         }
-      }
+        
+        newOps.add(opMap);
+            }
       
       // Only update if we changed something, and prevent infinite loop
       if (needsUpdate) {
@@ -498,18 +496,16 @@ class RichTextEditorController {
     final deltaJson = _quillController.document.toDelta().toJson();
     
     // Override link colors to blue to prevent yellow links
-    if (deltaJson is List) {
-      for (var op in deltaJson) {
-        if (op is Map && op['attributes'] != null) {
-          final attrs = op['attributes'] as Map;
-          // If it's a link, set color to blue
-          if (attrs.containsKey('link')) {
-            attrs['color'] = '#0000FF'; // Blue
-          }
+    for (var op in deltaJson) {
+      if (op is Map && op['attributes'] != null) {
+        final attrs = op['attributes'] as Map;
+        // If it's a link, set color to blue
+        if (attrs.containsKey('link')) {
+          attrs['color'] = '#0000FF'; // Blue
         }
       }
     }
-    
+      
     return json.encode(deltaJson);
   }
 

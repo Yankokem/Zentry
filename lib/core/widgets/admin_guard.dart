@@ -9,6 +9,23 @@ class AdminGuard extends StatelessWidget {
 
   AdminGuard({super.key, required this.child});
 
+  void _showErrorDialog(BuildContext context, String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<bool>(
@@ -29,13 +46,7 @@ class AdminGuard extends StatelessWidget {
           // Not an admin - show access denied and redirect
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Access Denied: Admin privileges required'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 3),
-              ),
-            );
+            _showErrorDialog(context, 'Access Denied', 'Admin privileges required');
           });
 
           return Scaffold(

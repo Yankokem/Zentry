@@ -53,12 +53,7 @@ class _JournalPageState extends State<JournalPage> {
         setState(() => _isLoading = false);
         // Only show error if not a permission denied error caused by logout
         if (!error.toString().contains('permission-denied')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error loading entries: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showErrorDialog('Error loading entries', error.toString());
         }
       }
     });
@@ -112,6 +107,40 @@ class _JournalPageState extends State<JournalPage> {
         return Colors.grey;
       }
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -215,27 +244,57 @@ class _JournalPageState extends State<JournalPage> {
                         ],
                       ),
                     ] else ...[
-                      TextField(
-                        controller: _searchController,
-                        autofocus: true,
-                        style: const TextStyle(
-                          color: Color(0xFF1E1E1E),
-                          fontSize: 20,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search entries...',
-                          hintStyle: TextStyle(
-                            color: const Color(0xFF1E1E1E).withOpacity(0.5),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF1E1E1E).withOpacity(0.1),
                           ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
                         ),
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
+                        child: TextField(
+                          controller: _searchController,
+                          autofocus: true,
+                          style: const TextStyle(
+                            color: Color(0xFF1E1E1E),
+                            fontSize: 18,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Search entries...',
+                            hintStyle: TextStyle(
+                              color: const Color(0xFF1E1E1E).withOpacity(0.5),
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.search,
+                              color: Color(0xFF1E1E1E),
+                              size: 20,
+                            ),
+                            suffixIcon: IconButton(
+                              icon: const Icon(
+                                Icons.clear,
+                                color: Color(0xFF1E1E1E),
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isSearching = false;
+                                  _searchQuery = '';
+                                  _searchController.clear();
+                                });
+                              },
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                        ),
                       ),
                     ],
                   ],
@@ -691,16 +750,12 @@ class _JournalPageState extends State<JournalPage> {
                 await _journalService.deleteEntry(entry.id!);
                 Navigator.pop(context);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Entry deleted')),
-                  );
+                  _showSuccessDialog('Entry deleted', 'Your journal entry has been successfully deleted.');
                 }
               } catch (e) {
                 Navigator.pop(context);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
+                  _showErrorDialog('Error', e.toString());
                 }
               }
             },
@@ -775,7 +830,7 @@ class _JournalPageState extends State<JournalPage> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        Wrap(
+                        const Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
@@ -911,22 +966,11 @@ class _JournalPageState extends State<JournalPage> {
                           entry.id!, updatedEntry);
                       Navigator.pop(context);
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Journal entry updated'),
-                            backgroundColor: Colors.green,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        );
+                        _showSuccessDialog('Journal entry updated', 'Your journal entry has been successfully updated.');
                       }
                     } catch (e) {
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e')),
-                        );
+                        _showErrorDialog('Error', e.toString());
                       }
                     }
                   }

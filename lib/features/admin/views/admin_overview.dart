@@ -118,142 +118,163 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
 
   // Support Stats - Shows Bug Reports and Account Appeals
   Widget _buildSupportStats(BuildContext context, bool isTablet) {
-    return Row(
-      children: [
-        Expanded(
-          child: StreamBuilder<List<BugReportModel>>(
-            stream: _bugReportService.getBugReportsStream(),
-            builder: (context, snapshot) {
-              // Show skeleton while loading or if there's an error
-              if (snapshot.connectionState == ConnectionState.waiting || snapshot.hasError) {
-                return const SkeletonStatCard();
-              }
-              
-              final allReports = snapshot.data ?? [];
-              final open = allReports.where((r) => r.status == 'Open').length;
-              final inProgress = allReports.where((r) => r.status == 'In Progress').length;
-              final totalActive = open + inProgress;
-              
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(Icons.bug_report_rounded, 
-                            color: Colors.red.shade600, size: 18),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Bug Reports',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '$totalActive',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$open open, $inProgress in progress',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+    // Use Column on mobile, Row on tablet
+    if (isTablet) {
+      return Row(
+        children: [
+          Expanded(child: _buildBugReportCard()),
+          const SizedBox(width: 12),
+          Expanded(child: _buildAppealCard()),
+        ],
+      );
+    } else {
+      return Column(
+        children: [
+          _buildBugReportCard(),
+          const SizedBox(height: 12),
+          _buildAppealCard(),
+        ],
+      );
+    }
+  }
+
+  Widget _buildBugReportCard() {
+    return StreamBuilder<List<BugReportModel>>(
+      stream: _bugReportService.getBugReportsStream(),
+      builder: (context, snapshot) {
+        // Show skeleton while loading or if there's an error
+        if (snapshot.connectionState == ConnectionState.waiting || snapshot.hasError) {
+          return const SkeletonStatCard();
+        }
+        
+        final allReports = snapshot.data ?? [];
+        final open = allReports.where((r) => r.status == 'Open').length;
+        final inProgress = allReports.where((r) => r.status == 'In Progress').length;
+        final totalActive = open + inProgress;
+        
+        return Container(
+          width: double.infinity, // Ensure full width on mobile
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: StreamBuilder<List<AccountAppealModel>>(
-            stream: _appealService.getAppealsStream(),
-            builder: (context, snapshot) {
-              // Show skeleton while loading or if there's an error
-              if (snapshot.connectionState == ConnectionState.waiting || snapshot.hasError) {
-                return const SkeletonStatCard();
-              }
-              
-              final allAppeals = snapshot.data ?? [];
-              final pending = allAppeals.where((a) => a.status == 'Pending').length;
-              
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(Icons.security_rounded, 
-                            color: Colors.orange.shade600, size: 18),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Pending Appeals',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade100,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '$pending',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Awaiting review',
+                    child: Icon(Icons.bug_report_rounded, 
+                      color: Colors.red.shade600, size: 18),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible( // Use Flexible to prevent overflow
+                    child: const Text(
+                      'Bug Reports',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '$totalActive',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
-              );
-            },
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$open open, $inProgress in progress',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAppealCard() {
+    return StreamBuilder<List<AccountAppealModel>>(
+      stream: _appealService.getAppealsStream(),
+      builder: (context, snapshot) {
+        // Show skeleton while loading or if there's an error
+        if (snapshot.connectionState == ConnectionState.waiting || snapshot.hasError) {
+          return const SkeletonStatCard();
+        }
+        
+        final allAppeals = snapshot.data ?? [];
+        final pending = allAppeals.where((a) => a.status == 'Pending').length;
+        
+        return Container(
+          width: double.infinity, // Ensure full width on mobile
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.security_rounded, 
+                      color: Colors.orange.shade600, size: 18),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible( // Use Flexible to prevent overflow
+                    child: const Text(
+                      'Pending Appeals',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '$pending',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'awaiting review',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -281,88 +302,185 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
               color: Colors.blue.shade50,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.bar_chart_rounded, color: Colors.blue.shade700, size: 20),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'User Activity Overview',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E1E1E),
-                    ),
-                  ),
-                ),
-                // Time interval dropdown
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: DropdownButton<String>(
-                    value: _activityInterval,
-                    underline: const SizedBox(),
-                    isDense: true,
-                    items: ['Daily', 'Weekly', 'Monthly']
-                        .map((interval) => DropdownMenuItem(
-                              value: interval,
-                              child: Text(
-                                interval,
-                                style: const TextStyle(fontSize: 12),
+            child: isTablet 
+                ? Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.bar_chart_rounded, color: Colors.blue.shade700, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'User Activity Overview',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1E1E),
+                          ),
+                        ),
+                      ),
+                      // Time interval dropdown
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: DropdownButton<String>(
+                          value: _activityInterval,
+                          underline: const SizedBox(),
+                          isDense: true,
+                          items: ['Daily', 'Weekly', 'Monthly']
+                              .map((interval) => DropdownMenuItem(
+                                    value: interval,
+                                    child: Text(
+                                      interval,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _activityInterval = value);
+                              _loadActivityData();
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Item type dropdown
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: DropdownButton<String>(
+                          value: _activityType,
+                          underline: const SizedBox(),
+                          isDense: true,
+                          items: ['All', 'Projects', 'Journal', 'Wishlist']
+                              .map((type) => DropdownMenuItem(
+                                    value: type,
+                                    child: Text(
+                                      type,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _activityType = value);
+                              _loadActivityData();
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade100,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(Icons.bar_chart_rounded, color: Colors.blue.shade700, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'User Activity Overview',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E1E1E),
                               ),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _activityInterval = value);
-                        _loadActivityData();
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Item type dropdown
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: DropdownButton<String>(
-                    value: _activityType,
-                    underline: const SizedBox(),
-                    isDense: true,
-                    items: ['All', 'Projects', 'Journal', 'Wishlist']
-                        .map((type) => DropdownMenuItem(
-                              value: type,
-                              child: Text(
-                                type,
-                                style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade300),
                               ),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _activityType = value);
-                        _loadActivityData();
-                      }
-                    },
+                              child: DropdownButton<String>(
+                                value: _activityInterval,
+                                underline: const SizedBox(),
+                                isDense: true,
+                                isExpanded: true,
+                                items: ['Daily', 'Weekly', 'Monthly']
+                                    .map((interval) => DropdownMenuItem(
+                                          value: interval,
+                                          child: Text(
+                                            interval,
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                        ))
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() => _activityInterval = value);
+                                    _loadActivityData();
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: DropdownButton<String>(
+                                value: _activityType,
+                                underline: const SizedBox(),
+                                isDense: true,
+                                isExpanded: true,
+                                items: ['All', 'Projects', 'Journal', 'Wishlist']
+                                    .map((type) => DropdownMenuItem(
+                                          value: type,
+                                          child: Text(
+                                            type,
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                        ))
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() => _activityType = value);
+                                    _loadActivityData();
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
           // Chart
           Padding(
@@ -706,6 +824,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
     Color color,
   ) {
     return Container(
+      width: double.infinity, // Ensure full width
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
@@ -735,23 +854,26 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: color,
                   ),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                  ),
+                  maxLines: 2, // Prevent text overflow
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
-            ),
-          ),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade500,
             ),
           ),
         ],
@@ -759,7 +881,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage>
     );
   }
 
-  // User Sign-ups Trend Chart with Filters
+  // User Sign-ups Trend
   Widget _buildSignupTrendChart(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -1613,9 +1613,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-      // Uncomment to enable test notifications (development only)
-      floatingActionButton: const TestNotificationButton(),
-    );
+          );
   }
 }
 

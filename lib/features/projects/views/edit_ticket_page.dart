@@ -366,6 +366,40 @@ class _EditTicketPageState extends State<EditTicketPage> {
     }
   }
 
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -913,16 +947,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
   void _saveChanges() async {
     if (_formKey.currentState!.validate()) {
       if (selectedDeadline == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Please select a deadline for the ticket'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
+        _showErrorDialog('Deadline Required', 'Please select a deadline for the ticket');
         return;
       }
 
@@ -1181,16 +1206,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
 
       Navigator.pop(context);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Ticket updated successfully'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      );
+      _showSuccessDialog('Ticket Updated', 'Ticket updated successfully');
     }
   }
 
@@ -1210,9 +1226,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking images: $e')),
-        );
+        _showErrorDialog('Image Error', 'Error picking images: ${e.toString()}');
       }
     }
   }
@@ -1232,9 +1246,7 @@ class _EditTicketPageState extends State<EditTicketPage> {
       return uploadedUrls;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading images: $e')),
-        );
+        _showErrorDialog('Upload Error', 'Error uploading images: ${e.toString()}');
       }
       return [];
     }

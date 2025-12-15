@@ -35,6 +35,40 @@ class _AdminAppealDetailsScreenState extends State<AdminAppealDetailsScreen> {
     super.dispose();
   }
 
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM d, yyyy • hh:mm a');
@@ -566,17 +600,13 @@ class _AdminAppealDetailsScreenState extends State<AdminAppealDetailsScreen> {
   Future<void> _submitDecision() async {
     // Validate required fields
     if (_selectedStatus.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a decision')),
-      );
+      _showErrorDialog('Decision Required', 'Please select a decision');
       return;
     }
 
     // Only require reason if not upholding decision
     if (_selectedStatus != 'Uphold Decision' && _reasonController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please provide a reason for this decision')),
-      );
+      _showErrorDialog('Reason Required', 'Please provide a reason for this decision');
       return;
     }
 
@@ -588,15 +618,11 @@ class _AdminAppealDetailsScreenState extends State<AdminAppealDetailsScreen> {
         _reasonController.text,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Appeal decision submitted successfully')),
-      );
+      _showSuccessDialog('Decision Submitted', 'Appeal decision submitted successfully');
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error submitting decision: $e')),
-      );
+      _showErrorDialog('Submit Error', 'Error submitting decision: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() => _isUpdating = false);
@@ -626,9 +652,7 @@ class _AdminAppealDetailsScreenState extends State<AdminAppealDetailsScreen> {
     if (confirmed != true) return;
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Appeal deletion not yet implemented')),
-    );
+    _showErrorDialog('Not Implemented', 'Appeal deletion not yet implemented');
   }
 
   Color _getStatusColor(String status) {

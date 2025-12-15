@@ -37,7 +37,6 @@ export 'widgets/stat_card.dart';
 export 'widgets/compact_calendar_widget.dart';
 export 'widgets/admin_guard.dart';
 export 'widgets/skeleton_loader.dart';
-export 'widgets/test_notification_button.dart';
 
 // Providers
 export 'providers/wishlist_provider.dart';

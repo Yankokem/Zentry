@@ -75,9 +75,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
   Future<void> _pickImage() async {
     try {
       if (_selectedImages.length >= _maxImages) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Maximum $_maxImages images allowed')),
-        );
+        _showErrorDialog('Maximum Images', 'Maximum $_maxImages images allowed');
         return;
       }
 
@@ -96,9 +94,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        _showErrorDialog('Error Picking Image', e.toString());
       }
     }
   }
@@ -338,25 +334,16 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
     }
     setState(() => _isLoading = false);
 
-    if (success && mounted) {
+    if (success) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(widget.itemToEdit != null
-              ? 'Wishlist item updated'
-              : 'Wishlist item added'),
-          backgroundColor: AppTheme.success,
-          behavior: SnackBarBehavior.floating,
-        ),
+      _showSuccessDialog(
+        widget.itemToEdit != null ? 'Wishlist Item Updated' : 'Wishlist Item Added',
+        widget.itemToEdit != null 
+            ? 'Your wishlist item has been successfully updated.'
+            : 'Your wishlist item has been successfully added.'
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to save wishlist item'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showErrorDialog('Failed to Save', 'Failed to save wishlist item. Please try again.');
     }
   }
 
@@ -474,12 +461,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (nameController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter a category name'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      _showErrorDialog('Validation Error', 'Please enter a category name');
                       return;
                     }
 
@@ -499,12 +481,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
 
                     if (success && mounted) {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Category created successfully'),
-                          backgroundColor: AppTheme.success,
-                        ),
-                      );
+                      _showSuccessDialog('Category Created', 'Category created successfully');
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -557,13 +534,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
   void _selectSuggestedEmail(String email) async {
     if (_teamMembers.contains(email)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This email is already added to the shared list'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Email Already Added', 'This email is already added to the shared list');
       }
       return;
     }
@@ -577,32 +548,14 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
             _newMemberController.clear();
             _suggestedEmails.clear();
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Email added successfully'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          _showSuccessDialog('Email Added', 'Email added successfully');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No account found with this email'),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          _showErrorDialog('Account Not Found', 'No account found with this email');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error checking account: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorDialog('Error Checking Account', 'Error checking account: ${e.toString()}');
       }
     }
   }
@@ -630,6 +583,40 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       'Dec'
     ];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.error, color: Colors.red, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        icon: const Icon(Icons.check_circle, color: Colors.green, size: 32),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
